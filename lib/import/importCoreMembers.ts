@@ -197,10 +197,10 @@ export async function importCoreMembers(
         insertedRows++
 
         // Provision Supabase Auth user for new Mumin
-        // email = {its_no}@mumin.local, default password = Sabeel_No
+        // email = {its_no}@mumin.local, default password = PACI_NO
         const { data: authUser, error: authErr } = await admin.auth.admin.createUser({
           email: `${row.ITS_NO}@mumin.local`,
-          password: row.Sabeel_No,
+          password: row.PACI_NO,
           email_confirm: true,
           app_metadata: {
             its_no: parseInt(row.ITS_NO),

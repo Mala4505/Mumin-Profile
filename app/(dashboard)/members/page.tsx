@@ -14,6 +14,8 @@ interface PageProps {
     balig_status?: string
     status?: string
     search?: string
+    paci_no?: string
+    show_all?: string
   }>
 }
 
@@ -30,12 +32,22 @@ export default async function MembersPage({ searchParams }: PageProps) {
     balig_status: params.balig_status as 'Balig' | 'Ghair Balig' | undefined,
     status: params.status as MemberFilters['status'],
     search: params.search,
+    paci_no: params.paci_no,
   }
 
+  // Determine if the user has actively requested data
+  const showAll = params.show_all === '1'
+  const hasActiveFilter = showAll || Boolean(
+    params.search || params.sector_id || params.subsector_id ||
+    params.gender || params.balig_status || params.status || params.paci_no
+  )
+
   const [members, sectors] = await Promise.all([
-    getMembers(filters),
+    hasActiveFilter ? getMembers(filters) : Promise.resolve([]),
     getSectors(),
   ])
+
+  const mode: 'idle' | 'loaded' = hasActiveFilter ? 'loaded' : 'idle'
 
   return (
     <div className="p-4 md:p-6 lg:p-8">
@@ -44,10 +56,12 @@ export default async function MembersPage({ searchParams }: PageProps) {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Members</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {members.length} member{members.length !== 1 ? 's' : ''} found
+            {mode === 'idle'
+              ? 'Search or filter to find members'
+              : `${members.length} member${members.length !== 1 ? 's' : ''} found`}
           </p>
         </div>
-        {session.role !== 'Mumin' && (
+        {session.role !== 'Mumin' && mode === 'loaded' && (
           <a
             href={`/reports?${new URLSearchParams(params as Record<string, string>).toString()}`}
             className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors self-start sm:self-auto"
@@ -58,8 +72,13 @@ export default async function MembersPage({ searchParams }: PageProps) {
         )}
       </div>
 
-      <MemberFiltersBar sectors={sectors} currentFilters={filters} role={session.role} />
-      <MemberTable members={members} role={session.role} />
+      <MemberFiltersBar
+        sectors={sectors}
+        currentFilters={filters}
+        role={session.role}
+        showAll={showAll}
+      />
+      <MemberTable members={members} role={session.role} mode={mode} />
     </div>
   )
 }

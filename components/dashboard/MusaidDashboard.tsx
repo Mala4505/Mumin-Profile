@@ -33,6 +33,15 @@ const StarIcon = () => (
   </svg>
 )
 
+const BuildingIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z" />
+    <path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2" />
+    <path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2" />
+    <path d="M10 6h4" /><path d="M10 10h4" /><path d="M10 14h4" /><path d="M10 18h4" />
+  </svg>
+)
+
 interface Props {
   stats: MusaidStats
 }
@@ -48,7 +57,7 @@ export default function MusaidDashboard({ stats }: Props) {
         )}
       </div>
 
-      {/* 2x2 Stat Cards */}
+      {/* Stat Cards — row 1: members */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Total Members"
@@ -84,6 +93,34 @@ export default function MusaidDashboard({ stats }: Props) {
         />
       </div>
 
+      {/* Stat Cards — row 2: buildings, flats & families */}
+      <div className="grid grid-cols-3 gap-4">
+        <StatCard
+          title="Buildings"
+          value={stats.totalBuildings}
+          subtitle="In this subsector"
+          icon={<BuildingIcon />}
+          iconBg="bg-blue-100"
+          iconColor="text-blue-600"
+        />
+        <StatCard
+          title="Flats"
+          value={stats.totalFlats}
+          subtitle="By PACI no."
+          icon={<BuildingIcon />}
+          iconBg="bg-amber-100"
+          iconColor="text-amber-600"
+        />
+        <StatCard
+          title="Families"
+          value={stats.totalFamilies}
+          subtitle="By Sabeel no."
+          icon={<UsersIcon />}
+          iconBg="bg-teal-100"
+          iconColor="text-teal-600"
+        />
+      </div>
+
       {/* Balig Summary Card */}
       <div className="bg-card border border-border rounded-xl p-6">
         <h2 className="text-base font-semibold text-foreground mb-5">Balig vs Ghair Balig</h2>
@@ -115,6 +152,44 @@ export default function MusaidDashboard({ stats }: Props) {
               className="h-full bg-border rounded-r-full transition-all duration-500"
               style={{ width: `${Math.round((stats.ghairBaligCount / stats.muminCount) * 100)}%` }}
             />
+          </div>
+        )}
+      </div>
+
+      {/* Buildings */}
+      <div>
+        <h2 className="text-base font-semibold text-foreground mb-4">Buildings</h2>
+        {stats.buildings.length === 0 ? (
+          <div className="bg-card border border-border rounded-xl p-8 text-center text-muted-foreground">
+            No buildings found in this subsector.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {stats.buildings.map((b) => {
+              const pct = stats.totalFlats > 0
+                ? Math.round((b.flat_count / stats.totalFlats) * 100)
+                : 0
+              return (
+                <div
+                  key={b.building_id}
+                  className="bg-card border border-border rounded-xl p-5 hover:border-primary/40 hover:shadow-md transition-all duration-200"
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <h3 className="font-semibold text-foreground">{b.building_name}</h3>
+                    <span className="text-sm font-bold text-primary tabular-nums">{b.flat_count}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    {b.flat_count} flat{b.flat_count !== 1 ? 's' : ''} · {pct}% of subsector
+                  </p>
+                  <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-blue-500 rounded-full transition-all duration-500"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+              )
+            })}
           </div>
         )}
       </div>

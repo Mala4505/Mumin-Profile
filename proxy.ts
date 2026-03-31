@@ -43,9 +43,10 @@ export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname
   const isLoginRoute = pathname.startsWith('/login')
   const isChangePasswordRoute = pathname.startsWith('/change-password')
+  const isPublicApiRoute = pathname.startsWith('/api/auth/')
 
   // Redirect unauthenticated users to login
-  if (!user && !isLoginRoute && !isChangePasswordRoute) {
+  if (!user && !isLoginRoute && !isChangePasswordRoute && !isPublicApiRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
@@ -76,11 +77,13 @@ export async function proxy(request: NextRequest) {
 
     // Role-based route protection
     const role = appMeta.role
+    // /admin pages: SuperAdmin only
     if (pathname.startsWith('/admin') && role !== 'SuperAdmin') {
       const url = request.nextUrl.clone()
       url.pathname = '/dashboard'
       return NextResponse.redirect(url)
     }
+    // /import pages: all staff except Mumin
     if (pathname.startsWith('/import') && role === 'Mumin') {
       const url = request.nextUrl.clone()
       url.pathname = '/members'

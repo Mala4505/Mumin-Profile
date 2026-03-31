@@ -163,7 +163,7 @@ export default function SuperAdminDashboard({ stats }: Props) {
       </div>
 
       {/* ── 2. Stat Cards ───────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Total Mumineen"
           value={stats.totalMumineen}
@@ -181,6 +181,14 @@ export default function SuperAdminDashboard({ stats }: Props) {
           iconColor="text-green-600"
         />
         <StatCard
+          title="Sectors"
+          value={stats.totalSectors}
+          subtitle={`${stats.totalSubsectors} subsectors`}
+          icon={<MapPinIcon />}
+          iconBg="bg-secondary/20"
+          iconColor="text-secondary-foreground"
+        />
+        <StatCard
           title="Login Accounts"
           value={stats.totalUsers}
           subtitle="Mumineen with login"
@@ -188,21 +196,33 @@ export default function SuperAdminDashboard({ stats }: Props) {
           iconBg="bg-purple-100"
           iconColor="text-purple-600"
         />
+      </div>
+
+      {/* ── 2b. Building, Flat & Family Stat Cards ──────────────────────── */}
+      <div className="grid grid-cols-3 gap-4">
         <StatCard
-          title="Sectors"
-          value={stats.totalSectors}
-          subtitle="Active sectors"
-          icon={<MapPinIcon />}
-          iconBg="bg-secondary/20"
-          iconColor="text-secondary-foreground"
-        />
-        <StatCard
-          title="Subsectors"
-          value={stats.totalSubsectors}
-          subtitle="Across all sectors"
+          title="Buildings"
+          value={stats.totalBuildings}
+          subtitle="Registered buildings"
           icon={<Building2Icon />}
           iconBg="bg-blue-100"
           iconColor="text-blue-600"
+        />
+        <StatCard
+          title="Flats"
+          value={stats.totalFlats}
+          subtitle="By PACI no."
+          icon={<Building2Icon />}
+          iconBg="bg-amber-100"
+          iconColor="text-amber-600"
+        />
+        <StatCard
+          title="Families"
+          value={stats.totalFamilies}
+          subtitle="By Sabeel no."
+          icon={<UsersIcon />}
+          iconBg="bg-teal-100"
+          iconColor="text-teal-600"
         />
       </div>
 
@@ -278,7 +298,13 @@ export default function SuperAdminDashboard({ stats }: Props) {
                   <th className="text-right px-5 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hidden sm:table-cell">
                     Subsectors
                   </th>
-                  <th className="text-left px-5 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hidden md:table-cell w-40">
+                  <th className="text-right px-5 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hidden md:table-cell">
+                    Buildings
+                  </th>
+                  <th className="text-right px-5 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hidden md:table-cell">
+                    Flats
+                  </th>
+                  <th className="text-left px-5 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hidden lg:table-cell w-40">
                     Coverage
                   </th>
                 </tr>
@@ -303,7 +329,13 @@ export default function SuperAdminDashboard({ stats }: Props) {
                       <td className="px-5 py-3.5 text-right text-muted-foreground hidden sm:table-cell tabular-nums">
                         {sector.subsector_count}
                       </td>
-                      <td className="px-5 py-3.5 hidden md:table-cell">
+                      <td className="px-5 py-3.5 text-right text-muted-foreground hidden md:table-cell tabular-nums">
+                        {sector.building_count}
+                      </td>
+                      <td className="px-5 py-3.5 text-right text-muted-foreground hidden md:table-cell tabular-nums">
+                        {sector.flat_count}
+                      </td>
+                      <td className="px-5 py-3.5 hidden lg:table-cell">
                         <div className="flex items-center gap-2">
                           <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
                             <div
@@ -325,7 +357,40 @@ export default function SuperAdminDashboard({ stats }: Props) {
         )}
       </div>
 
-      {/* ── 5. Recent Activity Feed ─────────────────────────────────────── */}
+      {/* ── 5. Buildings Overview ───────────────────────────────────────── */}
+      <div>
+        <h2 className="text-base font-semibold text-foreground mb-3">Buildings Overview</h2>
+        {stats.sectors.every(s => s.building_count === 0) ? (
+          <div className="bg-card border border-border rounded-lg p-8 text-center text-muted-foreground text-sm">
+            No buildings found.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {stats.sectors.filter(s => s.building_count > 0).map(sector => (
+              <div
+                key={sector.sector_id}
+                className="bg-card border border-border rounded-lg p-4 hover:border-primary/40 transition-colors"
+              >
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                  {sector.sector_name}
+                </p>
+                <div className="flex items-end justify-between">
+                  <div>
+                    <p className="text-2xl font-bold text-foreground tabular-nums">{sector.building_count}</p>
+                    <p className="text-xs text-muted-foreground">building{sector.building_count !== 1 ? 's' : ''}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-lg font-semibold text-primary tabular-nums">{sector.flat_count}</p>
+                    <p className="text-xs text-muted-foreground">flat{sector.flat_count !== 1 ? 's' : ''}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── 6. Recent Activity Feed ─────────────────────────────────────── */}
       <div>
         <h2 className="text-base font-semibold text-foreground mb-3">Recent Activity</h2>
         <div className="bg-card border border-border rounded-lg overflow-hidden">

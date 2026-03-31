@@ -1,6 +1,6 @@
 import type { Database } from './database'
 
-export type Role = 'SuperAdmin' | 'Masool' | 'Musaid' | 'Mumin'
+export type Role = 'SuperAdmin' | 'Admin' | 'Masool' | 'Musaid' | 'Mumin'
 
 export type MuminStatus = 'active' | 'deceased' | 'relocated' | 'left_community' | 'inactive'
 
@@ -39,7 +39,7 @@ export interface SessionUser {
   must_change_password: boolean
 }
 
-// Member list item (joins mumin with subsector/sector)
+// Member list item (joins mumin with subsector/sector/house/building)
 // Note: canonical definition lives in lib/members/getMembers.ts — this re-exports it for convenience
 export interface MemberListItem {
   its_no: number
@@ -53,6 +53,13 @@ export interface MemberListItem {
   sector_id: number
   sector_name: string
   sabeel_no: string
+  // House/building fields (null if no house record found)
+  paci_no: string | null
+  floor_no: string | null
+  flat_no: string | null
+  building_name: string | null
+  building_id: number | null
+  landmark: string | null
 }
 
 // Filters for member list
@@ -64,4 +71,5 @@ export interface MemberFilters {
   balig_status?: 'Balig' | 'Ghair Balig'
   status?: MuminStatus
   search?: string
+  paci_no?: string
 }

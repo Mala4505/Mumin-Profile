@@ -30,25 +30,25 @@ const NAV_ITEMS: NavItem[] = [
     label: 'Dashboard',
     href: '/dashboard',
     icon: LayoutDashboard,
-    roles: ['SuperAdmin', 'Masool', 'Musaid', 'Mumin'],
+    roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid', 'Mumin'],
   },
   {
     label: 'Members',
     href: ROUTES.MEMBERS,
     icon: Users,
-    roles: ['SuperAdmin', 'Masool', 'Musaid'],
+    roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid'],
   },
   {
     label: 'Import',
     href: ROUTES.IMPORT,
     icon: Upload,
-    roles: ['SuperAdmin'],
+    roles: ['SuperAdmin', 'Admin', 'Masool'],
   },
   {
     label: 'Reports',
     href: ROUTES.REPORTS,
     icon: BarChart3,
-    roles: ['SuperAdmin', 'Masool', 'Musaid'],
+    roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid'],
   },
   {
     label: 'Admin',
@@ -60,6 +60,7 @@ const NAV_ITEMS: NavItem[] = [
 
 const ROLE_LABELS: Record<Role, string> = {
   SuperAdmin: 'Super Admin',
+  Admin: 'Admin',
   Masool: 'Masool',
   Musaid: 'Musaid',
   Mumin: 'Mumin',

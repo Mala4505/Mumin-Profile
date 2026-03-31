@@ -1,15 +1,13 @@
 import type { SessionUser, MemberFilters } from '@/lib/types/app'
 
 export function canViewAllMembers(user: SessionUser): boolean {
-  return user.role === 'SuperAdmin' || user.role === 'Masool' || user.role === 'Musaid'
+  return user.role === 'SuperAdmin' || user.role === 'Admin' || user.role === 'Masool' || user.role === 'Musaid'
 }
 
 export function canEditMember(user: SessionUser, memberSubsectorId: number): boolean {
   if (user.role === 'SuperAdmin') return true
-  if (user.role === 'Masool') {
-    // Masool edits any member in their sectors — subsector_id check happens via DB
-    return true
-  }
+  if (user.role === 'Admin') return true
+  if (user.role === 'Masool') return true
   if (user.role === 'Musaid') {
     return user.subsector_ids.includes(memberSubsectorId)
   }
@@ -18,7 +16,7 @@ export function canEditMember(user: SessionUser, memberSubsectorId: number): boo
 
 export function canRunCsvImport(user: SessionUser, importType: 'core' | 'profile'): boolean {
   if (user.role === 'SuperAdmin') return true
-  if (user.role === 'Masool' && importType === 'profile') return true
+  if ((user.role === 'Admin' || user.role === 'Masool') && importType === 'profile') return true
   return false
 }
 
@@ -27,12 +25,12 @@ export function canManageUsers(user: SessionUser): boolean {
 }
 
 export function canAssignSubsectors(user: SessionUser): boolean {
-  return user.role === 'SuperAdmin' || user.role === 'Masool'
+  return user.role === 'SuperAdmin' || user.role === 'Admin' || user.role === 'Masool'
 }
 
 export function canViewProfileField(user: SessionUser, visibilityLevel: 1 | 2 | 3): boolean {
   if (user.role === 'SuperAdmin') return true
-  if (user.role === 'Masool' || user.role === 'Musaid') return visibilityLevel <= 2
+  if (user.role === 'Admin' || user.role === 'Masool' || user.role === 'Musaid') return visibilityLevel <= 2
   if (user.role === 'Mumin') return visibilityLevel === 1
   return false
 }
@@ -41,6 +39,8 @@ export function canViewProfileField(user: SessionUser, visibilityLevel: 1 | 2 | 
 export function getScopedFilters(user: SessionUser): Partial<MemberFilters> {
   // SuperAdmin sees everything — no additional filter
   if (user.role === 'SuperAdmin') return {}
+  // Admin: filtered to their sectors at DB level via RLS (same as Masool)
+  if (user.role === 'Admin') return {}
   // Masool: filtered to their sectors at DB level via RLS
   if (user.role === 'Masool') return {}
   // Musaid: filtered to their subsectors at DB level via RLS

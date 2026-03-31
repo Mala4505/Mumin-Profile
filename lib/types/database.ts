@@ -42,7 +42,7 @@ export type Database = {
           status: 'active' | 'deceased' | 'relocated' | 'left_community' | 'inactive'
           status_changed_at: string | null; status_notes: string | null; notes: string | null
           created_at: string; updated_at: string
-          role: 'SuperAdmin' | 'Masool' | 'Musaid' | 'Mumin'
+          role: 'SuperAdmin' | 'Admin' | 'Masool' | 'Musaid' | 'Mumin'
           supabase_auth_id: string | null
           is_active: boolean
           must_change_password: boolean
@@ -57,7 +57,7 @@ export type Database = {
           status?: 'active' | 'deceased' | 'relocated' | 'left_community' | 'inactive'
           status_changed_at?: string | null; status_notes?: string | null; notes?: string | null
           created_at?: string; updated_at?: string
-          role?: 'SuperAdmin' | 'Masool' | 'Musaid' | 'Mumin'
+          role?: 'SuperAdmin' | 'Admin' | 'Masool' | 'Musaid' | 'Mumin'
           supabase_auth_id?: string | null
           is_active?: boolean
           must_change_password?: boolean
@@ -72,7 +72,7 @@ export type Database = {
           status?: 'active' | 'deceased' | 'relocated' | 'left_community' | 'inactive'
           status_changed_at?: string | null; status_notes?: string | null; notes?: string | null
           created_at?: string; updated_at?: string
-          role?: 'SuperAdmin' | 'Masool' | 'Musaid' | 'Mumin'
+          role?: 'SuperAdmin' | 'Admin' | 'Masool' | 'Musaid' | 'Mumin'
           supabase_auth_id?: string | null
           is_active?: boolean
           must_change_password?: boolean

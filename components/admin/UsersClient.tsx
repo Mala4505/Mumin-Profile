@@ -23,11 +23,12 @@ interface Props {
   subsectors: Subsector[]
 }
 
-const ROLES = ['SuperAdmin', 'Masool', 'Musaid', 'Mumin'] as const
+const ROLES = ['SuperAdmin', 'Admin', 'Masool', 'Musaid', 'Mumin'] as const
 type Role = typeof ROLES[number]
 
 const ROLE_COLORS: Record<string, string> = {
   SuperAdmin: 'bg-purple-100 text-purple-700',
+  Admin: 'bg-amber-100 text-amber-700',
   Masool: 'bg-primary/10 text-primary',
   Musaid: 'bg-blue-100 text-blue-700',
   Mumin: 'bg-muted text-muted-foreground',
@@ -85,12 +86,12 @@ export function UsersClient({ initialUsers, sectors, subsectors }: Props) {
     }
 
     // Only send assignments relevant to the new role
-    if (editRole === 'Masool') {
+    if (editRole === 'Admin' || editRole === 'Masool') {
       body.sector_ids = editSectorIds
-      body.subsector_ids = [] // clear subsectors if switching to Masool
+      body.subsector_ids = [] // clear subsectors
     } else if (editRole === 'Musaid') {
       body.subsector_ids = editSubsectorIds
-      body.sector_ids = [] // clear sectors if switching to Musaid
+      body.sector_ids = [] // clear sectors
     } else {
       body.sector_ids = []
       body.subsector_ids = []
@@ -116,7 +117,7 @@ export function UsersClient({ initialUsers, sectors, subsectors }: Props) {
             ...u,
             role: editRole,
             is_active: editActive,
-            sector: editRole === 'Masool' ? editSectorIds.map(id => ({ sector_id: id })) : [],
+            sector: (editRole === 'Admin' || editRole === 'Masool') ? editSectorIds.map(id => ({ sector_id: id })) : [],
             subsector: editRole === 'Musaid' ? editSubsectorIds.map(id => ({ subsector_id: id })) : [],
           }
         : u
@@ -211,7 +212,7 @@ export function UsersClient({ initialUsers, sectors, subsectors }: Props) {
               {/* Role */}
               <div>
                 <label className="block text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Role</label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   {ROLES.map(r => (
                     <button
                       key={r}
@@ -252,8 +253,8 @@ export function UsersClient({ initialUsers, sectors, subsectors }: Props) {
                 </div>
               </div>
 
-              {/* Sector assignments — Masool only */}
-              {editRole === 'Masool' && (
+              {/* Sector assignments — Admin and Masool */}
+              {(editRole === 'Admin' || editRole === 'Masool') && (
                 <div>
                   <label className="block text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">
                     Assigned Sectors

@@ -9,15 +9,15 @@ import {
   Eye,
   EyeOff,
   AlertCircle,
-  Loader2,
   LogIn,
 } from 'lucide-react'
+import { LumaSpin } from '@/components/ui/luma-spin'
 
 export function LoginForm() {
   const router = useRouter()
   const [itsNo, setItsNo] = useState('')
-  const [password, setPassword] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
+  const [paciNo, setPaciNo] = useState('')
+  const [showPaci, setShowPaci] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -26,22 +26,41 @@ export function LoginForm() {
     setError('')
     setLoading(true)
 
-    const supabase = createClient()
-    const email = `${itsNo}@mumin.local`
+    try {
+      // Step 1: Validate ITS + PACI server-side; get derived credentials
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ its_no: itsNo, paci_no: paciNo }),
+      })
 
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+      const data = await res.json()
 
-    if (authError) {
-      setError('Invalid ITS No or password. Please try again.')
+      if (!res.ok) {
+        setError(data.error ?? 'Invalid ITS No or PACI No. Please try again.')
+        setLoading(false)
+        return
+      }
+
+      // Step 2: Sign in with HMAC-derived credentials
+      const supabase = createClient()
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email: data.email,
+        password: data.password,
+      })
+
+      if (authError) {
+        setError('Sign in failed. Please try again.')
+        setLoading(false)
+        return
+      }
+
+      router.push('/dashboard')
+      router.refresh()
+    } catch {
+      setError('Something went wrong. Please try again.')
       setLoading(false)
-      return
     }
-
-    router.push('/dashboard')
-    router.refresh()
   }
 
   return (
@@ -55,7 +74,7 @@ export function LoginForm() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6" noValidate>
-        {/* ITS Number field */}
+        {/* ITS Number */}
         <div>
           <label
             htmlFor="its_no"
@@ -79,10 +98,10 @@ export function LoginForm() {
           />
         </div>
 
-        {/* Password field */}
+        {/* PACI Number */}
         <div>
           <label
-            htmlFor="password"
+            htmlFor="paci_no"
             className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-2"
           >
             <Lock className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
@@ -90,22 +109,23 @@ export function LoginForm() {
           </label>
           <div className="relative">
             <input
-              id="password"
-              type={showPassword ? 'text' : 'password'}
-              value={password}
-              onChange={e => setPassword(e.target.value)}
+              id="paci_no"
+              type={showPaci ? 'text' : 'password'}
+              inputMode="numeric"
+              value={paciNo}
+              onChange={e => setPaciNo(e.target.value)}
               className="w-full border border-border rounded-lg h-11 px-3 pr-11 bg-white text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-shadow"
-              placeholder="Your Sabeel number"
+              placeholder="Enter your PACI number"
               required
               autoComplete="current-password"
             />
             <button
               type="button"
-              onClick={() => setShowPassword(prev => !prev)}
+              onClick={() => setShowPaci(prev => !prev)}
               className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground transition-colors"
-              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              aria-label={showPaci ? 'Hide PACI number' : 'Show PACI number'}
             >
-              {showPassword ? (
+              {showPaci ? (
                 <EyeOff className="w-4 h-4" aria-hidden="true" />
               ) : (
                 <Eye className="w-4 h-4" aria-hidden="true" />
@@ -113,7 +133,7 @@ export function LoginForm() {
             </button>
           </div>
           <p className="text-xs text-muted-foreground mt-1.5 italic">
-            Default password is your Sabeel number
+            Use your house PACI number as your password
           </p>
         </div>
 
@@ -128,17 +148,14 @@ export function LoginForm() {
           </div>
         )}
 
-        {/* Submit button */}
+        {/* Submit */}
         <button
           type="submit"
           disabled={loading}
           className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-lg h-11 font-semibold hover:opacity-90 disabled:opacity-60 transition-opacity cursor-pointer disabled:cursor-not-allowed"
         >
           {loading ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
-              Signing in...
-            </>
+            <LumaSpin size={24} />
           ) : (
             <>
               <LogIn className="w-4 h-4" aria-hidden="true" />

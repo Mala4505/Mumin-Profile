@@ -390,8 +390,8 @@ export function MemberProfileView({ profile, session }: Props) {
         )}
       </div>
 
-      {/* Location Card — staff only */}
-      {isStaff && (
+      {/* Location Card — staff and own profile */}
+      {(isStaff || isOwnProfile) && (
         <div className="bg-card rounded-xl border border-border shadow-sm p-5">
           <div className="flex items-center gap-2 mb-4">
             <MapPin className="w-4 h-4 text-primary" />
@@ -401,6 +401,7 @@ export function MemberProfileView({ profile, session }: Props) {
             <InfoField label="Sector" value={displayProfile.sector_name} />
             <InfoField label="Subsector" value={displayProfile.subsector_name} />
             <InfoField label="Building" value={displayProfile.building_name} />
+            {displayProfile.landmark && <InfoField label="Landmark" value={displayProfile.landmark} />}
             <InfoField label="PACI No" value={displayProfile.paci_no} />
             {displayProfile.floor_no && <InfoField label="Floor" value={displayProfile.floor_no} />}
             {displayProfile.flat_no && <InfoField label="Flat" value={displayProfile.flat_no} />}

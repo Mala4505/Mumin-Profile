@@ -74,6 +74,25 @@
   --radius-xl: calc(var(--radius) + 8px);
 }
 
+/* ── Luma Spinner ───────────────────────────────────────── */
+@keyframes loaderAnim {
+  0%    { inset: 0 35px 35px 0; }
+  12.5% { inset: 0 35px 0 0; }
+  25%   { inset: 35px 35px 0 0; }
+  37.5% { inset: 35px 0 0 0; }
+  50%   { inset: 35px 0 0 35px; }
+  62.5% { inset: 0 0 0 35px; }
+  75%   { inset: 0 0 35px 35px; }
+  87.5% { inset: 0 0 35px 0; }
+  100%  { inset: 0 35px 35px 0; }
+}
+.luma-blade {
+  animation: loaderAnim 2.5s infinite;
+}
+.luma-blade-delayed {
+  animation: loaderAnim 2.5s infinite -1.25s;
+}
+
 * {
   border-color: var(--border);
   box-sizing: border-box;

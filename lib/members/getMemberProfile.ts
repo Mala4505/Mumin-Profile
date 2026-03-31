@@ -15,6 +15,7 @@ export interface MemberProfile {
   subsector_name: string
   sector_name: string
   building_name: string
+  landmark: string | null
   floor_no: string | null
   flat_no: string | null
   paci_no: string
@@ -46,6 +47,7 @@ export async function getMemberProfile(itsNo: number): Promise<MemberProfile | n
         sector!inner ( sector_name ),
         building!inner (
           building_name,
+          landmark,
           house!inner (
             paci_no, floor_no, flat_no,
             sabeel_no
@@ -74,7 +76,11 @@ export async function getMemberProfile(itsNo: number): Promise<MemberProfile | n
     `)
     .eq('its_no', itsNo)
 
-  const house = m.subsector?.building?.[0]?.house?.find((h: any) => h.sabeel_no === m.sabeel_no)
+  const buildings: any[] = m.subsector?.building ?? []
+  const matchedBuilding = buildings.find((b: any) =>
+    (b.house ?? []).some((h: any) => h.sabeel_no === m.sabeel_no)
+  )
+  const house = (matchedBuilding?.house ?? []).find((h: any) => h.sabeel_no === m.sabeel_no)
 
   return {
     its_no: m.its_no,
@@ -90,7 +96,8 @@ export async function getMemberProfile(itsNo: number): Promise<MemberProfile | n
     subsector_id: m.subsector_id,
     subsector_name: m.subsector?.subsector_name ?? '',
     sector_name: m.subsector?.sector?.sector_name ?? '',
-    building_name: m.subsector?.building?.[0]?.building_name ?? '',
+    building_name: matchedBuilding?.building_name ?? '',
+    landmark: matchedBuilding?.landmark ?? null,
     floor_no: house?.floor_no ?? null,
     flat_no: house?.flat_no ?? null,
     paci_no: house?.paci_no ?? '',

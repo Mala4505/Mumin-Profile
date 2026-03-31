@@ -2,11 +2,13 @@ import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth/getSession'
 import {
   getSuperAdminStats,
+  getAdminStats,
   getMasoolStats,
   getMusaidStats,
   getMuminStats,
 } from '@/lib/dashboard/getStats'
 import SuperAdminDashboard from '@/components/dashboard/SuperAdminDashboard'
+import AdminDashboard from '@/components/dashboard/AdminDashboard'
 import MasoolDashboard from '@/components/dashboard/MasoolDashboard'
 import MusaidDashboard from '@/components/dashboard/MusaidDashboard'
 import MuminDashboard from '@/components/dashboard/MuminDashboard'
@@ -20,6 +22,15 @@ export default async function DashboardPage() {
     return (
       <div className="p-4 md:p-6 lg:p-8">
         <SuperAdminDashboard stats={stats} />
+      </div>
+    )
+  }
+
+  if (session.role === 'Admin') {
+    const stats = await getAdminStats(session)
+    return (
+      <div className="p-4 md:p-6 lg:p-8">
+        <AdminDashboard stats={stats} />
       </div>
     )
   }

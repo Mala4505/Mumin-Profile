@@ -92,6 +92,31 @@ export default function MuminDashboard({ stats }: Props) {
             <p className="text-xs text-muted-foreground mb-0.5">Status</p>
             <StatusBadge status={stats.status} />
           </div>
+          {stats.paciNo && (
+            <div className="p-4">
+              <p className="text-xs text-muted-foreground mb-0.5">PACI No</p>
+              <p className="text-sm font-medium font-mono text-foreground">{stats.paciNo}</p>
+            </div>
+          )}
+          {(stats.floorNo || stats.flatNo) && (
+            <div className="p-4">
+              <p className="text-xs text-muted-foreground mb-0.5">Floor / Flat</p>
+              <p className="text-sm font-medium text-foreground">
+                {stats.floorNo ? `Floor ${stats.floorNo}` : '—'}
+                {stats.flatNo ? ` / Flat ${stats.flatNo}` : ''}
+              </p>
+            </div>
+          )}
+          {stats.landmarkName && (
+            <div className="p-4 col-span-2">
+              <p className="text-xs text-muted-foreground mb-0.5">Landmark</p>
+              <p className="text-sm font-medium text-foreground">{stats.landmarkName}</p>
+            </div>
+          )}
+          <div className="p-4">
+            <p className="text-xs text-muted-foreground mb-0.5">Family Members</p>
+            <p className="text-sm font-medium text-foreground">{stats.totalFamilyMembers} member{stats.totalFamilyMembers !== 1 ? 's' : ''}</p>
+          </div>
         </div>
       </div>
 

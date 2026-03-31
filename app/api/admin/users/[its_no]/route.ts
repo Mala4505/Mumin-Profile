@@ -31,7 +31,7 @@ export async function PATCH(
   if (isNaN(itsNo)) return NextResponse.json({ error: 'Invalid ITS No' }, { status: 400 })
 
   const body = await request.json() as {
-    role?: 'SuperAdmin' | 'Masool' | 'Musaid' | 'Mumin'
+    role?: 'SuperAdmin' | 'Admin' | 'Masool' | 'Musaid' | 'Mumin'
     is_active?: boolean
     sector_ids?: number[]
     subsector_ids?: number[]
@@ -49,7 +49,7 @@ export async function PATCH(
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  // Replace sector assignments (Masool)
+  // Replace sector assignments (Admin and Masool)
   if (body.sector_ids !== undefined) {
     await admin.from('user_sector').delete().eq('its_no', itsNo)
     if (body.sector_ids.length > 0) {

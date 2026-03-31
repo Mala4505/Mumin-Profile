@@ -2,19 +2,52 @@
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Search, SlidersHorizontal, ChevronDown, X } from 'lucide-react'
+import { Search, SlidersHorizontal, ChevronDown, X, Eye } from 'lucide-react'
 import type { MemberFilters, Role } from '@/lib/types/app'
 
 interface Props {
   sectors: Array<{ sector_id: number; sector_name: string }>
   currentFilters: MemberFilters
   role: Role
+  showAll?: boolean
 }
 
 const selectClass =
   'appearance-none bg-card border border-border rounded-lg px-3 py-2 pr-8 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors cursor-pointer'
 
-export function MemberFiltersBar({ sectors, currentFilters, role }: Props) {
+type PillGroup = {
+  key: string
+  options: Array<{ label: string; value: string }>
+}
+
+const PILL_GROUPS: PillGroup[] = [
+  {
+    key: 'gender',
+    options: [
+      { label: 'Male', value: 'M' },
+      { label: 'Female', value: 'F' },
+    ],
+  },
+  {
+    key: 'balig_status',
+    options: [
+      { label: 'Balig', value: 'Balig' },
+      { label: 'Ghair Balig', value: 'Ghair Balig' },
+    ],
+  },
+  {
+    key: 'status',
+    options: [
+      { label: 'Active', value: 'active' },
+      { label: 'Deceased', value: 'deceased' },
+      { label: 'Relocated', value: 'relocated' },
+      { label: 'Left', value: 'left_community' },
+      { label: 'Inactive', value: 'inactive' },
+    ],
+  },
+]
+
+export function MemberFiltersBar({ sectors, currentFilters, role, showAll = false }: Props) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -36,6 +69,11 @@ export function MemberFiltersBar({ sectors, currentFilters, role }: Props) {
     [pathname, router, searchParams],
   )
 
+  function togglePill(key: string, value: string) {
+    const current = searchParams.get(key)
+    updateFilter(key, current === value ? '' : value)
+  }
+
   // Debounced search
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
@@ -56,8 +94,11 @@ export function MemberFiltersBar({ sectors, currentFilters, role }: Props) {
   const hasFilters =
     Object.values(currentFilters).some((v) => v !== undefined && v !== '') || searchValue !== ''
 
+  const showSectorFilter = role === 'SuperAdmin' || role === 'Admin'
+
   return (
-    <div className="bg-card rounded-xl border border-border p-4 mb-4 shadow-sm">
+    <div className="bg-card rounded-xl border border-border p-4 mb-4 shadow-sm space-y-3">
+      {/* Top row: search + dropdowns */}
       <div className="flex flex-wrap gap-3 items-end">
         {/* Filter label */}
         <div className="flex items-center gap-1.5 text-muted-foreground self-center">
@@ -74,13 +115,13 @@ export function MemberFiltersBar({ sectors, currentFilters, role }: Props) {
             type="text"
             value={searchValue}
             onChange={(e) => setSearchValue(e.target.value)}
-            placeholder="Search by name or ITS..."
+            placeholder="Search by name, ITS, phone, Sabeel, PACI..."
             className="w-full pl-9 pr-3 py-2 text-sm bg-card border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
           />
         </div>
 
-        {/* Sector — SuperAdmin only */}
-        {role === 'SuperAdmin' && (
+        {/* Sector — SuperAdmin and Admin */}
+        {showSectorFilter && (
           <div className="relative">
             <select
               value={currentFilters.sector_id ?? ''}
@@ -98,35 +139,7 @@ export function MemberFiltersBar({ sectors, currentFilters, role }: Props) {
           </div>
         )}
 
-        {/* Gender */}
-        <div className="relative">
-          <select
-            value={currentFilters.gender ?? ''}
-            onChange={(e) => updateFilter('gender', e.target.value)}
-            className={selectClass}
-          >
-            <option value="">All Genders</option>
-            <option value="M">Male</option>
-            <option value="F">Female</option>
-          </select>
-          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
-        </div>
-
-        {/* Balig Status */}
-        <div className="relative">
-          <select
-            value={currentFilters.balig_status ?? ''}
-            onChange={(e) => updateFilter('balig_status', e.target.value)}
-            className={selectClass}
-          >
-            <option value="">All Balig</option>
-            <option value="Balig">Balig</option>
-            <option value="Ghair Balig">Ghair Balig</option>
-          </select>
-          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
-        </div>
-
-        {/* Status */}
+        {/* Status dropdown */}
         <div className="relative">
           <select
             value={currentFilters.status ?? ''}
@@ -143,6 +156,17 @@ export function MemberFiltersBar({ sectors, currentFilters, role }: Props) {
           <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
         </div>
 
+        {/* View All */}
+        {!showAll && (
+          <a
+            href="/members?show_all=1"
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-muted-foreground hover:text-foreground border border-border rounded-lg hover:bg-muted/40 transition-colors"
+          >
+            <Eye className="w-3.5 h-3.5" />
+            View All
+          </a>
+        )}
+
         {/* Clear filters */}
         {hasFilters && (
           <button
@@ -153,6 +177,35 @@ export function MemberFiltersBar({ sectors, currentFilters, role }: Props) {
             Clear
           </button>
         )}
+      </div>
+
+      {/* Quick-filter pills row */}
+      <div className="flex flex-wrap gap-2 pt-1 border-t border-border/50">
+        {PILL_GROUPS.map((group) => {
+          const activeVal = searchParams.get(group.key)
+          return (
+            <div key={group.key} className="flex items-center gap-1 flex-wrap">
+              {group.options.map((opt) => {
+                const isActive = activeVal === opt.value
+                return (
+                  <button
+                    key={opt.value}
+                    onClick={() => togglePill(group.key, opt.value)}
+                    className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+                      isActive
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'bg-background text-muted-foreground border-border hover:border-primary/50 hover:text-foreground'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                )
+              })}
+              {/* Divider between groups */}
+              <span className="text-border text-xs select-none">|</span>
+            </div>
+          )
+        })}
       </div>
     </div>
   )
