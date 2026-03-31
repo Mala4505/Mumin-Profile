@@ -257,7 +257,8 @@ export async function importCoreMembers(
 
       const { error: upsertErr } = await admin
         .from('mumin')
-        .upsert(muminData, { onConflict: 'its_no' })
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .upsert(muminData as any, { onConflict: 'its_no' })
 
       if (upsertErr) {
         const msg = `Failed to upsert mumin ${row.ITS_NO}: ${upsertErr.message}`
