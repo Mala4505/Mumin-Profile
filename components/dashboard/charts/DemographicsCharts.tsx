@@ -12,8 +12,8 @@ interface Props {
 const GENDER_COLORS = ['#3B82F6', '#EC4899']
 const BALIG_COLORS = ['#F59E0B', '#94A3B8']
 
-const renderLabel = ({ percent }: { percent: number }) =>
-  percent > 0.05 ? `${(percent * 100).toFixed(0)}%` : ''
+const renderLabel = ({ percent }: { percent?: number }) =>
+  (percent ?? 0) > 0.05 ? `${((percent ?? 0) * 100).toFixed(0)}%` : ''
 
 export default function DemographicsCharts({ maleCount, femaleCount, baligCount, ghairBaligCount }: Props) {
   const total = maleCount + femaleCount
