@@ -10,8 +10,28 @@ import {
   EyeOff,
   AlertCircle,
   LogIn,
+  ShieldCheck,
+  KeyRound,
+  ArrowRightCircle,
 } from 'lucide-react'
 import { LumaSpin } from '@/components/ui/luma-spin'
+
+type Step = 'verifying' | 'signing-in' | 'redirecting' | null
+
+const STEP_LABELS: Record<NonNullable<Step>, { icon: React.ReactNode; text: string }> = {
+  verifying: {
+    icon: <ShieldCheck className="w-3.5 h-3.5" />,
+    text: 'Verifying credentials...',
+  },
+  'signing-in': {
+    icon: <KeyRound className="w-3.5 h-3.5" />,
+    text: 'Signing in...',
+  },
+  redirecting: {
+    icon: <ArrowRightCircle className="w-3.5 h-3.5" />,
+    text: 'Redirecting to dashboard...',
+  },
+}
 
 export function LoginForm() {
   const router = useRouter()
@@ -19,15 +39,16 @@ export function LoginForm() {
   const [paciNo, setPaciNo] = useState('')
   const [showPaci, setShowPaci] = useState(false)
   const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [step, setStep] = useState<Step>(null)
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+  const loading = step !== null
+
+  async function handleSubmit() {
     setError('')
-    setLoading(true)
 
     try {
-      // Step 1: Validate ITS + PACI server-side; get derived credentials
+      // Step 1 — validate ITS + PACI server-side
+      setStep('verifying')
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -37,12 +58,13 @@ export function LoginForm() {
       const data = await res.json()
 
       if (!res.ok) {
-        setError(data.error ?? 'Invalid ITS No or PACI No. Please try again.')
-        setLoading(false)
+        setError(data.error ?? 'Invalid ITS No or password. Please try again.')
+        setStep(null)
         return
       }
 
-      // Step 2: Sign in with HMAC-derived credentials
+      // Step 2 — sign in with derived credentials
+      setStep('signing-in')
       const supabase = createClient()
       const { error: authError } = await supabase.auth.signInWithPassword({
         email: data.email,
@@ -51,17 +73,21 @@ export function LoginForm() {
 
       if (authError) {
         setError('Sign in failed. Please try again.')
-        setLoading(false)
+        setStep(null)
         return
       }
 
+      // Step 3 — redirect
+      setStep('redirecting')
       router.push('/dashboard')
       router.refresh()
     } catch {
       setError('Something went wrong. Please try again.')
-      setLoading(false)
+      setStep(null)
     }
   }
+
+  const currentStep = step ? STEP_LABELS[step] : null
 
   return (
     <div className="w-full max-w-md">
@@ -73,7 +99,7 @@ export function LoginForm() {
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6" noValidate>
+      <form action={handleSubmit} className="space-y-6" noValidate>
         {/* ITS Number */}
         <div>
           <label
@@ -90,7 +116,8 @@ export function LoginForm() {
             pattern="[0-9]*"
             value={itsNo}
             onChange={e => setItsNo(e.target.value)}
-            className="w-full border border-border rounded-lg h-11 px-3 bg-white text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-shadow"
+            disabled={loading}
+            className="w-full border border-border rounded-lg h-11 px-3 bg-white text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
             placeholder="e.g. 10000001"
             required
             autoFocus
@@ -98,7 +125,7 @@ export function LoginForm() {
           />
         </div>
 
-        {/* PACI Number */}
+        {/* Password (PACI) */}
         <div>
           <label
             htmlFor="paci_no"
@@ -114,7 +141,8 @@ export function LoginForm() {
               inputMode="numeric"
               value={paciNo}
               onChange={e => setPaciNo(e.target.value)}
-              className="w-full border border-border rounded-lg h-11 px-3 pr-11 bg-white text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-shadow"
+              disabled={loading}
+              className="w-full border border-border rounded-lg h-11 px-3 pr-11 bg-white text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
               placeholder="Enter your PACI number"
               required
               autoComplete="current-password"
@@ -122,8 +150,9 @@ export function LoginForm() {
             <button
               type="button"
               onClick={() => setShowPaci(prev => !prev)}
-              className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground transition-colors"
-              aria-label={showPaci ? 'Hide PACI number' : 'Show PACI number'}
+              disabled={loading}
+              className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground transition-colors disabled:pointer-events-none"
+              aria-label={showPaci ? 'Hide password' : 'Show password'}
             >
               {showPaci ? (
                 <EyeOff className="w-4 h-4" aria-hidden="true" />
@@ -152,10 +181,10 @@ export function LoginForm() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-lg h-11 font-semibold hover:opacity-90 disabled:opacity-60 transition-opacity cursor-pointer disabled:cursor-not-allowed"
+          className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-lg h-11 font-semibold hover:opacity-90 disabled:opacity-80 transition-opacity cursor-pointer disabled:cursor-not-allowed"
         >
           {loading ? (
-            <LumaSpin size={24} />
+            <LumaSpin size={22} color="#0F172A" />
           ) : (
             <>
               <LogIn className="w-4 h-4" aria-hidden="true" />
@@ -163,6 +192,14 @@ export function LoginForm() {
             </>
           )}
         </button>
+
+        {/* Step indicator */}
+        {currentStep && (
+          <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground animate-pulse">
+            {currentStep.icon}
+            <span>{currentStep.text}</span>
+          </div>
+        )}
       </form>
     </div>
   )
