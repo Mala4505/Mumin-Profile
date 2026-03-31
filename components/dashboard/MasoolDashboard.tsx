@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import type { MasoolStats } from '@/lib/dashboard/getStats'
 import StatCard from './StatCard'
+import SubsectorMuminChart from './charts/SubsectorMuminChart'
+import BuildingFlatsChart from './charts/BuildingFlatsChart'
 
 const UsersIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -135,6 +137,9 @@ export default function MasoolDashboard({ stats }: Props) {
         )}
       </div>
 
+      {/* Subsector Chart */}
+      <SubsectorMuminChart subsectors={stats.subsectors} />
+
       {/* Buildings */}
       <div>
         <h2 className="text-lg font-semibold text-foreground mb-4">Buildings</h2>
@@ -172,6 +177,9 @@ export default function MasoolDashboard({ stats }: Props) {
           </div>
         )}
       </div>
+
+      {/* Buildings Chart */}
+      <BuildingFlatsChart buildings={stats.buildings} />
 
       <div>
         <Link

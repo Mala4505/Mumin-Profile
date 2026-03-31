@@ -29,7 +29,9 @@ interface ImportResult {
   errors: Array<{ rowNumber: number; itsNo?: string; message: string }>
 }
 
-const CORE_COLUMNS = ['ITS_NO', 'Name', 'Gender', 'Balig', 'Sabeel_No', 'PACI_NO', 'Building', 'SubSector', 'Sector']
+const CORE_COLUMNS_REQUIRED = ['ITS_NO', 'Name', 'Gender', 'Balig', 'Sabeel_No', 'PACI_NO', 'Building', 'SubSector', 'Sector']
+const CORE_COLUMNS_OPTIONAL = ['DOB', 'Floor_No', 'Flat_No', 'Role', 'Phone', 'Street', 'Landmark', 'Family_Type']
+const CORE_COLUMNS = [...CORE_COLUMNS_REQUIRED, ...CORE_COLUMNS_OPTIONAL]
 const PROFILE_COLUMNS = ['ITS_NO', 'Field_Caption', 'Value']
 
 function downloadTemplate(isCore: boolean) {
@@ -37,9 +39,10 @@ function downloadTemplate(isCore: boolean) {
   let filename: string
   if (isCore) {
     csv = [
-      'ITS_NO,Name,Gender,DOB,Balig,Sabeel_No,PACI_NO,Floor_No,Flat_No,Building,SubSector,Sector',
-      '10000001,Mohammed Ali,M,1990-01-15,Balig,SBL-0001,PAC-001,2,5A,Block A,A-1,Sector A',
-      '10000002,Fatima Hussain,F,,Ghair Balig,SBL-0002,PAC-002,,,Block B,A-2,Sector A',
+      'ITS_NO,Name,Gender,DOB,Balig,Sabeel_No,PACI_NO,Floor_No,Flat_No,Building,SubSector,Sector,Role,Phone,Street,Landmark,Family_Type',
+      '10000001,Mohammed Ali,M,1990-01-15,Balig,SBL-0001,PAC-001,2,5A,Block A,A-1,Sector A,Mumin,+96512345678,Street 12,Near Park,Family',
+      '10000002,Fatima Hussain,F,,Ghair Balig,SBL-0002,PAC-002,,,Block B,A-2,Sector A,,,,, ',
+      '10000003,Ahmed Hussain,M,1985-06-20,Balig,SBL-0001,PAC-001,2,5A,Block A,A-1,Sector A,Masool,+96598765432,,,Bachelor',
     ].join('\n')
     filename = 'core-members-template.csv'
   } else {
@@ -383,16 +386,34 @@ export function ImportForm({ role }: ImportFormProps) {
             <p className="text-xs text-muted-foreground mt-3 mb-2">
               Expected columns for {canRunCore ? 'Core Member Import' : 'Profile Data Import'}:
             </p>
-            <div className="flex flex-wrap gap-2">
-              {columns.map(col => (
-                <code
-                  key={col}
-                  className="bg-muted text-foreground font-mono text-xs px-2.5 py-1 rounded-md border border-border"
-                >
-                  {col}
-                </code>
-              ))}
-            </div>
+            {canRunCore ? (
+              <>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Required</p>
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {CORE_COLUMNS_REQUIRED.map(col => (
+                    <code key={col} className="bg-muted text-foreground font-mono text-xs px-2.5 py-1 rounded-md border border-border">
+                      {col}
+                    </code>
+                  ))}
+                </div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Optional</p>
+                <div className="flex flex-wrap gap-2">
+                  {CORE_COLUMNS_OPTIONAL.map(col => (
+                    <code key={col} className="bg-muted/50 text-muted-foreground font-mono text-xs px-2.5 py-1 rounded-md border border-dashed border-border">
+                      {col}
+                    </code>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {columns.map(col => (
+                  <code key={col} className="bg-muted text-foreground font-mono text-xs px-2.5 py-1 rounded-md border border-border">
+                    {col}
+                  </code>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

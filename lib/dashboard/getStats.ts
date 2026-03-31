@@ -108,24 +108,22 @@ export async function getSuperAdminStats(): Promise<SuperAdminStats> {
       .order('created_at', { ascending: false })
       .limit(8),
     supabase.from('building').select('building_id, subsector_id'),
-    supabase.from('house').select('paci_no, sabeel_no, building_id'),
+    supabase.from('house').select('paci_no, building_id'),
   ])
 
   const totalMumineen = muminResult.count ?? 0
   const activeMumineen = (muminResult.data ?? []).filter((m: any) => m.status === 'active').length
 
   const allBuildings = (buildingResult.data ?? []) as Array<{ building_id: number; subsector_id: number }>
-  const allHouses = (houseResult.data ?? []) as Array<{ paci_no: string; sabeel_no: string; building_id: number }>
+  const allHouses = (houseResult.data ?? []) as Array<{ paci_no: string; building_id: number }>
 
   const flatCountByBuilding = new Map<number, number>()
-  const sabeelsByBuilding = new Map<number, Set<string>>()
   for (const h of allHouses) {
     flatCountByBuilding.set(h.building_id, (flatCountByBuilding.get(h.building_id) ?? 0) + 1)
-    if (!sabeelsByBuilding.has(h.building_id)) sabeelsByBuilding.set(h.building_id, new Set())
-    sabeelsByBuilding.get(h.building_id)!.add(h.sabeel_no)
   }
 
-  const totalFamilies = new Set(allHouses.map(h => h.sabeel_no)).size
+  const { data: familyCountData } = await supabase.from('family').select('sabeel_no').not('paci_no', 'is', null)
+  const totalFamilies = familyCountData?.length ?? 0
 
   const sectors = (sectorResult.data ?? []) as Array<{ sector_id: number; sector_name: string }>
   const sectorStats = await Promise.all(
@@ -198,16 +196,20 @@ export async function getAdminStats(session: SessionUser): Promise<AdminStats> {
   const buildingIds = buildings.map(b => b.building_id)
 
   const housesResult = buildingIds.length > 0
-    ? await supabase.from('house').select('paci_no, sabeel_no, building_id').in('building_id', buildingIds)
+    ? await supabase.from('house').select('paci_no, building_id').in('building_id', buildingIds)
     : { data: [] }
 
-  const houses = (housesResult.data ?? []) as Array<{ paci_no: string; sabeel_no: string; building_id: number }>
+  const houses = (housesResult.data ?? []) as Array<{ paci_no: string; building_id: number }>
   const flatCountByBuilding = new Map<number, number>()
   for (const h of houses) {
     flatCountByBuilding.set(h.building_id, (flatCountByBuilding.get(h.building_id) ?? 0) + 1)
   }
 
-  const totalFamilies = new Set(houses.map(h => h.sabeel_no)).size
+  const paciNosInScope = houses.map(h => h.paci_no)
+  const { data: famData } = buildingIds.length > 0
+    ? await supabase.from('family').select('sabeel_no').in('paci_no', paciNosInScope)
+    : { data: [] }
+  const totalFamilies = famData?.length ?? 0
 
   // Per-sector breakdown
   const subsectorsBySector = new Map<number, typeof subsectors>()
@@ -234,7 +236,7 @@ export async function getAdminStats(session: SessionUser): Promise<AdminStats> {
         mumin_count: mCount.count ?? 0,
         building_count: sectorBuildings.length,
         flat_count: sectorHouses.length,
-        family_count: new Set(sectorHouses.map(h => h.sabeel_no)).size,
+        family_count: sectorHouses.length, // each house row = one physical unit; families counted by paci_no
       }
     })
   )
@@ -299,16 +301,20 @@ export async function getMasoolStats(session: SessionUser): Promise<MasoolStats>
   const buildingIds = buildings.map(b => b.building_id)
 
   const housesResult = buildingIds.length > 0
-    ? await supabase.from('house').select('paci_no, sabeel_no, building_id').in('building_id', buildingIds)
+    ? await supabase.from('house').select('paci_no, building_id').in('building_id', buildingIds)
     : { data: [] }
 
-  const houses = (housesResult.data ?? []) as Array<{ paci_no: string; sabeel_no: string; building_id: number }>
+  const houses = (housesResult.data ?? []) as Array<{ paci_no: string; building_id: number }>
   const flatCountByBuilding = new Map<number, number>()
   for (const h of houses) {
     flatCountByBuilding.set(h.building_id, (flatCountByBuilding.get(h.building_id) ?? 0) + 1)
   }
 
-  const totalFamilies = new Set(houses.map(h => h.sabeel_no)).size
+  const masoolPaciNos = houses.map(h => h.paci_no)
+  const { data: masoolFamData } = buildingIds.length > 0
+    ? await supabase.from('family').select('sabeel_no').in('paci_no', masoolPaciNos)
+    : { data: [] }
+  const totalFamilies = masoolFamData?.length ?? 0
 
   const buildingStats = buildings.map(b => ({
     building_id: b.building_id,
@@ -364,16 +370,20 @@ export async function getMusaidStats(session: SessionUser): Promise<MusaidStats>
   const buildingIds = buildings.map(b => b.building_id)
 
   const housesResult = buildingIds.length > 0
-    ? await supabase.from('house').select('paci_no, sabeel_no, building_id').in('building_id', buildingIds)
+    ? await supabase.from('house').select('paci_no, building_id').in('building_id', buildingIds)
     : { data: [] }
 
-  const houses = (housesResult.data ?? []) as Array<{ paci_no: string; sabeel_no: string; building_id: number }>
+  const houses = (housesResult.data ?? []) as Array<{ paci_no: string; building_id: number }>
   const flatCountByBuilding = new Map<number, number>()
   for (const h of houses) {
     flatCountByBuilding.set(h.building_id, (flatCountByBuilding.get(h.building_id) ?? 0) + 1)
   }
 
-  const totalFamilies = new Set(houses.map(h => h.sabeel_no)).size
+  const musaidPaciNos = houses.map(h => h.paci_no)
+  const { data: musaidFamData } = buildingIds.length > 0
+    ? await supabase.from('family').select('sabeel_no').in('paci_no', musaidPaciNos)
+    : { data: [] }
+  const totalFamilies = musaidFamData?.length ?? 0
 
   const buildingStats = buildings.map(b => ({
     building_id: b.building_id,
@@ -411,15 +421,22 @@ export async function getMuminStats(itsNo: number): Promise<MuminStats | null> {
   if (!muminResult.data) return null
   const m = muminResult.data as any
 
-  // Fetch house data via sabeel_no
-  const houseResult = await supabase
-    .from('house')
-    .select('paci_no, floor_no, flat_no, building:building_id(building_name, landmark)')
+  // Fetch house data via family.paci_no → house
+  const { data: famRow } = await supabase
+    .from('family')
+    .select('paci_no')
     .eq('sabeel_no', m.sabeel_no)
-    .limit(1)
-    .single()
+    .maybeSingle()
 
-  const house = houseResult.data as any
+  const { data: houseData } = famRow?.paci_no
+    ? await supabase
+        .from('house')
+        .select('paci_no, floor_no, flat_no, building:building_id(building_name, landmark)')
+        .eq('paci_no', famRow.paci_no)
+        .maybeSingle()
+    : { data: null }
+
+  const house = houseData as any
 
   // Count family members (same sabeel_no)
   const familyCount = await supabase

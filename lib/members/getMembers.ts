@@ -35,17 +35,17 @@ interface HouseInfo {
 export async function getMembers(filters: MemberFilters): Promise<MemberListItem[]> {
   const supabase = await createClient()
 
-  // If filtering by paci_no, first resolve the sabeel_no(s) for that PACI
+  // If filtering by paci_no, first resolve the sabeel_no(s) for that PACI via family table
   let paciSabeelNos: string[] | null = null
   if (filters.paci_no) {
     const adminClient = createAdminClient()
-    const { data: houseRows } = await adminClient
-      .from('house')
+    const { data: familyRows } = await adminClient
+      .from('family')
       .select('sabeel_no')
       .ilike('paci_no', `%${filters.paci_no}%`)
       .limit(100)
-    paciSabeelNos = (houseRows ?? []).map((h: any) => h.sabeel_no as string)
-    // If no matching houses found, return empty
+    paciSabeelNos = (familyRows ?? []).map((f: any) => f.sabeel_no as string)
+    // If no matching families found, return empty
     if (paciSabeelNos.length === 0) return []
   }
 
@@ -137,19 +137,33 @@ export async function getMembers(filters: MemberFilters): Promise<MemberListItem
 
   if (members.length === 0) return members
 
-  // Second query: fetch house + building info for all unique sabeel_nos in this result set
+  // Second query: fetch address info via family → house → building
   const uniqueSabeelNos = [...new Set(members.map(m => m.sabeel_no))]
   const adminClient = createAdminClient()
-  const { data: houseData } = await adminClient
-    .from('house')
-    .select('paci_no, sabeel_no, floor_no, flat_no, building:building_id(building_id, building_name, landmark)')
+
+  // Step A: family → paci_no for all sabeel_nos in this result set
+  const { data: familyData } = await adminClient
+    .from('family')
+    .select('sabeel_no, paci_no')
     .in('sabeel_no', uniqueSabeelNos)
 
-  // Build map: sabeel_no → HouseInfo (use first matching house if multiple)
+  const sabeelToPaci = new Map<string, string>()
+  for (const f of (familyData ?? []) as any[]) {
+    if (f.paci_no) sabeelToPaci.set(f.sabeel_no, f.paci_no)
+  }
+
+  const paciNos = [...new Set([...sabeelToPaci.values()])]
+
+  // Step B: house → building details by paci_no
   const houseMap = new Map<string, HouseInfo>()
-  for (const h of (houseData ?? []) as any[]) {
-    if (!houseMap.has(h.sabeel_no)) {
-      houseMap.set(h.sabeel_no, {
+  if (paciNos.length > 0) {
+    const { data: houseData } = await adminClient
+      .from('house')
+      .select('paci_no, floor_no, flat_no, building:building_id(building_id, building_name, landmark)')
+      .in('paci_no', paciNos)
+
+    for (const h of (houseData ?? []) as any[]) {
+      houseMap.set(h.paci_no, {
         paci_no: h.paci_no,
         floor_no: h.floor_no,
         flat_no: h.flat_no,
@@ -160,9 +174,10 @@ export async function getMembers(filters: MemberFilters): Promise<MemberListItem
     }
   }
 
-  // Merge house info into each member
+  // Step C: merge into each member
   for (const m of members) {
-    const house = houseMap.get(m.sabeel_no)
+    const paciNo = sabeelToPaci.get(m.sabeel_no)
+    const house = paciNo ? houseMap.get(paciNo) : undefined
     if (house) {
       m.paci_no = house.paci_no
       m.floor_no = house.floor_no

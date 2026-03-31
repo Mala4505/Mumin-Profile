@@ -62,26 +62,26 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '[debug] ITS No not found in mumin table' }, { status: 401 })
     }
 
-    // 2. Validate PACI via house table
-    const { data: house, error: houseError } = await admin
-      .from('house')
+    // 2. Validate PACI via family table (family.paci_no replaced house.paci_no)
+    const { data: family, error: familyError } = await admin
+      .from('family')
       .select('paci_no')
       .eq('sabeel_no', mumin.sabeel_no)
       .maybeSingle()
 
-    if (houseError) {
-      console.error('[login] house lookup error:', houseError)
+    if (familyError) {
+      console.error('[login] family lookup error:', familyError)
       return NextResponse.json({ error: 'Database error. Please try again.' }, { status: 500 })
     }
-    if (!house) {
+    if (!family || !family.paci_no) {
       return NextResponse.json(
         { error: `[debug] No house record found for sabeel_no: ${mumin.sabeel_no}` },
         { status: 401 }
       )
     }
-    if (house.paci_no !== paci_no) {
+    if (family.paci_no !== paci_no) {
       return NextResponse.json(
-        { error: `[debug] PACI mismatch. DB has: ${house.paci_no}, entered: ${paci_no}` },
+        { error: `[debug] PACI mismatch. DB has: ${family.paci_no}, entered: ${paci_no}` },
         { status: 401 }
       )
     }

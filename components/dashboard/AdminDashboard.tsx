@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import type { AdminStats } from '@/lib/dashboard/getStats'
 import StatCard from './StatCard'
+import SectorMuminChart from './charts/SectorMuminChart'
 
 const UsersIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -159,6 +160,14 @@ export default function AdminDashboard({ stats }: Props) {
           </div>
         )}
       </div>
+      {/* Sector Chart */}
+      <SectorMuminChart
+        sectors={stats.sectorBreakdown.map(s => ({
+          sector_name: s.sector_name,
+          mumin_count: s.mumin_count,
+          flat_count: s.flat_count,
+        }))}
+      />
     </div>
   )
 }

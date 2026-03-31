@@ -13,6 +13,18 @@ export const CoreRowSchema = z.object({
   Building: z.string().min(1, 'Building is required').max(100),
   SubSector: z.string().min(1, 'SubSector is required').max(100),
   Sector: z.string().min(1, 'Sector is required').max(100),
+  // Optional new columns — all handle blank cells from old CSVs gracefully
+  Role: z.preprocess(
+    v => (v === '' || v == null ? undefined : v),
+    z.enum(['Mumin', 'Masool', 'Musaid']).optional()
+  ),
+  Phone: z.string().max(20).optional().transform(v => v || undefined),
+  Street: z.string().max(200).optional().transform(v => v || undefined),
+  Landmark: z.string().max(200).optional().transform(v => v || undefined),
+  Family_Type: z.preprocess(
+    v => (v === '' || v == null ? undefined : v),
+    z.enum(['Family', 'Bachelor']).optional()
+  ),
 })
 
 export type CoreRowInput = z.infer<typeof CoreRowSchema>

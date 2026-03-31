@@ -22,15 +22,15 @@ export type Database = {
         Relationships: []
       }
       house: {
-        Row: { paci_no: string; sabeel_no: string; building_id: number; floor_no: string | null; flat_no: string | null; created_at: string; updated_at: string }
-        Insert: { paci_no: string; sabeel_no: string; building_id: number; floor_no?: string | null; flat_no?: string | null; created_at?: string; updated_at?: string }
-        Update: { paci_no?: string; sabeel_no?: string; building_id?: number; floor_no?: string | null; flat_no?: string | null; created_at?: string; updated_at?: string }
+        Row: { paci_no: string; building_id: number; floor_no: string | null; flat_no: string | null; created_at: string; updated_at: string }
+        Insert: { paci_no: string; building_id: number; floor_no?: string | null; flat_no?: string | null; created_at?: string; updated_at?: string }
+        Update: { paci_no?: string; building_id?: number; floor_no?: string | null; flat_no?: string | null; created_at?: string; updated_at?: string }
         Relationships: []
       }
       family: {
-        Row: { sabeel_no: string; head_its_no: number | null; registration_date: string | null; notes: string | null; created_at: string; updated_at: string }
-        Insert: { sabeel_no: string; head_its_no?: number | null; registration_date?: string | null; notes?: string | null; created_at?: string; updated_at?: string }
-        Update: { sabeel_no?: string; head_its_no?: number | null; registration_date?: string | null; notes?: string | null; created_at?: string; updated_at?: string }
+        Row: { sabeel_no: string; paci_no: string | null; head_its_no: number | null; registration_date: string | null; notes: string | null; created_at: string; updated_at: string }
+        Insert: { sabeel_no: string; paci_no?: string | null; head_its_no?: number | null; registration_date?: string | null; notes?: string | null; created_at?: string; updated_at?: string }
+        Update: { sabeel_no?: string; paci_no?: string | null; head_its_no?: number | null; registration_date?: string | null; notes?: string | null; created_at?: string; updated_at?: string }
         Relationships: []
       }
       mumin: {
@@ -48,6 +48,7 @@ export type Database = {
           must_change_password: boolean
           last_login_at: string | null
           force_relogin_at: string | null
+          family_type: 'Family' | 'Bachelor' | null
         }
         Insert: {
           its_no: number; sabeel_no: string; subsector_id: number; name: string
@@ -63,6 +64,7 @@ export type Database = {
           must_change_password?: boolean
           last_login_at?: string | null
           force_relogin_at?: string | null
+          family_type?: 'Family' | 'Bachelor' | null
         }
         Update: {
           its_no?: number; sabeel_no?: string; subsector_id?: number; name?: string
@@ -78,6 +80,7 @@ export type Database = {
           must_change_password?: boolean
           last_login_at?: string | null
           force_relogin_at?: string | null
+          family_type?: 'Family' | 'Bachelor' | null
         }
         Relationships: []
       }

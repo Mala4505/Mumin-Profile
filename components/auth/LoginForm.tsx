@@ -14,7 +14,7 @@ import {
   KeyRound,
   ArrowRightCircle,
 } from 'lucide-react'
-import { LumaSpin } from '@/components/ui/luma-spin'
+import { LoadingDots } from '@/components/ui/loading-dots'
 
 type Step = 'verifying' | 'signing-in' | 'redirecting' | null
 
@@ -184,7 +184,9 @@ export function LoginForm() {
           className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-lg h-11 font-semibold hover:opacity-90 disabled:opacity-80 transition-opacity cursor-pointer disabled:cursor-not-allowed"
         >
           {loading ? (
-            <LumaSpin size={22} color="#0F172A" />
+            <LoadingDots size={5} color="#0F172A">
+              <span className="text-sm font-semibold">{currentStep?.text ?? 'Loading'}</span>
+            </LoadingDots>
           ) : (
             <>
               <LogIn className="w-4 h-4" aria-hidden="true" />
@@ -193,13 +195,7 @@ export function LoginForm() {
           )}
         </button>
 
-        {/* Step indicator */}
-        {currentStep && (
-          <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground animate-pulse">
-            {currentStep.icon}
-            <span>{currentStep.text}</span>
-          </div>
-        )}
+
       </form>
     </div>
   )

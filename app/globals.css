@@ -74,6 +74,13 @@
   --radius-xl: calc(var(--radius) + 8px);
 }
 
+/* ── Loading Dots ───────────────────────────────────────── */
+@keyframes loading {
+  0%   { opacity: 0.2; }
+  20%  { opacity: 1; }
+  100% { opacity: 0.2; }
+}
+
 /* ── Luma Spinner ───────────────────────────────────────── */
 @keyframes loaderAnim {
   0%    { inset: 0 35px 35px 0; }

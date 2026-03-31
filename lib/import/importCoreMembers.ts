@@ -12,6 +12,36 @@ export interface ImportResult {
   status: 'completed' | 'completed_with_errors' | 'failed'
 }
 
+/**
+ * Normalise DOB to YYYY-MM-DD regardless of input format.
+ * Handles: DD-MM-YYYY, DD/MM/YYYY, YYYY-MM-DD, YYYY/MM/DD
+ * Returns null if the value cannot be parsed.
+ */
+function parseDob(raw: string): string | null {
+  const s = raw.trim()
+  if (!s) return null
+
+  // Already YYYY-MM-DD or YYYY/MM/DD
+  if (/^\d{4}[-/]\d{2}[-/]\d{2}$/.test(s)) {
+    return s.replace(/\//g, '-')
+  }
+
+  // DD-MM-YYYY or DD/MM/YYYY
+  const match = s.match(/^(\d{2})[-/](\d{2})[-/](\d{4})$/)
+  if (match) {
+    const [, dd, mm, yyyy] = match
+    return `${yyyy}-${mm}-${dd}`
+  }
+
+  return null
+}
+
+interface BuildingRecord {
+  building_id: number
+  street: string | null
+  landmark: string | null
+}
+
 export async function importCoreMembers(
   csvText: string,
   filename: string,
@@ -74,7 +104,7 @@ export async function importCoreMembers(
     const [{ data: sectors }, { data: subsectors }, { data: buildings }] = await Promise.all([
       admin.from('sector').select('sector_id, sector_name'),
       admin.from('subsector').select('subsector_id, sector_id, subsector_name'),
-      admin.from('building').select('building_id, subsector_id, building_name'),
+      admin.from('building').select('building_id, subsector_id, building_name, street, landmark'),
     ])
 
     const sectorMap = new Map((sectors ?? []).map(s => [s.sector_name.toLowerCase(), s.sector_id]))
@@ -82,10 +112,13 @@ export async function importCoreMembers(
       `${s.sector_id}::${s.subsector_name.toLowerCase()}`, s.subsector_id
     ]))
 
-    // building map: key = "subsector_id::building_name_lower"
-    const buildingMap = new Map((buildings ?? []).map(b => [
-      `${b.subsector_id}::${b.building_name.toLowerCase()}`, b.building_id
-    ]))
+    // building map: key = "subsector_id::building_name_lower", value = full record
+    const buildingMap = new Map<string, BuildingRecord>(
+      (buildings ?? []).map(b => [
+        `${b.subsector_id}::${b.building_name.toLowerCase()}`,
+        { building_id: b.building_id, street: b.street, landmark: b.landmark }
+      ])
+    )
 
     // ── Phase 3 + 4: Validate + upsert each row ───────────────
     let insertedRows = 0
@@ -107,6 +140,7 @@ export async function importCoreMembers(
       }
 
       const row: CoreRowInput = parsed_row.data
+      const csvRole = (row.Role ?? 'Mumin') as 'Mumin' | 'Masool' | 'Musaid'
 
       // Sector resolution
       const sectorId = sectorMap.get(row.Sector.toLowerCase())
@@ -131,13 +165,20 @@ export async function importCoreMembers(
         continue
       }
 
-      // Building resolution — auto-create if not found
+      // Building resolution — auto-create if not found, update street/landmark if provided
       const buildingKey = `${subsectorId}::${row.Building.toLowerCase()}`
-      let buildingId = buildingMap.get(buildingKey)
-      if (!buildingId) {
+      let buildingRecord = buildingMap.get(buildingKey)
+
+      if (!buildingRecord) {
+        // New building — create with street/landmark if provided
         const { data: newBuilding, error: bErr } = await admin
           .from('building')
-          .insert({ subsector_id: subsectorId, building_name: row.Building })
+          .insert({
+            subsector_id: subsectorId,
+            building_name: row.Building,
+            street: row.Street ?? null,
+            landmark: row.Landmark ?? null,
+          })
           .select('building_id')
           .single()
         if (bErr || !newBuilding) {
@@ -145,21 +186,45 @@ export async function importCoreMembers(
           errors.push({ rowNumber: rowNum, itsNo: row.ITS_NO, rawData: raw, message: msg })
           continue
         }
-        buildingId = newBuilding.building_id
-        buildingMap.set(buildingKey, buildingId)
+        buildingRecord = { building_id: newBuilding.building_id, street: row.Street ?? null, landmark: row.Landmark ?? null }
+        buildingMap.set(buildingKey, buildingRecord)
+      } else {
+        // Existing building — update street/landmark only if CSV provides a value that differs
+        const needsStreetUpdate = row.Street && row.Street !== buildingRecord.street
+        const needsLandmarkUpdate = row.Landmark && row.Landmark !== buildingRecord.landmark
+
+        if (needsStreetUpdate || needsLandmarkUpdate) {
+          const updatePayload: Record<string, string> = {}
+          if (needsStreetUpdate) updatePayload.street = row.Street!
+          if (needsLandmarkUpdate) updatePayload.landmark = row.Landmark!
+
+          await admin.from('building').update(updatePayload).eq('building_id', buildingRecord.building_id)
+
+          // Sync local cache so subsequent rows don't re-trigger the update
+          buildingMap.set(buildingKey, {
+            ...buildingRecord,
+            street: needsStreetUpdate ? row.Street! : buildingRecord.street,
+            landmark: needsLandmarkUpdate ? row.Landmark! : buildingRecord.landmark,
+          })
+          buildingRecord = buildingMap.get(buildingKey)!
+        }
       }
 
-      // Upsert family
-      await admin.from('family').upsert({ sabeel_no: row.Sabeel_No }, { onConflict: 'sabeel_no', ignoreDuplicates: true })
+      const buildingId = buildingRecord.building_id
 
-      // Upsert house
+      // Upsert house — physical unit only (no sabeel_no; multiple families can share one PACI)
       await admin.from('house').upsert({
         paci_no: row.PACI_NO,
-        sabeel_no: row.Sabeel_No,
         building_id: buildingId,
         floor_no: row.Floor_No ?? null,
         flat_no: row.Flat_No ?? null,
       }, { onConflict: 'paci_no' })
+
+      // Upsert family — occupant record links sabeel_no to paci_no
+      await admin.from('family').upsert({
+        sabeel_no: row.Sabeel_No,
+        paci_no: row.PACI_NO,
+      }, { onConflict: 'sabeel_no' })
 
       // Check if mumin exists (to track insert vs update)
       const { data: existing } = await admin
@@ -168,14 +233,26 @@ export async function importCoreMembers(
         .eq('its_no', parseInt(row.ITS_NO))
         .maybeSingle()
 
-      const muminData = {
+      // Build mumin payload — optional fields only written when CSV provides them
+      // to avoid overwriting manually-entered data on re-import
+      const muminData: Record<string, unknown> = {
         its_no: parseInt(row.ITS_NO),
         sabeel_no: row.Sabeel_No,
         subsector_id: subsectorId,
         name: row.Name,
         gender: row.Gender as 'M' | 'F',
-        date_of_birth: row.DOB ? row.DOB : null,
+        date_of_birth: row.DOB ? parseDob(row.DOB) : null,
         balig_status: row.Balig as 'Balig' | 'Ghair Balig',
+      }
+
+      if (row.Phone) muminData.phone = row.Phone
+      if (row.Family_Type) muminData.family_type = row.Family_Type
+
+      // status and role: only set for new inserts — never overwrite on re-import
+      // (prevents accidentally demoting a Masool or changing status via CSV)
+      if (!existing) {
+        muminData.status = 'active'
+        muminData.role = csvRole
       }
 
       const { error: upsertErr } = await admin
@@ -196,15 +273,15 @@ export async function importCoreMembers(
       } else {
         insertedRows++
 
-        // Provision Supabase Auth user for new Mumin
-        // email = {its_no}@mumin.local, default password = PACI_NO
+        // Provision Supabase Auth user for new mumin
+        // email = {its_no}@mumin.local, password validated via PACI at login (lazy provisioning)
         const { data: authUser, error: authErr } = await admin.auth.admin.createUser({
           email: `${row.ITS_NO}@mumin.local`,
           password: row.PACI_NO,
           email_confirm: true,
           app_metadata: {
             its_no: parseInt(row.ITS_NO),
-            role: 'Mumin',
+            role: csvRole,
             sector_ids: [],
             subsector_ids: [],
             must_change_password: false,
@@ -214,7 +291,7 @@ export async function importCoreMembers(
         if (authUser?.user) {
           await admin.from('mumin').update({
             supabase_auth_id: authUser.user.id,
-            role: 'Mumin',
+            role: csvRole,
             is_active: true,
             must_change_password: false,
           }).eq('its_no', parseInt(row.ITS_NO))

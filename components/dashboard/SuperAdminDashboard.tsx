@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import type { SuperAdminStats } from '@/lib/dashboard/getStats'
 import StatCard from './StatCard'
+import SectorMuminChart from './charts/SectorMuminChart'
 
 function timeAgo(date: string): string {
   const now = Date.now()
@@ -356,6 +357,9 @@ export default function SuperAdminDashboard({ stats }: Props) {
           </div>
         )}
       </div>
+
+      {/* ── 4b. Sector Chart ────────────────────────────────────────────── */}
+      <SectorMuminChart sectors={stats.sectors} />
 
       {/* ── 5. Buildings Overview ───────────────────────────────────────── */}
       <div>

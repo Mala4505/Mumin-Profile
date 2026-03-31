@@ -36,6 +36,7 @@ export interface MemberProfile {
 export async function getMemberProfile(itsNo: number): Promise<MemberProfile | null> {
   const supabase = await createClient()
 
+  // Query 1: mumin + subsector + sector
   const { data: mumin, error } = await supabase
     .from('mumin')
     .select(`
@@ -44,15 +45,7 @@ export async function getMemberProfile(itsNo: number): Promise<MemberProfile | n
       subsector_id,
       subsector!subsector_id!inner (
         subsector_name,
-        sector!inner ( sector_name ),
-        building!inner (
-          building_name,
-          landmark,
-          house!inner (
-            paci_no, floor_no, flat_no,
-            sabeel_no
-          )
-        )
+        sector!inner ( sector_name )
       )
     `)
     .eq('its_no', itsNo)
@@ -60,9 +53,25 @@ export async function getMemberProfile(itsNo: number): Promise<MemberProfile | n
 
   if (error || !mumin) return null
 
-  // Cast to any — the nested !inner join type cannot be inferred with Relationships: []
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const m = mumin as any
+
+  // Query 2: family → paci_no → house → building
+  const { data: familyRow } = await supabase
+    .from('family')
+    .select(`
+      paci_no,
+      house!family_paci_no_fkey (
+        floor_no, flat_no,
+        building:building_id ( building_name, landmark )
+      )
+    `)
+    .eq('sabeel_no', m.sabeel_no)
+    .maybeSingle()
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const fam = familyRow as any
+  const house = fam?.house ?? null
 
   // Fetch profile values with field info
   const { data: profileValues } = await supabase
@@ -75,12 +84,6 @@ export async function getMemberProfile(itsNo: number): Promise<MemberProfile | n
       )
     `)
     .eq('its_no', itsNo)
-
-  const buildings: any[] = m.subsector?.building ?? []
-  const matchedBuilding = buildings.find((b: any) =>
-    (b.house ?? []).some((h: any) => h.sabeel_no === m.sabeel_no)
-  )
-  const house = (matchedBuilding?.house ?? []).find((h: any) => h.sabeel_no === m.sabeel_no)
 
   return {
     its_no: m.its_no,
@@ -96,11 +99,11 @@ export async function getMemberProfile(itsNo: number): Promise<MemberProfile | n
     subsector_id: m.subsector_id,
     subsector_name: m.subsector?.subsector_name ?? '',
     sector_name: m.subsector?.sector?.sector_name ?? '',
-    building_name: matchedBuilding?.building_name ?? '',
-    landmark: matchedBuilding?.landmark ?? null,
+    building_name: house?.building?.building_name ?? '',
+    landmark: house?.building?.landmark ?? null,
     floor_no: house?.floor_no ?? null,
     flat_no: house?.flat_no ?? null,
-    paci_no: house?.paci_no ?? '',
+    paci_no: fam?.paci_no ?? '',
     profile_values: (profileValues ?? []).map((pv: any) => ({
       field_id: pv.field_id,
       caption: pv.profile_field?.caption ?? '',

@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import type { MusaidStats } from '@/lib/dashboard/getStats'
 import StatCard from './StatCard'
+import DemographicsCharts from './charts/DemographicsCharts'
+import BuildingFlatsChart from './charts/BuildingFlatsChart'
 
 const UsersIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -156,6 +158,14 @@ export default function MusaidDashboard({ stats }: Props) {
         )}
       </div>
 
+      {/* Demographics Charts */}
+      <DemographicsCharts
+        maleCount={stats.maleCount}
+        femaleCount={stats.femaleCount}
+        baligCount={stats.baligCount}
+        ghairBaligCount={stats.ghairBaligCount}
+      />
+
       {/* Buildings */}
       <div>
         <h2 className="text-base font-semibold text-foreground mb-4">Buildings</h2>
@@ -193,6 +203,9 @@ export default function MusaidDashboard({ stats }: Props) {
           </div>
         )}
       </div>
+
+      {/* Buildings Chart */}
+      <BuildingFlatsChart buildings={stats.buildings} />
 
       {/* Quick Link */}
       <div>
