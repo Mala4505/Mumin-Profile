@@ -370,6 +370,24 @@ export type Database = {
         Update: { id?: number; name?: string; created_by?: number; is_public?: boolean; filter_config?: Json; column_config?: Json; created_at?: string; updated_at?: string }
         Relationships: []
       }
+      change_request: {
+        Row: {
+          id: number; sabeel_no: string; requested_by: number; remark: string
+          status: 'pending' | 'done'; reviewed_by: number | null; reviewed_at: string | null
+          created_at: string; updated_at: string
+        }
+        Insert: {
+          id?: number; sabeel_no: string; requested_by: number; remark: string
+          status?: 'pending' | 'done'; reviewed_by?: number | null; reviewed_at?: string | null
+          created_at?: string; updated_at?: string
+        }
+        Update: {
+          id?: number; sabeel_no?: string; requested_by?: number; remark?: string
+          status?: 'pending' | 'done'; reviewed_by?: number | null; reviewed_at?: string | null
+          created_at?: string; updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>

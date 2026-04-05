@@ -325,7 +325,7 @@ export function UsersClient({ initialUsers, sectors, subsectors, mode, currentSe
                       </span>
                     </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground hidden md:table-cell">
-                      {u.last_login_at ? new Date(u.last_login_at).toLocaleDateString() : 'Pending'}
+                      {u.last_login_at ? new Date(u.last_login_at).toLocaleDateString() : 'Never'}
                     </td>
                     <td className="px-4 py-3">
                       <button
