@@ -21,6 +21,20 @@ export interface ImportResult {
   status: "completed" | "completed_with_errors" | "failed";
 }
 
+export type ProgressEvent =
+  | { type: "start"; total: number }
+  | {
+      type: "progress";
+      phase: string;
+      processed: number;
+      total: number;
+      inserted: number;
+      updated: number;
+      errors: number;
+    }
+  | { type: "error"; row: number; its_no?: string; message: string }
+  | { type: "done"; result: ImportResult };
+
 /**
  * Normalise DOB to YYYY-MM-DD regardless of input format.
  * Handles: DD-MM-YYYY, DD/MM/YYYY, YYYY-MM-DD, YYYY/MM/DD
@@ -45,16 +59,38 @@ function parseDob(raw: string): string | null {
   return null;
 }
 
+function chunkArray<T>(arr: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) {
+    chunks.push(arr.slice(i, i + size));
+  }
+  return chunks;
+}
+
 interface BuildingRecord {
   building_id: number;
   street: string | null;
   landmark: string | null;
 }
 
+interface MuminRawPayload {
+  its_no: number;
+  sabeel_no: string;
+  subsector_id: number;
+  name: string;
+  gender: string;
+  date_of_birth: string | null;
+  balig_status: string;
+  phone?: string;
+  family_type?: string;
+  _csvRole: string;
+}
+
 export async function importCoreMembers(
   csvText: string,
   filename: string,
   importedByItsNo: number,
+  onProgress?: (event: ProgressEvent) => void,
 ): Promise<ImportResult> {
   const admin = createAdminClient();
 
@@ -118,6 +154,8 @@ export async function importCoreMembers(
     const totalRows = rows.length;
     const errors: ImportResult["errors"] = [];
 
+    onProgress?.({ type: "start", total: totalRows });
+
     // ── Phase 2: Load reference data ─────────────────────────
     const [{ data: sectors }, { data: subsectors }, { data: buildings }] =
       await Promise.all([
@@ -148,13 +186,27 @@ export async function importCoreMembers(
       ]),
     );
 
-    // ── Phase 3 + 4: Validate + upsert each row ───────────────
-    let insertedRows = 0;
-    let updatedRows = 0;
+    // ── Phase 3: Validation + reference resolution loop ──────
+    // Collect payloads for batch upsert — no DB calls for house/family/mumin here
+    const housePayloads = new Map<string, Record<string, unknown>>(); // key: paci_no
+    const familyPayloads = new Map<string, Record<string, unknown>>(); // key: sabeel_no
+    const allMuminPayloads: MuminRawPayload[] = [];
 
     for (let i = 0; i < rows.length; i++) {
       const rowNum = i + 2; // 1-based + header row
       const raw = rows[i] as Record<string, string>;
+
+      if (i % 100 === 0) {
+        onProgress?.({
+          type: "progress",
+          phase: "Validating rows…",
+          processed: i,
+          total: totalRows,
+          inserted: 0,
+          updated: 0,
+          errors: errors.length,
+        });
+      }
 
       // Row validation
       const parsed_row = CoreRowSchema.safeParse(raw);
@@ -163,6 +215,7 @@ export async function importCoreMembers(
           .map((e) => `${e.path.join(".")}: ${e.message}`)
           .join("; ");
         errors.push({ rowNumber: rowNum, rawData: raw, message: msg });
+        onProgress?.({ type: "error", row: rowNum, message: msg });
         await admin.from("import_error_detail").insert({
           import_id: importLogId,
           row_number: rowNum,
@@ -175,29 +228,6 @@ export async function importCoreMembers(
 
       const row: CoreRowInput = parsed_row.data;
       const csvRole = (row.Role ?? "Mumin") as "Mumin" | "Masool" | "Musaid";
-
-      // // Sector resolution
-      // const sectorId = sectorMap.get(row.Sector.toLowerCase())
-      // if (!sectorId) {
-      //   const msg = `Sector not found: "${row.Sector}"`
-      //   errors.push({ rowNumber: rowNum, itsNo: row.ITS_NO, rawData: raw, message: msg })
-      //   await admin.from('import_error_detail').insert({
-      //     import_id: importLogId, row_number: rowNum, raw_row_data: raw, error_message: msg, its_no: parseInt(row.ITS_NO),
-      //   })
-      //   continue
-      // }
-
-      // // SubSector resolution
-      // const subsectorKey = `${sectorId}::${row.SubSector.toLowerCase()}`
-      // const subsectorId = subsectorMap.get(subsectorKey)
-      // if (!subsectorId) {
-      //   const msg = `SubSector not found: "${row.SubSector}" in Sector "${row.Sector}"`
-      //   errors.push({ rowNumber: rowNum, itsNo: row.ITS_NO, rawData: raw, message: msg })
-      //   await admin.from('import_error_detail').insert({
-      //     import_id: importLogId, row_number: rowNum, raw_row_data: raw, error_message: msg, its_no: parseInt(row.ITS_NO),
-      //   })
-      //   continue
-      // }
 
       // ── SECTOR RESOLUTION (auto-create if missing) ──
       let sectorId = sectorMap.get(row.Sector.toLowerCase());
@@ -215,6 +245,7 @@ export async function importCoreMembers(
             rawData: raw,
             message: msg,
           });
+          onProgress?.({ type: "error", row: rowNum, its_no: row.ITS_NO, message: msg });
           await admin.from("import_error_detail").insert({
             import_id: importLogId,
             row_number: rowNum,
@@ -245,6 +276,7 @@ export async function importCoreMembers(
             rawData: raw,
             message: msg,
           });
+          onProgress?.({ type: "error", row: rowNum, its_no: row.ITS_NO, message: msg });
           await admin.from("import_error_detail").insert({
             import_id: importLogId,
             row_number: rowNum,
@@ -258,12 +290,11 @@ export async function importCoreMembers(
         subsectorMap.set(subsectorKey, subsectorId);
       }
 
-      // Building resolution — auto-create if not found, update street/landmark if provided
+      // ── BUILDING RESOLUTION (auto-create if missing) ──
       const buildingKey = `${subsectorId}::${row.Building.toLowerCase()}`;
       let buildingRecord = buildingMap.get(buildingKey);
 
       if (!buildingRecord) {
-        // New building — create with street/landmark if provided
         const { data: newBuilding, error: bErr } = await admin
           .from("building")
           .insert({
@@ -282,6 +313,7 @@ export async function importCoreMembers(
             rawData: raw,
             message: msg,
           });
+          onProgress?.({ type: "error", row: rowNum, its_no: row.ITS_NO, message: msg });
           continue;
         }
         buildingRecord = {
@@ -307,7 +339,6 @@ export async function importCoreMembers(
             .update(updatePayload)
             .eq("building_id", buildingRecord.building_id);
 
-          // Sync local cache so subsequent rows don't re-trigger the update
           buildingMap.set(buildingKey, {
             ...buildingRecord,
             street: needsStreetUpdate ? row.Street! : buildingRecord.street,
@@ -321,36 +352,22 @@ export async function importCoreMembers(
 
       const buildingId = buildingRecord.building_id;
 
-      // Upsert house — physical unit only (no sabeel_no; multiple families can share one PACI)
-      await admin.from("house").upsert(
-        {
-          paci_no: row.PACI_NO,
-          building_id: buildingId,
-          floor_no: row.Floor_No ?? null,
-          flat_no: row.Flat_No ?? null,
-        },
-        { onConflict: "paci_no" },
-      );
+      // Collect house payload (deduplicated by paci_no — last writer wins)
+      housePayloads.set(row.PACI_NO, {
+        paci_no: row.PACI_NO,
+        building_id: buildingId,
+        floor_no: row.Floor_No ?? null,
+        flat_no: row.Flat_No ?? null,
+      });
 
-      // Upsert family — occupant record links sabeel_no to paci_no
-      await admin.from("family").upsert(
-        {
-          sabeel_no: row.Sabeel_No,
-          paci_no: row.PACI_NO,
-        },
-        { onConflict: "sabeel_no" },
-      );
+      // Collect family payload (deduplicated by sabeel_no)
+      familyPayloads.set(row.Sabeel_No, {
+        sabeel_no: row.Sabeel_No,
+        paci_no: row.PACI_NO,
+      });
 
-      // Check if mumin exists (to track insert vs update)
-      const { data: existing } = await admin
-        .from("mumin")
-        .select("its_no")
-        .eq("its_no", parseInt(row.ITS_NO))
-        .maybeSingle();
-
-      // Build mumin payload — optional fields only written when CSV provides them
-      // to avoid overwriting manually-entered data on re-import
-      const muminData: Record<string, unknown> = {
+      // Collect mumin payload
+      const muminPayload: MuminRawPayload = {
         its_no: parseInt(row.ITS_NO),
         sabeel_no: row.Sabeel_No,
         subsector_id: subsectorId,
@@ -358,77 +375,120 @@ export async function importCoreMembers(
         gender: row.Gender as "M" | "F",
         date_of_birth: row.DOB ? parseDob(row.DOB) : null,
         balig_status: row.Balig as "Balig" | "Ghair Balig",
+        _csvRole: csvRole,
       };
+      if (row.Phone) muminPayload.phone = row.Phone;
+      if (row.Family_Type) muminPayload.family_type = row.Family_Type;
 
-      if (row.Phone) muminData.phone = row.Phone;
-      if (row.Family_Type) muminData.family_type = row.Family_Type;
+      allMuminPayloads.push(muminPayload);
+    }
+
+    onProgress?.({
+      type: "progress",
+      phase: "Upserting houses…",
+      processed: totalRows,
+      total: totalRows,
+      inserted: 0,
+      updated: 0,
+      errors: errors.length,
+    });
+
+    // ── Phase 4: Batch upsert houses ─────────────────────────
+    const houseArr = [...housePayloads.values()];
+    for (const chunk of chunkArray(houseArr, 500)) {
+      await admin.from("house").upsert(chunk as any, { onConflict: "paci_no" });
+    }
+
+    onProgress?.({
+      type: "progress",
+      phase: "Upserting families…",
+      processed: totalRows,
+      total: totalRows,
+      inserted: 0,
+      updated: 0,
+      errors: errors.length,
+    });
+
+    // ── Phase 5: Batch upsert families ───────────────────────
+    const familyArr = [...familyPayloads.values()];
+    for (const chunk of chunkArray(familyArr, 500)) {
+      await admin.from("family").upsert(chunk as any, { onConflict: "sabeel_no" });
+    }
+
+    onProgress?.({
+      type: "progress",
+      phase: "Upserting mumin…",
+      processed: totalRows,
+      total: totalRows,
+      inserted: 0,
+      updated: 0,
+      errors: errors.length,
+    });
+
+    // ── Phase 6: Pre-fetch existing mumin ITS nos ────────────
+    // Replaces ~7000 individual "does this row exist?" queries with a handful of batch queries
+    const existingSet = new Set<number>();
+    const allItsNos = allMuminPayloads.map((p) => p.its_no);
+    for (const chunk of chunkArray(allItsNos, 1000)) {
+      const { data: existingRows } = await admin
+        .from("mumin")
+        .select("its_no")
+        .in("its_no", chunk);
+      for (const r of (existingRows ?? []) as any[]) {
+        existingSet.add(r.its_no as number);
+      }
+    }
+
+    // ── Phase 7: Batch upsert mumin ──────────────────────────
+    // Group by column profile to ensure uniform columns within each batch
+    // (PostgREST requires uniform columns per batch for correct ON CONFLICT behaviour)
+    // Profile key: `${isNew}_${hasPhone}_${hasFamilyType}`
+    const muminGroups = new Map<string, Record<string, unknown>[]>();
+    let insertedRows = 0;
+    let updatedRows = 0;
+
+    for (const p of allMuminPayloads) {
+      const isNew = !existingSet.has(p.its_no);
+      const hasPhone = p.phone !== undefined;
+      const hasFamilyType = p.family_type !== undefined;
+
+      const base: Record<string, unknown> = {
+        its_no: p.its_no,
+        sabeel_no: p.sabeel_no,
+        subsector_id: p.subsector_id,
+        name: p.name,
+        gender: p.gender,
+        date_of_birth: p.date_of_birth,
+        balig_status: p.balig_status,
+      };
+      if (hasPhone) base.phone = p.phone;
+      if (hasFamilyType) base.family_type = p.family_type;
 
       // status and role: only set for new inserts — never overwrite on re-import
-      // (prevents accidentally demoting a Masool or changing status via CSV)
-      if (!existing) {
-        muminData.status = "active";
-        muminData.role = csvRole;
-      }
-
-      const { error: upsertErr } = await admin
-        .from("mumin")
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .upsert(muminData as any, { onConflict: "its_no" });
-
-      if (upsertErr) {
-        const msg = `Failed to upsert mumin ${row.ITS_NO}: ${upsertErr.message}`;
-        errors.push({
-          rowNumber: rowNum,
-          itsNo: row.ITS_NO,
-          rawData: raw,
-          message: msg,
-        });
-        await admin.from("import_error_detail").insert({
-          import_id: importLogId,
-          row_number: rowNum,
-          raw_row_data: raw,
-          error_message: msg,
-          its_no: parseInt(row.ITS_NO),
-        });
-        continue;
-      }
-
-      if (existing) {
-        updatedRows++;
-      } else {
+      if (isNew) {
+        base.status = "active";
+        base.role = p._csvRole;
         insertedRows++;
+      } else {
+        updatedRows++;
+      }
 
-        // Provision Supabase Auth user for new mumin
-        // email = {its_no}@mumin.local, password validated via PACI at login (lazy provisioning)
-        const { data: authUser, error: authErr } =
-          await admin.auth.admin.createUser({
-            email: `${row.ITS_NO}@mumin.local`,
-            password: row.PACI_NO,
-            email_confirm: true,
-            app_metadata: {
-              its_no: parseInt(row.ITS_NO),
-              role: csvRole,
-              sector_ids: [],
-              subsector_ids: [],
-              must_change_password: false,
-            },
+      const groupKey = `${isNew}_${hasPhone}_${hasFamilyType}`;
+      if (!muminGroups.has(groupKey)) muminGroups.set(groupKey, []);
+      muminGroups.get(groupKey)!.push(base);
+    }
+
+    for (const group of muminGroups.values()) {
+      for (const chunk of chunkArray(group, 500)) {
+        const { error: upsertErr } = await admin
+          .from("mumin")
+          .upsert(chunk as any, { onConflict: "its_no" });
+        if (upsertErr) {
+          errors.push({
+            rowNumber: 0,
+            rawData: {},
+            message: `Batch mumin upsert failed: ${upsertErr.message}`,
           });
-
-        if (authUser?.user) {
-          await admin
-            .from("mumin")
-            .update({
-              supabase_auth_id: authUser.user.id,
-              role: csvRole,
-              is_active: true,
-              must_change_password: false,
-            })
-            .eq("its_no", parseInt(row.ITS_NO));
-        } else if (authErr && !authErr.message.includes("already registered")) {
-          // Non-fatal: log but don't fail the row
-          console.warn(
-            `Auth provision failed for ITS ${row.ITS_NO}: ${authErr.message}`,
-          );
         }
       }
     }
@@ -456,7 +516,7 @@ export async function importCoreMembers(
       })
       .eq("id", importLogId);
 
-    return {
+    const result: ImportResult = {
       importLogId,
       totalRows,
       insertedRows,
@@ -465,6 +525,9 @@ export async function importCoreMembers(
       errors,
       status,
     };
+
+    onProgress?.({ type: "done", result });
+    return result;
   } catch (err) {
     await admin
       .from("import_log")

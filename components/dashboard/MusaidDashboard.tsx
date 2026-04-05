@@ -166,6 +166,60 @@ export default function MusaidDashboard({ stats }: Props) {
         ghairBaligCount={stats.ghairBaligCount}
       />
 
+      {/* Masools of My Sector */}
+      {stats.sector_masools.length > 0 && (
+        <div>
+          <h2 className="text-base font-semibold text-foreground mb-3">Masools of My Sector</h2>
+          <div className="bg-card border border-border rounded-lg overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-muted/50 border-b border-border">
+                  <th className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Name</th>
+                  <th className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">ITS No</th>
+                  <th className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Contact</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stats.sector_masools.map((m, idx) => (
+                  <tr key={m.its_no} className={`hover:bg-muted/20 transition-colors ${idx !== stats.sector_masools.length - 1 ? 'border-b border-border' : ''}`}>
+                    <td className="px-4 py-3 font-medium text-foreground">{m.name}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{m.its_no}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{m.phone ?? '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Musaids in My Subsector */}
+      {stats.subsector_musaids.length > 0 && (
+        <div>
+          <h2 className="text-base font-semibold text-foreground mb-3">Musaids in My Subsector</h2>
+          <div className="bg-card border border-border rounded-lg overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-muted/50 border-b border-border">
+                  <th className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Name</th>
+                  <th className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">ITS No</th>
+                  <th className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Contact</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stats.subsector_musaids.map((m, idx) => (
+                  <tr key={m.its_no} className={`hover:bg-muted/20 transition-colors ${idx !== stats.subsector_musaids.length - 1 ? 'border-b border-border' : ''}`}>
+                    <td className="px-4 py-3 font-medium text-foreground">{m.name}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{m.its_no}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{m.phone ?? '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* Buildings */}
       <div>
         <h2 className="text-base font-semibold text-foreground mb-4">Buildings</h2>

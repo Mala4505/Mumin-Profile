@@ -29,6 +29,21 @@ interface ImportResult {
   errors: Array<{ rowNumber: number; itsNo?: string; message: string }>
 }
 
+interface ProgressState {
+  phase: string
+  processed: number
+  total: number
+  inserted: number
+  updated: number
+  errors: number
+}
+
+interface LiveError {
+  row: number
+  its_no?: string
+  message: string
+}
+
 const CORE_COLUMNS_REQUIRED = ['ITS_NO', 'Name', 'Gender', 'Balig', 'Sabeel_No', 'PACI_NO', 'Building', 'SubSector', 'Sector']
 const CORE_COLUMNS_OPTIONAL = ['DOB', 'Floor_No', 'Flat_No', 'Role', 'Phone', 'Street', 'Landmark', 'Family_Type']
 const CORE_COLUMNS = [...CORE_COLUMNS_REQUIRED, ...CORE_COLUMNS_OPTIONAL]
@@ -65,8 +80,6 @@ function downloadTemplate(isCore: boolean) {
   URL.revokeObjectURL(url)
 }
 
-const IMPORT_STEPS = ['Structural Check', 'Validation', 'Reference Check', 'Committing']
-
 export function ImportForm({ role }: ImportFormProps) {
   const [file, setFile] = useState<File | null>(null)
   const [loading, setLoading] = useState(false)
@@ -74,7 +87,8 @@ export function ImportForm({ role }: ImportFormProps) {
   const [error, setError] = useState('')
   const [dragOver, setDragOver] = useState(false)
   const [colRefOpen, setColRefOpen] = useState(false)
-  const [exportSuccess, setExportSuccess] = useState(false)
+  const [progressState, setProgressState] = useState<ProgressState | null>(null)
+  const [liveErrors, setLiveErrors] = useState<LiveError[]>([])
   const fileRef = useRef<HTMLInputElement>(null)
 
   const canRunCore = role === 'SuperAdmin'
@@ -85,27 +99,105 @@ export function ImportForm({ role }: ImportFormProps) {
     if (!file) return
     setError('')
     setResult(null)
+    setProgressState(null)
+    setLiveErrors([])
     setLoading(true)
-    setExportSuccess(false)
 
     const formData = new FormData()
     formData.append('file', file)
 
     const endpoint = canRunCore ? '/api/import/core' : '/api/import/profile'
 
-    const res = await fetch(endpoint, { method: 'POST', body: formData })
-    const data = await res.json()
+    let res: Response
+    try {
+      res = await fetch(endpoint, { method: 'POST', body: formData })
+    } catch {
+      setError('Network error — could not reach the server.')
+      setLoading(false)
+      return
+    }
 
     if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
       setError(data.error ?? 'Import failed')
       setLoading(false)
       return
     }
 
-    setResult(data)
+    // Profile import returns plain JSON
+    if (!res.headers.get('content-type')?.includes('text/event-stream')) {
+      const data = await res.json()
+      setResult(data)
+      setLoading(false)
+      setFile(null)
+      if (fileRef.current) fileRef.current.value = ''
+      return
+    }
+
+    // Core import returns SSE stream — read incrementally
+    const reader = res.body!.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+
+        // Split on SSE event boundaries
+        const parts = buffer.split('\n\n')
+        buffer = parts.pop() ?? ''
+
+        for (const part of parts) {
+          const line = part.trim()
+          if (!line.startsWith('data: ')) continue
+          try {
+            const event = JSON.parse(line.slice(6))
+
+            if (event.type === 'start') {
+              setProgressState({
+                phase: 'Starting…',
+                processed: 0,
+                total: event.total,
+                inserted: 0,
+                updated: 0,
+                errors: 0,
+              })
+            } else if (event.type === 'progress') {
+              setProgressState({
+                phase: event.phase,
+                processed: event.processed,
+                total: event.total,
+                inserted: event.inserted,
+                updated: event.updated,
+                errors: event.errors,
+              })
+            } else if (event.type === 'error' && event.row) {
+              setLiveErrors(prev => [...prev, {
+                row: event.row,
+                its_no: event.its_no,
+                message: event.message,
+              }])
+            } else if (event.type === 'done') {
+              setResult(event.result)
+              setLoading(false)
+              setFile(null)
+              if (fileRef.current) fileRef.current.value = ''
+            } else if (event.type === 'error' && !event.row) {
+              setError(event.message ?? 'Import failed')
+              setLoading(false)
+            }
+          } catch {
+            // Ignore malformed SSE lines
+          }
+        }
+      }
+    } catch {
+      setError('Stream interrupted — check server logs.')
+    }
+
     setLoading(false)
-    setFile(null)
-    if (fileRef.current) fileRef.current.value = ''
   }
 
   function handleFileChange(newFile: File | null) {
@@ -170,6 +262,10 @@ export function ImportForm({ role }: ImportFormProps) {
           label: 'Completed with Errors',
         }
     : null
+
+  const progressPct = progressState && progressState.total > 0
+    ? Math.round((progressState.processed / progressState.total) * 100)
+    : 0
 
   return (
     <div className="space-y-5">
@@ -264,25 +360,48 @@ export function ImportForm({ role }: ImportFormProps) {
           </div>
         )}
 
-        {/* Progress indicator — shown during loading */}
+        {/* Live progress — shown while SSE stream is active */}
         {loading && (
-          <div className="bg-card border border-border rounded-xl p-5">
-            <p className="text-sm font-medium text-foreground mb-4 flex items-center gap-2">
-              <Loader2 className="w-4 h-4 animate-spin text-primary" />
-              Processing import…
+          <div className="bg-card border border-border rounded-xl p-5 space-y-3">
+            <p className="text-sm font-medium text-foreground flex items-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin text-primary flex-shrink-0" />
+              {progressState?.phase ?? 'Processing import…'}
             </p>
-            <div className="flex items-center gap-0">
-              {IMPORT_STEPS.map((step, i) => (
-                <div key={step} className="flex items-center flex-1 last:flex-none">
-                  <div className="flex flex-col items-center gap-1.5">
-                    <div className="w-7 h-7 rounded-full bg-primary/20 border-2 border-primary flex items-center justify-center animate-pulse">
-                      <div className="w-2 h-2 rounded-full bg-primary" />
-                    </div>
-                    <span className="text-xs text-muted-foreground whitespace-nowrap">{step}</span>
-                  </div>
-                  {i < IMPORT_STEPS.length - 1 && (
-                    <div className="flex-1 h-0.5 bg-primary/20 mx-1 mb-5 animate-pulse" />
+            {progressState && progressState.total > 0 && (
+              <>
+                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-primary rounded-full transition-all duration-300"
+                    style={{ width: `${progressPct}%` }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {progressState.processed.toLocaleString()} / {progressState.total.toLocaleString()} rows
+                  {progressState.inserted > 0 && ` · ${progressState.inserted} inserted`}
+                  {progressState.updated > 0 && ` · ${progressState.updated} updated`}
+                  {progressState.errors > 0 && ` · ${progressState.errors} errors`}
+                </p>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Live error list — grows as errors arrive */}
+        {liveErrors.length > 0 && (
+          <div className="bg-destructive/5 border border-destructive/20 rounded-xl overflow-hidden">
+            <div className="px-4 py-2.5 border-b border-destructive/20 bg-destructive/10">
+              <p className="text-xs font-semibold text-destructive uppercase tracking-wide">
+                Row Errors ({liveErrors.length})
+              </p>
+            </div>
+            <div className="overflow-auto max-h-[200px] divide-y divide-destructive/10">
+              {liveErrors.map((err, i) => (
+                <div key={i} className="px-4 py-2 text-xs">
+                  <span className="font-mono text-muted-foreground mr-2">Row {err.row}</span>
+                  {err.its_no && (
+                    <span className="font-mono text-muted-foreground mr-2">ITS {err.its_no}</span>
                   )}
+                  <span className="text-destructive">{err.message}</span>
                 </div>
               ))}
             </div>

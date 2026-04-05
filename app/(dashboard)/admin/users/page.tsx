@@ -4,34 +4,80 @@ import { getSession } from '@/lib/auth/getSession'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { UsersClient } from '@/components/admin/UsersClient'
 
-export default async function AdminUsersPage() {
+interface PageProps {
+  searchParams: Promise<{
+    search?: string
+    role?: string
+    show_all?: string
+  }>
+}
+
+export default async function AdminUsersPage({ searchParams }: PageProps) {
   const session = await getSession()
   if (!session) redirect('/login')
   if (session.role !== 'SuperAdmin') redirect('/dashboard')
 
+  const params = await searchParams
+  const search = params.search?.trim() ?? ''
+  const roleFilter = params.role ?? ''
+  const showAll = params.show_all === '1'
+
+  const hasFilter = showAll || search !== '' || roleFilter !== ''
+
   const admin = createAdminClient()
 
-  const [usersResult, sectorsResult, subsectorsResult] = await Promise.all([
-    admin
-      .from('mumin')
-      .select(`
-        its_no,
-        name,
-        role,
-        is_active,
-        last_login_at,
-        sector:user_sector(sector_id),
-        subsector:user_subsector(subsector_id)
-      `)
-      .not('supabase_auth_id', 'is', null)
-      .order('role', { ascending: true })
-      .order('its_no', { ascending: true })
-      .limit(100),
+  const [sectorsResult, subsectorsResult, sectorAssignResult, subsectorAssignResult] = await Promise.all([
     admin.from('sector').select('sector_id, sector_name').order('sector_name'),
     admin.from('subsector').select('subsector_id, sector_id, subsector_name').order('subsector_name'),
+    admin.from('user_sector').select('its_no, sector_id'),
+    admin.from('user_subsector').select('its_no, subsector_id'),
   ])
 
-  const users = (usersResult.data ?? []) as any[]
+  let users: any[] = []
+
+  if (hasFilter) {
+    let query = admin
+      .from('mumin')
+      .select('its_no, name, role, is_active, last_login_at, supabase_auth_id')
+      .order('name', { ascending: true })
+      .limit(2000)
+
+    if (roleFilter) {
+      query = query.eq('role', roleFilter)
+    }
+
+    if (search) {
+      const isNumeric = /^\d+$/.test(search)
+      if (isNumeric) {
+        query = query.or(`name.ilike.%${search}%,its_no.eq.${search}`)
+      } else {
+        query = query.ilike('name', `%${search}%`)
+      }
+    }
+
+    const { data: muminRows } = await query
+
+    // Build sector/subsector assignment maps
+    const sectorMap = new Map<number, number[]>()
+    for (const s of (sectorAssignResult.data ?? []) as any[]) {
+      const existing = sectorMap.get(s.its_no) ?? []
+      existing.push(s.sector_id)
+      sectorMap.set(s.its_no, existing)
+    }
+    const subsectorMap = new Map<number, number[]>()
+    for (const s of (subsectorAssignResult.data ?? []) as any[]) {
+      const existing = subsectorMap.get(s.its_no) ?? []
+      existing.push(s.subsector_id)
+      subsectorMap.set(s.its_no, existing)
+    }
+
+    users = ((muminRows ?? []) as any[]).map((m: any) => ({
+      ...m,
+      sector: (sectorMap.get(m.its_no) ?? []).map((id: number) => ({ sector_id: id })),
+      subsector: (subsectorMap.get(m.its_no) ?? []).map((id: number) => ({ subsector_id: id })),
+    }))
+  }
+
   const sectors = (sectorsResult.data ?? []) as any[]
   const subsectors = (subsectorsResult.data ?? []) as any[]
 
@@ -53,7 +99,15 @@ export default async function AdminUsersPage() {
         </a>
       </div>
 
-      <UsersClient initialUsers={users} sectors={sectors} subsectors={subsectors} />
+      <UsersClient
+        initialUsers={users}
+        sectors={sectors}
+        subsectors={subsectors}
+        mode={hasFilter ? 'loaded' : 'idle'}
+        currentSearch={search}
+        currentRole={roleFilter}
+        showAll={showAll}
+      />
     </div>
   )
 }

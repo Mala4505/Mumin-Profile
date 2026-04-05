@@ -71,5 +71,59 @@ export async function PATCH(
     }
   }
 
-  return NextResponse.json({ success: true })
+  // Check if a Supabase auth account exists; create one if not
+  const { data: muminRow } = await admin
+    .from('mumin')
+    .select('supabase_auth_id, sabeel_no, role')
+    .eq('its_no', itsNo)
+    .single()
+
+  let newAuthId: string | null = muminRow?.supabase_auth_id ?? null
+
+  if (!newAuthId) {
+    // Resolve password: use PACI no from family table if available
+    let password = `ITS${itsNo}` // fallback
+    if (muminRow?.sabeel_no) {
+      const { data: familyRow } = await admin
+        .from('family')
+        .select('paci_no')
+        .eq('sabeel_no', muminRow.sabeel_no)
+        .maybeSingle()
+      if (familyRow?.paci_no) password = familyRow.paci_no
+    }
+
+    const { data: authUser, error: authErr } = await admin.auth.admin.createUser({
+      email: `${itsNo}@mumin.local`,
+      password,
+      email_confirm: true,
+      app_metadata: {
+        its_no: itsNo,
+        role: body.role ?? muminRow?.role ?? 'Mumin',
+        sector_ids: body.sector_ids ?? [],
+        subsector_ids: body.subsector_ids ?? [],
+        must_change_password: true,
+      },
+    })
+
+    if (authUser?.user) {
+      newAuthId = authUser.user.id
+      await admin.from('mumin').update({
+        supabase_auth_id: newAuthId,
+        must_change_password: true,
+      }).eq('its_no', itsNo)
+    } else if (authErr) {
+      // If already registered (e.g. concurrent save), look up existing account
+      if (authErr.message.includes('already registered')) {
+        const { data: existing } = await admin.auth.admin.listUsers()
+        const found = existing?.users?.find(u => u.email === `${itsNo}@mumin.local`)
+        if (found) {
+          newAuthId = found.id
+          await admin.from('mumin').update({ supabase_auth_id: newAuthId }).eq('its_no', itsNo)
+        }
+      }
+      // Non-fatal: proceed without blocking the role update
+    }
+  }
+
+  return NextResponse.json({ success: true, supabase_auth_id: newAuthId })
 }

@@ -11,6 +11,8 @@ import {
   BarChart3,
   Settings,
   LogOut,
+  ClipboardList,
+  ClipboardCheck,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -43,30 +45,42 @@ const NAV_ITEMS: NavItem[] = [
     label: 'Dashboard',
     href: '/dashboard',
     icon: LayoutDashboard,
-    roles: ['SuperAdmin', 'Masool', 'Musaid', 'Mumin'],
+    roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid', 'Mumin'],
   },
   {
     label: 'Members',
     href: ROUTES.MEMBERS,
     icon: Users,
-    roles: ['SuperAdmin', 'Masool', 'Musaid'],
+    roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid'],
   },
   {
     label: 'Import',
     href: ROUTES.IMPORT,
     icon: Upload,
-    roles: ['SuperAdmin'],
+    roles: ['SuperAdmin', 'Admin', 'Masool'],
   },
   {
     label: 'Reports',
     href: ROUTES.REPORTS,
     icon: BarChart3,
-    roles: ['SuperAdmin', 'Masool', 'Musaid'],
+    roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid'],
+  },
+  {
+    label: 'Requests',
+    href: ROUTES.REQUESTS,
+    icon: ClipboardList,
+    roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid'],
   },
   {
     label: 'Admin',
     href: ROUTES.ADMIN_USERS,
     icon: Settings,
+    roles: ['SuperAdmin'],
+  },
+  {
+    label: 'Request Review',
+    href: ROUTES.ADMIN_REQUESTS,
+    icon: ClipboardCheck,
     roles: ['SuperAdmin'],
   },
 ]
@@ -143,7 +157,7 @@ export function MobileHeader({ role, userName }: MobileHeaderProps) {
 
       {/* Mobile nav sheet */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent side="left" className="w-72 p-0">
+        <SheetContent side="left" className="w-72 p-0" aria-describedby={undefined}>
           <SheetHeader className="border-b border-border px-5 py-4">
             <div className="flex items-center gap-3">
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-base select-none">

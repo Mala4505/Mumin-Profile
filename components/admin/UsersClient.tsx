@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { Pencil, X, Loader2, Shield } from 'lucide-react'
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
+import { Pencil, X, Loader2, Shield, Search, ChevronLeft, ChevronRight, ChevronDown, Users } from 'lucide-react'
 
 interface SystemUser {
   its_no: number
@@ -10,6 +10,7 @@ interface SystemUser {
   role: string
   is_active: boolean
   last_login_at: string | null
+  supabase_auth_id: string | null
   sector: Array<{ sector_id: number }>
   subsector: Array<{ subsector_id: number }>
 }
@@ -21,10 +22,18 @@ interface Props {
   initialUsers: SystemUser[]
   sectors: Sector[]
   subsectors: Subsector[]
+  mode: 'idle' | 'loaded'
+  currentSearch: string
+  currentRole: string
+  showAll: boolean
 }
 
 const ROLES = ['SuperAdmin', 'Admin', 'Masool', 'Musaid', 'Mumin'] as const
 type Role = typeof ROLES[number]
+
+const ALL_ROLES = ['', ...ROLES] as const
+
+const PAGE_SIZE = 50
 
 const ROLE_COLORS: Record<string, string> = {
   SuperAdmin: 'bg-purple-100 text-purple-700',
@@ -42,9 +51,14 @@ function RoleBadge({ role }: { role: string }) {
   )
 }
 
-export function UsersClient({ initialUsers, sectors, subsectors }: Props) {
+export function UsersClient({ initialUsers, sectors, subsectors, mode, currentSearch, currentRole, showAll }: Props) {
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
   const [users, setUsers] = useState(initialUsers)
+  const [searchInput, setSearchInput] = useState(currentSearch)
+  const [page, setPage] = useState(1)
   const [editing, setEditing] = useState<SystemUser | null>(null)
   const [editRole, setEditRole] = useState<Role>('Mumin')
   const [editActive, setEditActive] = useState(true)
@@ -52,6 +66,39 @@ export function UsersClient({ initialUsers, sectors, subsectors }: Props) {
   const [editSubsectorIds, setEditSubsectorIds] = useState<number[]>([])
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Sync users when server re-renders with new data
+  useEffect(() => { setUsers(initialUsers) }, [initialUsers])
+  useEffect(() => { setSearchInput(currentSearch) }, [currentSearch])
+
+  const updateParam = useCallback((key: string, value: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (value) params.set(key, value)
+    else params.delete(key)
+    params.delete('show_all')
+    router.push(`${pathname}?${params.toString()}`)
+    setPage(1)
+  }, [pathname, router, searchParams])
+
+  function handleSearchChange(val: string) {
+    setSearchInput(val)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => updateParam('search', val), 350)
+  }
+
+  function handleRoleChange(val: string) {
+    updateParam('role', val)
+  }
+
+  function clearAll() {
+    setSearchInput('')
+    router.push(pathname)
+    setPage(1)
+  }
+
+  const totalPages = Math.max(1, Math.ceil(users.length / PAGE_SIZE))
+  const paginated = useMemo(() => users.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [users, page])
 
   function openEdit(u: SystemUser) {
     setEditing(u)
@@ -80,18 +127,14 @@ export function UsersClient({ initialUsers, sectors, subsectors }: Props) {
     setSaving(true)
     setSaveError('')
 
-    const body: Record<string, unknown> = {
-      role: editRole,
-      is_active: editActive,
-    }
+    const body: Record<string, unknown> = { role: editRole, is_active: editActive }
 
-    // Only send assignments relevant to the new role
     if (editRole === 'Admin' || editRole === 'Masool') {
       body.sector_ids = editSectorIds
-      body.subsector_ids = [] // clear subsectors
+      body.subsector_ids = []
     } else if (editRole === 'Musaid') {
       body.subsector_ids = editSubsectorIds
-      body.sector_ids = [] // clear sectors
+      body.sector_ids = []
     } else {
       body.sector_ids = []
       body.subsector_ids = []
@@ -110,13 +153,15 @@ export function UsersClient({ initialUsers, sectors, subsectors }: Props) {
       return
     }
 
-    // Update local state
+    const responseData = await res.json()
+
     setUsers(prev => prev.map(u =>
       u.its_no === editing.its_no
         ? {
             ...u,
             role: editRole,
             is_active: editActive,
+            supabase_auth_id: responseData.supabase_auth_id ?? u.supabase_auth_id,
             sector: (editRole === 'Admin' || editRole === 'Masool') ? editSectorIds.map(id => ({ sector_id: id })) : [],
             subsector: editRole === 'Musaid' ? editSubsectorIds.map(id => ({ subsector_id: id })) : [],
           }
@@ -128,33 +173,135 @@ export function UsersClient({ initialUsers, sectors, subsectors }: Props) {
     router.refresh()
   }
 
+  // ── Idle state ──────────────────────────────────────────────────────────────
+  if (mode === 'idle') {
+    return (
+      <div className="space-y-4">
+        {/* Search / filter bar */}
+        <div className="bg-card rounded-xl border border-border p-4 shadow-sm flex flex-wrap gap-3 items-end">
+          <div className="flex-1 min-w-48 relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <input
+              type="text"
+              value={searchInput}
+              onChange={e => handleSearchChange(e.target.value)}
+              placeholder="Search by name or ITS No…"
+              className="w-full pl-9 pr-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </div>
+          <div className="relative">
+            <select
+              value={currentRole}
+              onChange={e => handleRoleChange(e.target.value)}
+              className="appearance-none bg-card border border-border rounded-lg px-3 py-2 pr-8 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 cursor-pointer"
+            >
+              <option value="">All Roles</option>
+              {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+          </div>
+        </div>
+
+        {/* Idle prompt */}
+        <div className="bg-card rounded-xl border border-border overflow-hidden shadow-sm">
+          <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
+            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+              <Users className="w-8 h-8 text-muted-foreground" />
+            </div>
+            <h3 className="text-base font-semibold text-foreground mb-1">Search to find members</h3>
+            <p className="text-sm text-muted-foreground mb-5">
+              Type a name or ITS No, filter by role, or load the full list.
+            </p>
+            <a
+              href="/admin/users?show_all=1"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+            >
+              <Users className="w-4 h-4" />
+              View All Members
+            </a>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Loaded state ─────────────────────────────────────────────────────────────
   return (
     <>
-      <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-border flex items-center justify-between">
-          <h2 className="font-semibold text-foreground flex items-center gap-2">
-            <Shield className="w-4 h-4 text-primary" />
-            System Users ({users.length})
-          </h2>
-          <span className="text-xs text-muted-foreground">Mumineen with system accounts</span>
+      {/* Search / filter bar */}
+      <div className="bg-card rounded-xl border border-border p-4 shadow-sm flex flex-wrap gap-3 items-end mb-4">
+        <div className="flex-1 min-w-48 relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+          <input
+            type="text"
+            value={searchInput}
+            onChange={e => handleSearchChange(e.target.value)}
+            placeholder="Search by name or ITS No…"
+            className="w-full pl-9 pr-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
         </div>
+        <div className="relative">
+          <select
+            value={currentRole}
+            onChange={e => handleRoleChange(e.target.value)}
+            className="appearance-none bg-card border border-border rounded-lg px-3 py-2 pr-8 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 cursor-pointer"
+          >
+            <option value="">All Roles</option>
+            {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+          </select>
+          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+        </div>
+        {(searchInput || currentRole) && (
+          <button
+            onClick={clearAll}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-muted-foreground hover:text-foreground border border-border rounded-lg hover:bg-muted/40 transition-colors"
+          >
+            <X className="w-3.5 h-3.5" />
+            Clear
+          </button>
+        )}
+        {!showAll && (
+          <a
+            href="/admin/users?show_all=1"
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-muted-foreground hover:text-foreground border border-border rounded-lg hover:bg-muted/40 transition-colors"
+          >
+            <Users className="w-3.5 h-3.5" />
+            View All
+          </a>
+        )}
+      </div>
+
+      <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+        <div className="px-4 py-3 border-b border-border flex items-center gap-2">
+          <Shield className="w-4 h-4 text-primary flex-shrink-0" />
+          <h2 className="font-semibold text-foreground text-sm">
+            {users.length} member{users.length !== 1 ? 's' : ''} found
+          </h2>
+        </div>
+
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-muted/40">
               <tr>
-                <th className="text-left px-4 py-3 text-muted-foreground font-medium">ITS No</th>
-                <th className="text-left px-4 py-3 text-muted-foreground font-medium">Name</th>
-                <th className="text-left px-4 py-3 text-muted-foreground font-medium">Role</th>
-                <th className="text-left px-4 py-3 text-muted-foreground font-medium">Sector / Subsector</th>
-                <th className="text-left px-4 py-3 text-muted-foreground font-medium">Status</th>
-                <th className="text-left px-4 py-3 text-muted-foreground font-medium">Last Login</th>
+                <th className="text-left px-4 py-3 text-muted-foreground font-medium text-xs uppercase tracking-wider">ITS No</th>
+                <th className="text-left px-4 py-3 text-muted-foreground font-medium text-xs uppercase tracking-wider">Name</th>
+                <th className="text-left px-4 py-3 text-muted-foreground font-medium text-xs uppercase tracking-wider">Role</th>
+                <th className="text-left px-4 py-3 text-muted-foreground font-medium text-xs uppercase tracking-wider">Sector / Subsector</th>
+                <th className="text-left px-4 py-3 text-muted-foreground font-medium text-xs uppercase tracking-wider">Status</th>
+                <th className="text-left px-4 py-3 text-muted-foreground font-medium text-xs uppercase tracking-wider hidden md:table-cell">Last Login</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {users.map(u => {
-                const sectorNames = u.sector.map(s => sectors.find(sec => sec.sector_id === s.sector_id)?.sector_name).filter(Boolean)
-                const subsectorNames = u.subsector.map(s => subsectors.find(sub => sub.subsector_id === s.subsector_id)?.subsector_name).filter(Boolean)
+              {paginated.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                    No members found.
+                  </td>
+                </tr>
+              ) : paginated.map(u => {
+                const sectorNames = u.sector.map((s: any) => sectors.find(sec => sec.sector_id === s.sector_id)?.sector_name).filter(Boolean)
+                const subsectorNames = u.subsector.map((s: any) => subsectors.find(sub => sub.subsector_id === s.subsector_id)?.subsector_name).filter(Boolean)
                 const assignment = sectorNames.length > 0
                   ? sectorNames.join(', ')
                   : subsectorNames.length > 0
@@ -164,7 +311,12 @@ export function UsersClient({ initialUsers, sectors, subsectors }: Props) {
                 return (
                   <tr key={u.its_no} className="hover:bg-muted/20 transition-colors">
                     <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{u.its_no}</td>
-                    <td className="px-4 py-3 font-medium">{u.name}</td>
+                    <td className="px-4 py-3 font-medium">
+                      {u.name}
+                      {!u.supabase_auth_id && (
+                        <span className="ml-2 text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">no login</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3"><RoleBadge role={u.role} /></td>
                     <td className="px-4 py-3 text-sm text-muted-foreground">{assignment}</td>
                     <td className="px-4 py-3">
@@ -172,7 +324,7 @@ export function UsersClient({ initialUsers, sectors, subsectors }: Props) {
                         {u.is_active ? 'Active' : 'Inactive'}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">
+                    <td className="px-4 py-3 text-xs text-muted-foreground hidden md:table-cell">
                       {u.last_login_at ? new Date(u.last_login_at).toLocaleDateString() : 'Never'}
                     </td>
                     <td className="px-4 py-3">
@@ -190,6 +342,32 @@ export function UsersClient({ initialUsers, sectors, subsectors }: Props) {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="px-4 py-3 border-t border-border flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">
+              Showing {((page - 1) * PAGE_SIZE) + 1}–{Math.min(page * PAGE_SIZE, users.length)} of {users.length}
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 disabled:opacity-40 transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="text-xs text-muted-foreground px-2">{page} / {totalPages}</span>
+              <button
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 disabled:opacity-40 transition-colors"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Edit Modal */}
@@ -197,11 +375,15 @@ export function UsersClient({ initialUsers, sectors, subsectors }: Props) {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40" onClick={closeEdit} />
           <div className="relative bg-card rounded-2xl border border-border shadow-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
-            {/* Header */}
             <div className="flex items-start justify-between mb-5">
               <div>
                 <h2 className="font-bold text-foreground text-lg">{editing.name}</h2>
                 <p className="text-xs text-muted-foreground mt-0.5">ITS {editing.its_no}</p>
+                {!editing.supabase_auth_id && (
+                  <p className="text-xs text-amber-600 mt-1">
+                    No login account — one will be created automatically on save.
+                  </p>
+                )}
               </div>
               <button onClick={closeEdit} className="p-1.5 rounded-lg hover:bg-muted/40 text-muted-foreground transition-colors">
                 <X className="w-4 h-4" />
@@ -209,7 +391,6 @@ export function UsersClient({ initialUsers, sectors, subsectors }: Props) {
             </div>
 
             <div className="space-y-5">
-              {/* Role */}
               <div>
                 <label className="block text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Role</label>
                 <div className="grid grid-cols-3 gap-2">
@@ -230,7 +411,6 @@ export function UsersClient({ initialUsers, sectors, subsectors }: Props) {
                 </div>
               </div>
 
-              {/* Active status */}
               <div>
                 <label className="block text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Account Status</label>
                 <div className="flex gap-2">
@@ -253,12 +433,9 @@ export function UsersClient({ initialUsers, sectors, subsectors }: Props) {
                 </div>
               </div>
 
-              {/* Sector assignments — Admin and Masool */}
               {(editRole === 'Admin' || editRole === 'Masool') && (
                 <div>
-                  <label className="block text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">
-                    Assigned Sectors
-                  </label>
+                  <label className="block text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Assigned Sectors</label>
                   <div className="space-y-1.5 bg-muted/30 rounded-lg p-3 border border-border">
                     {sectors.map(s => (
                       <label key={s.sector_id} className="flex items-center gap-2.5 cursor-pointer py-0.5">
@@ -276,12 +453,9 @@ export function UsersClient({ initialUsers, sectors, subsectors }: Props) {
                 </div>
               )}
 
-              {/* Subsector assignments — Musaid only */}
               {editRole === 'Musaid' && (
                 <div>
-                  <label className="block text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">
-                    Assigned Subsectors
-                  </label>
+                  <label className="block text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Assigned Subsectors</label>
                   <div className="space-y-3 bg-muted/30 rounded-lg p-3 border border-border max-h-48 overflow-y-auto">
                     {sectors.map(sec => {
                       const subs = subsectors.filter(s => s.sector_id === sec.sector_id)
@@ -310,7 +484,6 @@ export function UsersClient({ initialUsers, sectors, subsectors }: Props) {
                 </div>
               )}
 
-              {/* Error */}
               {saveError && (
                 <p className="text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2">
                   {saveError}
@@ -321,7 +494,6 @@ export function UsersClient({ initialUsers, sectors, subsectors }: Props) {
                 Role changes take effect on the user's next login.
               </p>
 
-              {/* Actions */}
               <div className="flex gap-2 pt-1">
                 <button
                   type="button"

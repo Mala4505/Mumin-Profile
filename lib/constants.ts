@@ -32,6 +32,8 @@ export const ROUTES = {
   IMPORT: '/import',
   REPORTS: '/reports',
   ADMIN_USERS: '/admin/users',
+  REQUESTS: '/requests',
+  ADMIN_REQUESTS: '/admin/requests',
   CHANGE_PASSWORD: '/change-password',
 } as const
 

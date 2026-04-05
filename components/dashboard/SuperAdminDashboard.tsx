@@ -278,7 +278,7 @@ export default function SuperAdminDashboard({ stats }: Props) {
         </Link>
       </div>
 
-      {/* ── 4. Sector Overview — Table ──────────────────────────────────── */}
+      {/* ── 4. Sector Overview — Accordion ─────────────────────────────── */}
       <div>
         <h2 className="text-base font-semibold text-foreground mb-3">Sector Overview</h2>
         {stats.sectors.length === 0 ? (
@@ -286,74 +286,88 @@ export default function SuperAdminDashboard({ stats }: Props) {
             No sectors found.
           </div>
         ) : (
-          <div className="bg-card border border-border rounded-lg overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-muted/50 border-b border-border">
-                  <th className="text-left px-5 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    Sector
-                  </th>
-                  <th className="text-right px-5 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    Members
-                  </th>
-                  <th className="text-right px-5 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hidden sm:table-cell">
-                    Subsectors
-                  </th>
-                  <th className="text-right px-5 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hidden md:table-cell">
-                    Buildings
-                  </th>
-                  <th className="text-right px-5 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hidden md:table-cell">
-                    Flats
-                  </th>
-                  <th className="text-left px-5 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hidden lg:table-cell w-40">
-                    Coverage
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {stats.sectors.map((sector, idx) => {
-                  const pct =
-                    stats.totalMumineen > 0
-                      ? Math.min(100, Math.round((sector.mumin_count / stats.totalMumineen) * 100))
-                      : 0
-                  return (
-                    <tr
-                      key={sector.sector_id}
-                      className={`hover:bg-muted/30 transition-colors ${idx !== stats.sectors.length - 1 ? 'border-b border-border' : ''}`}
-                    >
-                      <td className="px-5 py-3.5 font-medium text-foreground">
-                        {sector.sector_name}
-                      </td>
-                      <td className="px-5 py-3.5 text-right text-foreground tabular-nums">
-                        {sector.mumin_count.toLocaleString()}
-                      </td>
-                      <td className="px-5 py-3.5 text-right text-muted-foreground hidden sm:table-cell tabular-nums">
-                        {sector.subsector_count}
-                      </td>
-                      <td className="px-5 py-3.5 text-right text-muted-foreground hidden md:table-cell tabular-nums">
-                        {sector.building_count}
-                      </td>
-                      <td className="px-5 py-3.5 text-right text-muted-foreground hidden md:table-cell tabular-nums">
-                        {sector.flat_count}
-                      </td>
-                      <td className="px-5 py-3.5 hidden lg:table-cell">
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-primary rounded-full transition-all duration-500"
-                              style={{ width: `${pct}%` }}
-                            />
-                          </div>
-                          <span className="text-xs text-muted-foreground tabular-nums w-8 text-right">
-                            {pct}%
-                          </span>
+          <div className="space-y-1">
+            {/* Column header */}
+            <div className="flex items-center gap-4 px-5 py-2">
+              <span className="w-4" />
+              <span className="flex-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Sector</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground w-20 text-right">Members</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground w-20 text-right hidden sm:block">Subsectors</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground w-20 text-right hidden md:block">Buildings</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground w-14 text-right hidden md:block">Flats</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground w-32 hidden lg:block">Coverage</span>
+            </div>
+            {stats.sectors.map((sector) => {
+              const pct = stats.totalMumineen > 0
+                ? Math.min(100, Math.round((sector.mumin_count / stats.totalMumineen) * 100))
+                : 0
+              return (
+                <details key={sector.sector_id} className="group bg-card border border-border rounded-lg overflow-hidden">
+                  <summary className="flex items-center gap-4 px-5 py-3.5 cursor-pointer hover:bg-muted/30 list-none [&::-webkit-details-marker]:hidden select-none">
+                    <span className="text-[10px] text-muted-foreground transition-transform duration-150 group-open:rotate-90 inline-block w-4 text-center">▶</span>
+                    <span className="flex-1 font-medium text-foreground">{sector.sector_name}</span>
+                    <span className="text-sm tabular-nums text-foreground w-20 text-right">{sector.mumin_count.toLocaleString()}</span>
+                    <span className="text-sm tabular-nums text-muted-foreground w-20 text-right hidden sm:block">{sector.subsector_count}</span>
+                    <span className="text-sm tabular-nums text-muted-foreground w-20 text-right hidden md:block">{sector.building_count}</span>
+                    <span className="text-sm tabular-nums text-muted-foreground w-14 text-right hidden md:block">{sector.flat_count}</span>
+                    <span className="hidden lg:flex items-center gap-2 w-32">
+                      <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                        <div className="h-full bg-primary rounded-full" style={{ width: `${pct}%` }} />
+                      </div>
+                      <span className="text-xs text-muted-foreground w-8 text-right tabular-nums">{pct}%</span>
+                    </span>
+                  </summary>
+                  <div className="border-t border-border px-5 py-4 space-y-4 bg-muted/20">
+                    {/* Masools */}
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">Masool / Admin</p>
+                      {sector.masools.length === 0 ? (
+                        <p className="text-xs text-muted-foreground italic">No Masool assigned</p>
+                      ) : (
+                        <div className="space-y-1">
+                          {sector.masools.map(m => (
+                            <div key={m.its_no} className="flex items-center gap-3 text-sm">
+                              <span className="font-medium text-foreground">{m.name}</span>
+                              <span className="text-muted-foreground font-mono text-xs">{m.its_no}</span>
+                              {m.phone && <span className="text-muted-foreground text-xs">{m.phone}</span>}
+                            </div>
+                          ))}
                         </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+                      )}
+                    </div>
+                    {/* Subsectors with Musaids */}
+                    {sector.subsectors.length > 0 && (
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">Subsectors</p>
+                        <div className="space-y-2">
+                          {sector.subsectors.map(ss => (
+                            <div key={ss.subsector_id} className="bg-card rounded-md border border-border px-3 py-2">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-sm font-medium text-foreground">{ss.subsector_name}</span>
+                                <span className="text-xs tabular-nums text-muted-foreground">{ss.mumin_count} members</span>
+                              </div>
+                              {ss.musaids.length === 0 ? (
+                                <p className="text-xs text-muted-foreground italic">No Musaid assigned</p>
+                              ) : (
+                                <div className="space-y-0.5">
+                                  {ss.musaids.map(m => (
+                                    <div key={m.its_no} className="flex items-center gap-3 text-xs text-muted-foreground">
+                                      <span className="text-foreground">{m.name}</span>
+                                      <span className="font-mono">{m.its_no}</span>
+                                      {m.phone && <span>{m.phone}</span>}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </details>
+              )
+            })}
           </div>
         )}
       </div>

@@ -12,6 +12,8 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
+  ClipboardList,
+  ClipboardCheck,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -51,9 +53,21 @@ const NAV_ITEMS: NavItem[] = [
     roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid'],
   },
   {
+    label: 'Requests',
+    href: ROUTES.REQUESTS,
+    icon: ClipboardList,
+    roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid'],
+  },
+  {
     label: 'Admin',
     href: ROUTES.ADMIN_USERS,
     icon: Settings,
+    roles: ['SuperAdmin'],
+  },
+  {
+    label: 'Request Review',
+    href: ROUTES.ADMIN_REQUESTS,
+    icon: ClipboardCheck,
     roles: ['SuperAdmin'],
   },
 ]
