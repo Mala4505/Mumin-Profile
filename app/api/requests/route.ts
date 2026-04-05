@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
     // Get the subsector_id for any member of this sabeel
     const { data: familyMember } = await admin
       .from('mumin')
-      .select('subsector_id, subsector:subsector_id(sector_id)')
+      .select('subsector_id, subsector(sector_id)')
       .eq('sabeel_no', body.sabeel_no)
       .limit(1)
       .maybeSingle()
@@ -111,8 +111,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Family not found' }, { status: 404 })
     }
 
-    const subsectorId = familyMember.subsector_id
-    const sectorId = (familyMember.subsector as any)?.sector_id
+    const subsectorId = (familyMember as any).subsector_id
+    const sectorId = (familyMember as any).subsector?.sector_id
 
     const sectorIds: number[] = meta.sector_ids ?? []
     const subsectorIds: number[] = meta.subsector_ids ?? []
