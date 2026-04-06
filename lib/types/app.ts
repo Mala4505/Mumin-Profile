@@ -60,6 +60,7 @@ export interface MemberListItem {
   building_name: string | null
   building_id: number | null
   landmark: string | null
+  head_its_no: number | null
 }
 
 // Filters for member list

@@ -10,10 +10,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (session.role === 'Mumin') {
     return (
       <div className="min-h-screen bg-background">
-        <div className="md:hidden">
-          <MobileHeader role={session.role} />
-        </div>
-        <main className="max-w-2xl mx-auto px-4 py-6 md:py-10">
+        <MobileHeader role={session.role} />
+        <main className="max-w-2xl mx-auto px-4 pt-20 pb-6">
           {children}
         </main>
       </div>
