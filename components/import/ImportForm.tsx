@@ -18,6 +18,7 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
 export function ImportForm() {
   const [table, setTable] = useState<ImportTableKey | ''>('')
   const [action, setAction] = useState<ImportAction>('upsert')
+  const [fieldType, setFieldType] = useState<'static' | 'time-series'>('static')
   const [rows, setRows] = useState<Record<string, string>[]>([])
   const [errors, setErrors] = useState<RowError[]>([])
   const [validRows, setValidRows] = useState<Record<string, string>[]>([])
@@ -65,7 +66,11 @@ export function ImportForm() {
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ table, rows: batches[i], action, onConflictColumn }),
+        body: JSON.stringify(
+          table === 'profile_value'
+            ? { rows: batches[i], fieldType }
+            : { table, rows: batches[i], action, onConflictColumn }
+        ),
       })
       const data = await res.json()
       totalInserted += data.inserted ?? 0
@@ -126,6 +131,23 @@ export function ImportForm() {
           Download Template
         </Button>
       </div>
+
+      {/* Profile Value Flow — only shown when table = profile_value */}
+      {table === 'profile_value' && (
+        <div className="flex items-center gap-3 p-3 border rounded-lg bg-muted/30">
+          <span className="text-sm font-medium">Field Type:</span>
+          <Select value={fieldType} onValueChange={(v) => setFieldType(v as 'static' | 'time-series')}>
+            <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="static">Static (no date)</SelectItem>
+              <SelectItem value="time-series">Time-series (with date)</SelectItem>
+            </SelectContent>
+          </Select>
+          <span className="text-xs text-muted-foreground">
+            {fieldType === 'static' ? 'One value per member per field' : 'Multiple values per member per field, each with a date'}
+          </span>
+        </div>
+      )}
 
       {/* File Upload */}
       {table && (
