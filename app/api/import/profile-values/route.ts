@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     .select('its_no')
     .in('its_no', itsNos)
 
-  const validItsNos = new Set((existing ?? []).map((m) => m.its_no))
+  const validItsNos = new Set((existing ?? []).map((m) => String(m.its_no)))
   const validRows = rows.filter((r) => validItsNos.has(r.its_no))
   const skipped = rows.length - validRows.length
 
