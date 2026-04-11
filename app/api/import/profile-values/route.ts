@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
   const { data: existing } = await supabase
     .from('mumin')
     .select('its_no')
-    .in('its_no', itsNos)
+    .in('its_no', itsNos as unknown as number[])
 
   const validItsNos = new Set((existing ?? []).map((m) => String(m.its_no)))
   const validRows = rows.filter((r) => validItsNos.has(r.its_no))
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
 
   const { error, count } = await supabase
     .from('profile_value')
-    .upsert(upsertRows, { onConflict: conflictCol, count: 'exact' })
+    .upsert(upsertRows as any, { onConflict: conflictCol, count: 'exact' })
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })

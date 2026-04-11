@@ -34,7 +34,8 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'add') {
-      const { error } = await supabase.from(table).insert(rows)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await supabase.from(table).insert(rows as any)
       if (error) {
         failed = rows.length
         rows.forEach((r) => failedRows.push({ ...r, _error: error.message }))
@@ -45,7 +46,7 @@ export async function POST(req: NextRequest) {
       // upsert or update
       const { error, count } = await supabase
         .from(table)
-        .upsert(rows, { onConflict: onConflictColumn, count: 'exact' })
+        .upsert(rows as any, { onConflict: onConflictColumn, count: 'exact' })
       if (error) {
         failed = rows.length
         rows.forEach((r) => failedRows.push({ ...r, _error: error.message }))
