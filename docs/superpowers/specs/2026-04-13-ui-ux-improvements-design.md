@@ -27,7 +27,7 @@
 ### 2.2 Confirmation modals
 - The custom `ConfirmModal` in `BulkFillForm.tsx` is deleted and replaced with `<ConfirmDialog>` from `components/ui/confirm-dialog.tsx`
 - The inline confirm `div` in `SelfFillForm.tsx` is deleted and replaced with `<ConfirmDialog>`
-- Props: `title`, `description`, `confirmLabel`, `variant`, `loading`, `onConfirm`, `onOpenChange`
+- The existing `ConfirmDialog` component accepts these props (verified against source): `open`, `onOpenChange`, `title`, `description`, `confirmLabel`, `cancelLabel`, `variant` (`'default' | 'danger'`), `onConfirm`, `loading`
 
 ### 2.3 FormBuilder — Dialog instead of full-screen overlay
 - `FormsClient.tsx` currently renders FormBuilder inside `fixed inset-0 bg-background/80` overlay
@@ -47,11 +47,13 @@
 ```
 [ My Forms | Pending (2) | All Forms ]           [ + New Form ]
 [ 🔍 Search forms...                ] [ ⊞ | ☰ ]
+─────────────────────────────────────────────────────────────────
+  Total: 4   Published: 2   Pending: 1   Responses: 99
 ```
 - Search input filters the visible form cards client-side by title
 - Card/list view toggle: grid (default) or compact list rows
-- Stats bar at the bottom of the page (always visible):
-  - Total Forms · Published · Pending · Total Responses (sum across all visible forms)
+- Stats bar renders **below the search row, above the cards grid** (not at page bottom)
+  - Shows: Total Forms · Published · Pending · Total Responses (sum across currently visible tab's forms)
 
 ### 3.2 Enhanced form cards
 Each card shows:
@@ -97,8 +99,8 @@ Keep existing custom toast in `FormsClient.tsx` (no shared toast library needed)
 - Pencil/Edit button opens a shadcn `<Dialog>` (`max-w-md`)
 - Dialog contains the contact edit form (phone, alt phone, email, status) using shadcn `<Input>` and `<Select>`
 - Footer: Cancel + Save buttons; Save shows `Loader2` spinner while in flight
-- On success: close dialog, update display state, call `router.refresh()`
-- Error shown inside dialog as a destructive alert
+- On success: **optimistically update `displayProfile` state first**, then close dialog, then call `router.refresh()` in the background. This prevents a visible flicker between close and revalidation.
+- Error shown inside dialog as a destructive alert (dialog stays open on error)
 
 ### 4.3 Editable Umoor fields
 - Replace raw `<input>` in `EditableField` with shadcn `<Input>`
@@ -144,9 +146,14 @@ Keep existing custom toast in `FormsClient.tsx` (no shared toast library needed)
 
 ## 6. Form Analysis Page (new) — `/forms/[id]/responses`
 
-### 6.1 Route
+### 6.1 Route & Access Control
 - `app/(dashboard)/forms/[id]/responses/page.tsx` — server component, fetches form metadata + initial response counts
-- Protected: same role check as the fill page; Mumin role redirects to `/dashboard`
+- **Route protection:** Add `/forms/:id/responses` to `proxy.ts` protected routes — requires authenticated session
+- **Role access:**
+  - `SuperAdmin` and `Admin` — always have access to any form's responses
+  - `Masool` and `Musaid` — can view responses only for forms they are designated to fill (i.e. their role/user appears in `filler_access.fillers`), scoped to their assigned sectors/subsectors
+  - `Mumin` — never has access; redirect to `/dashboard`
+- The page server component reads the session via `getSession()`, checks role, and verifies Masool/Musaid filler access against the form's `filler_access` JSON before rendering. Returns 404 if form not found, redirect to `/dashboard` if access denied.
 
 ### 6.2 Stats header
 ```
@@ -168,15 +175,17 @@ Ramadan Attendance 1446         [Published]  Expires Apr 20
 
 **Tab 3 — Charts**
 - Per-question answer distribution using Recharts `<BarChart>` (already in codebase)
-- For yes/no or enum answers: horizontal bar chart of value counts
-- For free-text: shows "N unique answers" with a scrollable list of the top 10 most common values
-- Overall completion: shadcn `<Progress>` bar showing `responded / total_audience`
+- **Short-answer / enum values** (≤ 20 distinct values): horizontal `<BarChart>` of value counts, one bar per distinct answer
+- **Free-text / open-ended** (> 20 distinct values or field_type = 'text' with high cardinality): skip bar chart; instead show "N total responses · M unique answers" and a scrollable list of the top 10 most common values with their counts
+- **Unanswered questions**: if a question has 0 responses, show a muted placeholder ("No answers yet")
+- Overall completion: shadcn `<Progress>` bar showing `responded / total_audience` with percentage label
 
 ### 6.4 API
 - `GET /api/forms/[id]/responses` — returns `{ form, responses: [...], audience: [...] }`
-  - `responses`: joined `form_response` rows with `mumin.name`
-  - `audience`: all members in the form's audience filters (for pending calculation)
-- Access check: same role/scope rules as the fill endpoint
+  - `responses`: `form_response` rows joined with `mumin.name` and `mumin.its_no`; ordered by `submitted_at` desc
+  - `audience`: members matching the form's `audience_filters`, joined with `subsector.name`; used to compute pending list
+- **Access check:** SuperAdmin/Admin always allowed. Masool/Musaid: verify their user ID appears in `form.filler_access.fillers` before returning data; return 403 otherwise. Mumin: always 403.
+- `GET /api/forms` (existing) — extend response shape to include `response_count: number` and `audience_count: number` per form, computed via subquery/count. These power the progress bar on form cards.
 
 ### 6.5 Navigation
 - "View Responses" button on each published/expired/closed form card in `FormsClient`
