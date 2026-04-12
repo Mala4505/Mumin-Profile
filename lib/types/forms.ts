@@ -1,4 +1,4 @@
-export type FormStatus = 'draft' | 'pending_approval' | 'published' | 'closed'
+export type FormStatus = 'draft' | 'pending_approval' | 'published' | 'closed' | 'expired'
 export type FormType = 'simple' | 'detailed'
 
 export interface FormQuestion {

@@ -1,8 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { createClient } from '@/lib/supabase/client'
 import type { Role } from '@/lib/types/app'
 import type { FormDraft } from '../FormBuilder'
 
@@ -10,6 +9,7 @@ interface Props {
   draft: Partial<FormDraft>
   onBack: () => void
   onComplete: () => void
+  role: Role
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -50,17 +50,9 @@ function accessSummary(filler_access: FormDraft['filler_access'] | undefined): s
   })
 }
 
-export function Step5Review({ draft, onBack, onComplete }: Props) {
-  const [role, setRole] = useState<Role | null>(null)
+export function Step5Review({ draft, onBack, onComplete, role }: Props) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    const supabase = createClient()
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setRole((user?.app_metadata?.role as Role) ?? null)
-    })
-  }, [])
 
   const isAdmin = role === 'SuperAdmin' || role === 'Admin'
   const targetStatus = isAdmin ? 'published' : 'pending_approval'

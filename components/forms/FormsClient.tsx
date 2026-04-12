@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { FormBuilder } from '@/components/forms/FormBuilder'
 import {
   FileText,
   Plus,
@@ -87,8 +88,6 @@ interface ToastMsg {
   type: 'success' | 'error'
   message: string
 }
-
-let toastCounter = 0
 
 // ─── Skeleton ────────────────────────────────────────────────────────────────
 
@@ -227,6 +226,7 @@ export function FormsClient({ role }: FormsClientProps) {
   const [error, setError] = useState<string | null>(null)
   const [showBuilder, setShowBuilder] = useState(false)
   const [toasts, setToasts] = useState<ToastMsg[]>([])
+  const toastCounter = useRef(0)
 
   // Per-card action state: map of form id -> boolean
   const [approvingIds, setApprovingIds] = useState<Set<string>>(new Set())
@@ -234,7 +234,7 @@ export function FormsClient({ role }: FormsClientProps) {
 
   // ── Toast helpers ──────────────────────────────────────────────────────────
   function pushToast(type: 'success' | 'error', message: string) {
-    const id = ++toastCounter
+    const id = ++toastCounter.current
     setToasts((prev) => [...prev, { id, type, message }])
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 4000)
   }
@@ -350,31 +350,11 @@ export function FormsClient({ role }: FormsClientProps) {
 
   // ── If FormBuilder is shown ────────────────────────────────────────────────
   if (showBuilder) {
-    // Lazy import — FormBuilder may not exist yet; graceful fallback
-    let FormBuilderComponent: React.ComponentType<{ onClose: () => void }> | null = null
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      FormBuilderComponent = require('@/components/forms/FormBuilder').FormBuilder
-    } catch {
-      // FormBuilder not yet implemented
-    }
-
-    if (FormBuilderComponent) {
-      return <FormBuilderComponent onClose={() => { setShowBuilder(false); fetchForms() }} />
-    }
-
-    // Placeholder if FormBuilder not yet implemented
     return (
-      <div className="bg-card border border-border rounded-xl p-8 text-center">
-        <FileText className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
-        <p className="text-sm font-medium text-foreground mb-1">Form Builder</p>
-        <p className="text-xs text-muted-foreground mb-5">Form builder is not yet implemented.</p>
-        <button
-          onClick={() => setShowBuilder(false)}
-          className="px-4 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted/40 transition-colors"
-        >
-          Back to Forms
-        </button>
+      <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm overflow-y-auto py-8">
+        <div className="max-w-2xl mx-auto px-4">
+          <FormBuilder onComplete={() => { setShowBuilder(false); fetchForms() }} role={role} />
+        </div>
       </div>
     )
   }

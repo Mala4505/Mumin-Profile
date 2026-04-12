@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { FormQuestion, FillerAccess, AudienceFilters } from '@/lib/types/forms'
+import type { Role } from '@/lib/types/app'
 import { Step1BasicInfo } from './steps/Step1BasicInfo'
 import { Step2Audience } from './steps/Step2Audience'
 import { Step3Questions } from './steps/Step3Questions'
@@ -21,7 +22,7 @@ export interface FormDraft {
 
 const STEPS = ['Basic Info', 'Audience', 'Questions', 'Access', 'Review']
 
-export function FormBuilder({ onComplete }: { onComplete: () => void }) {
+export function FormBuilder({ onComplete, role }: { onComplete: () => void; role: Role }) {
   const [step, setStep] = useState(0)
   const [draft, setDraft] = useState<Partial<FormDraft>>({})
 
@@ -54,7 +55,7 @@ export function FormBuilder({ onComplete }: { onComplete: () => void }) {
       {step === 1 && <Step2Audience draft={draft} update={update} onNext={next} onBack={back} />}
       {step === 2 && <Step3Questions draft={draft} update={update} onNext={next} onBack={back} />}
       {step === 3 && <Step4Access draft={draft} update={update} onNext={next} onBack={back} />}
-      {step === 4 && <Step5Review draft={draft} onBack={back} onComplete={onComplete} />}
+      {step === 4 && <Step5Review draft={draft} onBack={back} onComplete={onComplete} role={role} />}
     </div>
   )
 }

@@ -69,7 +69,7 @@ export async function PUT(
     const { data: superAdmins } = await supabase
       .from('mumin')
       .select('its_no')
-      .eq('role_name', 'SuperAdmin')
+      .eq('role', 'SuperAdmin')
 
     if (superAdmins?.length) {
       const notifications = superAdmins.map((sa) => ({
