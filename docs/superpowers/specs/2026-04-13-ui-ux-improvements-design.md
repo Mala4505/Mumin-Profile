@@ -7,6 +7,17 @@
 
 ---
 
+## 0. Theme Constraint (non-negotiable)
+
+**All changes must stay within the existing color theme.** No new color values, no hardcoded hex codes, no new Tailwind color classes that aren't already used in the codebase. Every color must come from one of:
+- **CSS variables via Tailwind:** `bg-card`, `bg-background`, `bg-muted`, `border-border`, `text-foreground`, `text-muted-foreground`, `text-primary`, `bg-primary`, `text-primary-foreground`, `bg-destructive`, `text-destructive`
+- **Semantic status colors already in the codebase:** `bg-green-100 text-green-700`, `bg-amber-100 text-amber-700`, `bg-red-100 text-red-700`, `bg-blue-100 text-blue-700`, `bg-gray-100 text-gray-500` (as used in `STATUS_STYLES` in `MemberProfileView.tsx`)
+- **Primary tint variants already in use:** `bg-primary/5`, `bg-primary/10`, `text-primary/60`
+
+No gradients. No `from-*`/`to-*` Tailwind classes. The visual improvements come from layout, spacing, and information hierarchy — not new colors.
+
+---
+
 ## 1. Goals
 
 1. Standardise modal/loading patterns across the app (use existing `ConfirmDialog`, `Dialog`, `LumaSpin`)
@@ -59,7 +70,7 @@
 Each card shows:
 - **Title** + status badge + type badge (existing)
 - **Response progress bar** (published forms only): `X / Y · Z% completion · N pending`
-  - Progress bar uses a gradient fill (`from-sky-400 to-violet-400`)
+  - Progress bar uses `bg-primary` fill on `bg-muted` track (standard shadcn `<Progress>` — no gradient)
   - Counts fetched as part of the forms list API response (add `response_count`, `audience_count` fields)
 - **Contextual action buttons** based on status:
   - `draft` → "Continue Editing" (opens FormBuilder Dialog with existing draft)
@@ -89,8 +100,8 @@ Keep existing custom toast in `FormsClient.tsx` (no shared toast library needed)
 │  +965 9999…     ali@ex…       15 Jan 90 │
 └─────────────────────────────────────────┘
 ```
-- Avatar: gradient circle (`from-blue-500 to-violet-500`), initials, size `w-12 h-12`
-- Status ring dot: `w-3.5 h-3.5` coloured circle bottom-right of avatar (green = active, grey = others)
+- Avatar: `bg-primary/10 text-primary` circle (matching existing `MemberProfileView` avatar style), initials, size `w-12 h-12`
+- Status ring dot: `w-3.5 h-3.5` circle bottom-right of avatar — colour uses existing status classes: `bg-green-500` (active), `bg-gray-400` (all other statuses)
 - Name, ITS/Sabeel, badges all in one tight block
 - Contact fields below a divider (phone, email, DOB — staff also sees alt phone)
 - "Edit" button top-right of card
@@ -123,9 +134,9 @@ Keep existing custom toast in `FormsClient.tsx` (no shared toast library needed)
          │  [Active]  [Male]  [Balig]  │
          └──────────────────────────────┘
 ```
-- Avatar: gradient circle, `w-16 h-16`, centered
-- Status ring dot: bottom-right of avatar
-- Badges: centered row below ITS line
+- Avatar: `bg-primary text-primary-foreground` circle (matching existing `MuminDashboard` avatar style), `w-16 h-16`, centered
+- Status ring dot: `w-3.5 h-3.5` bottom-right of avatar — `bg-green-500` (active), `bg-gray-400` (others), `border-2 border-card`
+- Badges: centered row below ITS line — use existing badge classes from `MuminDashboard` (`bg-green-100 text-green-700`, `bg-muted text-muted-foreground`)
 - No banner, no stats strip (clean, symmetric)
 
 ### 5.2 Location info grid
