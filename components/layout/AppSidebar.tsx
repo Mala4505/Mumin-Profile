@@ -14,6 +14,7 @@ import {
   ChevronRight,
   ClipboardList,
   ClipboardCheck,
+  FileText,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -50,6 +51,12 @@ const NAV_ITEMS: NavItem[] = [
     label: 'Reports',
     href: ROUTES.REPORTS,
     icon: BarChart3,
+    roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid'],
+  },
+  {
+    label: 'Forms',
+    href: ROUTES.FORMS,
+    icon: FileText,
     roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid'],
   },
   {

@@ -31,6 +31,7 @@ export const ROUTES = {
   MEMBERS: '/members',
   IMPORT: '/import',
   REPORTS: '/reports',
+  FORMS: '/forms',
   ADMIN_USERS: '/admin/users',
   REQUESTS: '/requests',
   ADMIN_REQUESTS: '/admin/requests',
