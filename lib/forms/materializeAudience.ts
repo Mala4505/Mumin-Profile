@@ -31,7 +31,7 @@ export async function materializeAudience(formId: string, filters: AudienceFilte
   const { data: members, error } = await query
   if (error) throw new Error(`Audience query failed: ${error.message}`)
 
-  const rows = (members ?? []).map((m) => ({ form_id: formId, its_no: m.its_no }))
+  const rows = (members ?? []).map((m) => ({ form_id: formId, its_no: String(m.its_no) }))
   if (!rows.length) return
 
   const { error: insertErr } = await supabase
