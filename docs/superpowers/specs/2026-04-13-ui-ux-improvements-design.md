@@ -99,7 +99,7 @@ Keep existing custom toast in `FormsClient.tsx` (no shared toast library needed)
 - Pencil/Edit button opens a shadcn `<Dialog>` (`max-w-md`)
 - Dialog contains the contact edit form (phone, alt phone, email, status) using shadcn `<Input>` and `<Select>`
 - Footer: Cancel + Save buttons; Save shows `Loader2` spinner while in flight
-- On success: **optimistically update `displayProfile` state first**, then close dialog, then call `router.refresh()` in the background. This prevents a visible flicker between close and revalidation.
+- On success: **optimistically update `displayProfile`** (`useState<MemberProfile>` already in `MemberProfileView`) with the new contact values, then close dialog, then call `router.refresh()` in the background. This prevents a visible flicker between close and revalidation.
 - Error shown inside dialog as a destructive alert (dialog stays open on error)
 
 ### 4.3 Editable Umoor fields
@@ -148,12 +148,24 @@ Keep existing custom toast in `FormsClient.tsx` (no shared toast library needed)
 
 ### 6.1 Route & Access Control
 - `app/(dashboard)/forms/[id]/responses/page.tsx` — server component, fetches form metadata + initial response counts
-- **Route protection:** Add `/forms/:id/responses` to `proxy.ts` protected routes — requires authenticated session
+- **Route protection:** Add `/forms/:path*/responses` to `proxy.ts` protected routes — requires authenticated session
+- **`filler_access` shape** (from `lib/types/forms.ts`):
+  ```ts
+  interface FillerAccess {
+    fillers: Array<
+      | { type: 'role'; value: string }            // e.g. 'Masool', 'Musaid'
+      | { type: 'specific_masool'; value: string[] } // array of ITS nos
+      | { type: 'specific_musaid'; value: string[] }
+      | { type: 'self' }                            // Mumin self-fill only
+    >
+  }
+  ```
 - **Role access:**
   - `SuperAdmin` and `Admin` — always have access to any form's responses
-  - `Masool` and `Musaid` — can view responses only for forms they are designated to fill (i.e. their role/user appears in `filler_access.fillers`), scoped to their assigned sectors/subsectors
+  - `Masool` — access if `filler_access.fillers` contains `{ type: 'role', value: 'Masool' }` OR `{ type: 'specific_masool', value: [...] }` where the array includes their ITS no
+  - `Musaid` — same check with `'Musaid'` / `specific_musaid`
   - `Mumin` — never has access; redirect to `/dashboard`
-- The page server component reads the session via `getSession()`, checks role, and verifies Masool/Musaid filler access against the form's `filler_access` JSON before rendering. Returns 404 if form not found, redirect to `/dashboard` if access denied.
+- The page server component reads the session via `getSession()`, checks role, verifies filler access, returns 404 if form not found, redirects to `/dashboard` if access denied.
 
 ### 6.2 Stats header
 ```
@@ -185,7 +197,9 @@ Ramadan Attendance 1446         [Published]  Expires Apr 20
   - `responses`: `form_response` rows joined with `mumin.name` and `mumin.its_no`; ordered by `submitted_at` desc
   - `audience`: members matching the form's `audience_filters`, joined with `subsector.name`; used to compute pending list
 - **Access check:** SuperAdmin/Admin always allowed. Masool/Musaid: verify their user ID appears in `form.filler_access.fillers` before returning data; return 403 otherwise. Mumin: always 403.
-- `GET /api/forms` (existing) — extend response shape to include `response_count: number` and `audience_count: number` per form, computed via subquery/count. These power the progress bar on form cards.
+- `GET /api/forms` (existing) — extend response shape to include `response_count: number` and `audience_count: number` per form. Both are computed server-side in the existing API route handler:
+  - `response_count`: `SELECT COUNT(*) FROM form_response WHERE form_id = $id AND submitted = true`
+  - `audience_count`: evaluate `audience_filters` using the same logic as the fill endpoint's audience resolution (count members matching filters). For `all: true` filters, return total in-scope member count. These counts are appended to each form object in the returned `forms` array.
 
 ### 6.5 Navigation
 - "View Responses" button on each published/expired/closed form card in `FormsClient`
@@ -207,6 +221,7 @@ Ramadan Attendance 1446         [Published]  Expires Apr 20
 | `app/(dashboard)/forms/[id]/responses/page.tsx` | New page — server component |
 | `components/forms/FormResponsesClient.tsx` | New client component — stats header + tabs |
 | `app/api/forms/[id]/responses/route.ts` | New API route |
+| `proxy.ts` | Add `/forms/:path*/responses` to protected routes |
 
 ---
 
