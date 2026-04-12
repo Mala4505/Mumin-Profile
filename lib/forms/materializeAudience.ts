@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { AudienceFilters } from '@/lib/types/forms'
 
 export async function materializeAudience(formId: string, filters: AudienceFilters): Promise<void> {
-  const supabase = createClient()   // uses service role in API route context
+  const supabase = await createClient()   // uses service role in API route context
 
   let query = supabase.from('mumin').select('its_no')
 

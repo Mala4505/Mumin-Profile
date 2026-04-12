@@ -83,7 +83,14 @@ export async function PUT(
     }
   }
 
-  const { data, error } = await supabase.from('forms').update(body).eq('id', id).select().single()
+  const allowedFields = ['title', 'description', 'form_type', 'questions', 'audience_filters',
+    'filler_access', 'expires_at', 'umoor_category_id', 'status', 'published_at']
+  const safeBody: Record<string, unknown> = {}
+  for (const key of allowedFields) {
+    if (key in body) safeBody[key] = body[key]
+  }
+
+  const { data, error } = await supabase.from('forms').update(safeBody).eq('id', id).select().single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   return NextResponse.json({ form: data })

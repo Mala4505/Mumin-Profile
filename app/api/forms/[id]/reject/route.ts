@@ -22,5 +22,6 @@ export async function POST(
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (!data) return NextResponse.json({ error: 'Form not in pending_approval state' }, { status: 400 })
   return NextResponse.json({ form: data })
 }
