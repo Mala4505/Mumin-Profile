@@ -99,7 +99,7 @@ Keep existing custom toast in `FormsClient.tsx` (no shared toast library needed)
 - Pencil/Edit button opens a shadcn `<Dialog>` (`max-w-md`)
 - Dialog contains the contact edit form (phone, alt phone, email, status) using shadcn `<Input>` and `<Select>`
 - Footer: Cancel + Save buttons; Save shows `Loader2` spinner while in flight
-- On success: **optimistically update `displayProfile`** (`useState<MemberProfile>` already in `MemberProfileView`) with the new contact values, then close dialog, then call `router.refresh()` in the background. This prevents a visible flicker between close and revalidation.
+- On success: **optimistically update `displayProfile`** (`useState<MemberProfile>` already in `MemberProfileView`) with the new contact values first, then close dialog, then call `router.refresh()`. Because `displayProfile` is local React state, `router.refresh()` revalidates server data without resetting it — Next.js only updates RSC props, which `MemberProfileView` uses as the initial value but does not overwrite the live state. No flicker occurs because the state is already updated before refresh completes.
 - Error shown inside dialog as a destructive alert (dialog stays open on error)
 
 ### 4.3 Editable Umoor fields
@@ -148,7 +148,7 @@ Keep existing custom toast in `FormsClient.tsx` (no shared toast library needed)
 
 ### 6.1 Route & Access Control
 - `app/(dashboard)/forms/[id]/responses/page.tsx` — server component, fetches form metadata + initial response counts
-- **Route protection:** Add `/forms/:path*/responses` to `proxy.ts` protected routes — requires authenticated session
+- **Route protection:** In `proxy.ts`, add a check using `pathname.includes('/responses')` within the `/forms` path block (consistent with how other role guards are written using `pathname.startsWith()`). Redirect Mumin role to `/dashboard` if they attempt to access any `/forms/.../responses` URL.
 - **`filler_access` shape** (from `lib/types/forms.ts`):
   ```ts
   interface FillerAccess {
@@ -162,8 +162,8 @@ Keep existing custom toast in `FormsClient.tsx` (no shared toast library needed)
   ```
 - **Role access:**
   - `SuperAdmin` and `Admin` — always have access to any form's responses
-  - `Masool` — access if `filler_access.fillers` contains `{ type: 'role', value: 'Masool' }` OR `{ type: 'specific_masool', value: [...] }` where the array includes their ITS no
-  - `Musaid` — same check with `'Musaid'` / `specific_musaid`
+  - `Masool` — access if `filler_access.fillers` contains `{ type: 'role', value: 'Masool' }` OR `{ type: 'specific_masool', value: [...] }` where the array includes `String(session.its_no)` (use `session.its_no` from `getSession()`, converted to string for comparison)
+  - `Musaid` — same check using `'Musaid'` / `specific_musaid` and `String(session.its_no)`
   - `Mumin` — never has access; redirect to `/dashboard`
 - The page server component reads the session via `getSession()`, checks role, verifies filler access, returns 404 if form not found, redirects to `/dashboard` if access denied.
 
@@ -221,7 +221,7 @@ Ramadan Attendance 1446         [Published]  Expires Apr 20
 | `app/(dashboard)/forms/[id]/responses/page.tsx` | New page — server component |
 | `components/forms/FormResponsesClient.tsx` | New client component — stats header + tabs |
 | `app/api/forms/[id]/responses/route.ts` | New API route |
-| `proxy.ts` | Add `/forms/:path*/responses` to protected routes |
+| `proxy.ts` | Add Mumin redirect for `/forms/.../responses` paths (`pathname.includes('/responses')`) |
 
 ---
 
