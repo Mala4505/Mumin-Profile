@@ -12,8 +12,14 @@ import {
   Clock,
   AlertTriangle,
   FilePen,
+  Search,
+  LayoutGrid,
+  List,
 } from 'lucide-react'
 import type { Role } from '@/lib/types/app'
+import { Dialog, DialogContent } from '@/components/ui/dialog'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -26,7 +32,11 @@ interface Form {
   is_expired: boolean
   created_by: string
   created_at: string
+  response_count?: number
+  audience_count?: number
 }
+
+type FormWithCounts = Form & { response_count?: number; audience_count?: number }
 
 interface FormsClientProps {
   role: Role
@@ -153,6 +163,32 @@ function FormCard({
         </span>
       </div>
 
+      {/* Response progress — published/expired/closed forms with audience */}
+      {(form.status === 'published' || form.status === 'expired' || form.status === 'closed') &&
+        (form as FormWithCounts).audience_count != null &&
+        (form as FormWithCounts).audience_count! > 0 && (
+        <div className="space-y-1">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>Responses</span>
+            <span className="font-medium text-foreground">
+              {(form as FormWithCounts).response_count ?? 0} / {(form as FormWithCounts).audience_count}
+            </span>
+          </div>
+          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+            <div
+              className="h-full bg-primary rounded-full transition-all"
+              style={{
+                width: `${Math.min(100, Math.round(((form as FormWithCounts).response_count ?? 0) / (form as FormWithCounts).audience_count! * 100))}%`
+              }}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {Math.round(((form as FormWithCounts).response_count ?? 0) / (form as FormWithCounts).audience_count! * 100)}% complete
+            {form.status === 'published' && ` · ${(form as FormWithCounts).audience_count! - ((form as FormWithCounts).response_count ?? 0)} pending`}
+          </p>
+        </div>
+      )}
+
       {/* Expiry */}
       {form.expires_at && (
         <p className={`text-xs ${isExpired ? 'text-red-600 font-semibold' : 'text-muted-foreground'}`}>
@@ -195,6 +231,22 @@ function FormCard({
               Reject
             </button>
           </>
+        ) : form.status === 'draft' ? (
+          <button
+            onClick={() => router.push(`/forms/${form.id}`)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-foreground text-xs font-medium hover:bg-muted/40 transition-colors"
+          >
+            <FileText className="w-3.5 h-3.5" />
+            Continue Editing
+          </button>
+        ) : form.status === 'pending_approval' ? (
+          <button
+            onClick={() => router.push(`/forms/${form.id}`)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-foreground text-xs font-medium hover:bg-muted/40 transition-colors"
+          >
+            <FileText className="w-3.5 h-3.5" />
+            Edit
+          </button>
         ) : canFill ? (
           <button
             onClick={() => router.push(`/forms/${form.id}/fill`)}
@@ -204,13 +256,24 @@ function FormCard({
             Fill
           </button>
         ) : (
-          <button
-            onClick={() => router.push(`/forms/${form.id}`)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-foreground text-xs font-medium hover:bg-muted/40 transition-colors"
-          >
-            <FileText className="w-3.5 h-3.5" />
-            Edit
-          </button>
+          <div className="flex gap-2">
+            {form.status === 'published' && (
+              <button
+                onClick={() => router.push(`/forms/${form.id}`)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-foreground text-xs font-medium hover:bg-muted/40 transition-colors"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                Edit
+              </button>
+            )}
+            <button
+              onClick={() => router.push(`/forms/${form.id}/responses`)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors"
+            >
+              <FilePen className="w-3.5 h-3.5" />
+              View Responses
+            </button>
+          </div>
         )}
       </div>
     </div>
@@ -225,6 +288,9 @@ export function FormsClient({ role }: FormsClientProps) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showBuilder, setShowBuilder] = useState(false)
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
+  const [search, setSearch] = useState('')
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [toasts, setToasts] = useState<ToastMsg[]>([])
   const toastCounter = useRef(0)
 
@@ -346,18 +412,9 @@ export function FormsClient({ role }: FormsClientProps) {
     return myForms
   }
 
-  const tabForms = getTabForms()
-
-  // ── If FormBuilder is shown ────────────────────────────────────────────────
-  if (showBuilder) {
-    return (
-      <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm overflow-y-auto py-8">
-        <div className="max-w-2xl mx-auto px-4">
-          <FormBuilder onComplete={() => { setShowBuilder(false); fetchForms() }} role={role} />
-        </div>
-      </div>
-    )
-  }
+  const tabForms = getTabForms().filter((f) =>
+    search.trim() === '' || f.title.toLowerCase().includes(search.toLowerCase())
+  )
 
   // ── Main render ────────────────────────────────────────────────────────────
   return (
@@ -385,39 +442,74 @@ export function FormsClient({ role }: FormsClientProps) {
         </div>
       )}
 
-      {/* ── Header bar ───────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between">
-        {/* Tab bar */}
-        <div className="flex gap-1 bg-muted/40 p-1 rounded-xl">
-          {tabs.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                tab === t.id
-                  ? 'bg-card text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {t.icon}
-              {t.label}
-              {t.id === 'pending-approval' && pendingForms.length > 0 && (
-                <span className="ml-0.5 bg-amber-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold">
-                  {pendingForms.length}
-                </span>
-              )}
-            </button>
-          ))}
+      {/* ── Header ───────────────────────────────────────────────────── */}
+      <div className="space-y-3">
+        {/* Row 1: tabs + new form button */}
+        <div className="flex items-center justify-between gap-3">
+          <Tabs value={tab} onValueChange={(v) => setTab(v as TabId)} className="w-auto">
+            <TabsList>
+              {tabs.map((t) => (
+                <TabsTrigger key={t.id} value={t.id} className="flex items-center gap-1.5">
+                  {t.icon}
+                  {t.label}
+                  {t.id === 'pending-approval' && pendingForms.length > 0 && (
+                    <span className="ml-0.5 bg-amber-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold">
+                      {pendingForms.length}
+                    </span>
+                  )}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+          <button
+            onClick={() => setShowBuilder(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            New Form
+          </button>
         </div>
 
-        {/* New Form button */}
-        <button
-          onClick={() => setShowBuilder(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          New Form
-        </button>
+        {/* Row 2: search + view toggle */}
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search forms..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full h-9 pl-9 pr-3 text-sm bg-card border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+            />
+          </div>
+          <div className="flex items-center border border-border rounded-lg overflow-hidden">
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`p-2 transition-colors ${viewMode === 'grid' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted/40'}`}
+              title="Grid view"
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`p-2 transition-colors ${viewMode === 'list' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted/40'}`}
+              title="List view"
+            >
+              <List className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Row 3: stats bar */}
+        <div className="flex items-center gap-4 px-4 py-2.5 bg-muted/40 rounded-lg border border-border text-xs text-muted-foreground">
+          <span><span className="font-semibold text-foreground">{tabForms.length}</span> forms</span>
+          <span className="text-border">·</span>
+          <span><span className="font-semibold text-green-700">{tabForms.filter(f => f.status === 'published').length}</span> published</span>
+          <span className="text-border">·</span>
+          <span><span className="font-semibold text-amber-700">{tabForms.filter(f => f.status === 'pending_approval').length}</span> pending</span>
+          <span className="text-border">·</span>
+          <span><span className="font-semibold text-foreground">{tabForms.reduce((sum, f) => sum + ((f as FormWithCounts).response_count ?? 0), 0)}</span> responses</span>
+        </div>
       </div>
 
       {/* ── Error ────────────────────────────────────────────────────── */}
@@ -429,7 +521,10 @@ export function FormsClient({ role }: FormsClientProps) {
 
       {/* ── Content ──────────────────────────────────────────────────── */}
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className={viewMode === 'grid'
+          ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4'
+          : 'flex flex-col gap-2'
+        }>
           {[1, 2, 3].map((i) => (
             <CardSkeleton key={i} />
           ))}
@@ -458,7 +553,10 @@ export function FormsClient({ role }: FormsClientProps) {
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className={viewMode === 'grid'
+          ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4'
+          : 'flex flex-col gap-2'
+        }>
           {tabForms.map((form) => (
             <FormCard
               key={form.id}
@@ -472,6 +570,40 @@ export function FormsClient({ role }: FormsClientProps) {
           ))}
         </div>
       )}
+
+      {/* FormBuilder Dialog */}
+      <Dialog
+        open={showBuilder}
+        onOpenChange={(open) => {
+          if (!open) setShowDiscardConfirm(true)
+          else setShowBuilder(true)
+        }}
+      >
+        <DialogContent className="max-w-2xl overflow-y-auto max-h-[90vh]">
+          <FormBuilder
+            onComplete={() => {
+              setShowBuilder(false)
+              fetchForms()
+            }}
+            role={role}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Discard confirmation */}
+      <ConfirmDialog
+        open={showDiscardConfirm}
+        onOpenChange={setShowDiscardConfirm}
+        title="Discard this draft?"
+        description="You'll lose any progress on this form. This cannot be undone."
+        confirmLabel="Discard"
+        cancelLabel="Keep editing"
+        variant="danger"
+        onConfirm={() => {
+          setShowDiscardConfirm(false)
+          setShowBuilder(false)
+        }}
+      />
     </div>
   )
 }

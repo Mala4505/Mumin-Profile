@@ -20,9 +20,37 @@ export async function GET() {
 
   // Compute is_expired
   const now = new Date()
+
+  // Fetch response and audience counts in one query each
+  const formIds = (data ?? []).map((f) => f.id)
+  const responseCounts: Record<string, number> = {}
+  const audienceCounts: Record<string, number> = {}
+
+  if (formIds.length) {
+    const { data: rCounts } = await supabase
+      .from('form_response')
+      .select('form_id')
+      .in('form_id', formIds)
+
+    for (const row of rCounts ?? []) {
+      responseCounts[row.form_id] = (responseCounts[row.form_id] ?? 0) + 1
+    }
+
+    const { data: aCounts } = await supabase
+      .from('form_audience')
+      .select('form_id')
+      .in('form_id', formIds)
+
+    for (const row of aCounts ?? []) {
+      audienceCounts[row.form_id] = (audienceCounts[row.form_id] ?? 0) + 1
+    }
+  }
+
   const forms = (data ?? []).map((f) => ({
     ...f,
     is_expired: f.expires_at && new Date(f.expires_at) < now,
+    response_count: responseCounts[f.id] ?? 0,
+    audience_count: audienceCounts[f.id] ?? 0,
   }))
 
   return NextResponse.json({ forms })
