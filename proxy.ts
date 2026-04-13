@@ -77,8 +77,8 @@ export async function proxy(request: NextRequest) {
 
     // Role-based route protection
     const role = appMeta.role
-    // /admin pages: SuperAdmin only
-    if (pathname.startsWith('/admin') && role !== 'SuperAdmin') {
+    // /admin and /analytics pages: SuperAdmin only
+    if ((pathname.startsWith('/admin') || pathname.startsWith('/analytics')) && role !== 'SuperAdmin') {
       const url = request.nextUrl.clone()
       url.pathname = '/dashboard'
       return NextResponse.redirect(url)
@@ -87,6 +87,12 @@ export async function proxy(request: NextRequest) {
     if (pathname.startsWith('/import') && role === 'Mumin') {
       const url = request.nextUrl.clone()
       url.pathname = '/members'
+      return NextResponse.redirect(url)
+    }
+    // /forms/[id]/responses: staff only — Mumin cannot view form responses
+    if (pathname.includes('/responses') && pathname.startsWith('/forms') && role === 'Mumin') {
+      const url = request.nextUrl.clone()
+      url.pathname = '/dashboard'
       return NextResponse.redirect(url)
     }
   }
