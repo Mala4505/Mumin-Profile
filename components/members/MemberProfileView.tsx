@@ -5,6 +5,10 @@ import { useRouter } from 'next/navigation'
 import { MapPin, BookOpen, ChevronDown, Pencil, Check, X, Loader2 } from 'lucide-react'
 import type { MemberProfile } from '@/lib/members/getMemberProfile'
 import type { SessionUser } from '@/lib/types/app'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Button } from '@/components/ui/button'
 
 interface Props {
   profile: MemberProfile
@@ -100,13 +104,13 @@ function EditableField({
       <span className="block text-xs text-muted-foreground mb-1">{field.caption}</span>
       {editing ? (
         <div className="flex items-center gap-1.5">
-          <input
+          <Input
             autoFocus
             type={field.field_type === 'date' ? 'date' : field.field_type === 'number' ? 'number' : 'text'}
             value={val}
             onChange={e => setVal(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') cancel() }}
-            className="flex-1 text-sm bg-white border border-primary/40 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary/30"
+            className="flex-1 h-8 text-sm"
           />
           <button onClick={save} disabled={saving} className="p-1 rounded text-green-600 hover:bg-green-50 disabled:opacity-50">
             {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
@@ -166,7 +170,7 @@ export function MemberProfileView({ profile, session }: Props) {
   const isOwnProfile = session.its_no === profile.its_no
 
   // All state at the top — hooks must never be declared after computations
-  const [editingContact, setEditingContact] = useState(false)
+  const [contactEditOpen, setContactEditOpen] = useState(false)
   const [contactForm, setContactForm] = useState({
     phone: profile.phone ?? '',
     alternate_phone: profile.alternate_phone ?? '',
@@ -211,7 +215,7 @@ export function MemberProfileView({ profile, session }: Props) {
       email: contactForm.email || null,
       status: contactForm.status,
     }))
-    setEditingContact(false)
+    setContactEditOpen(false)
     setContactSaving(false)
     router.refresh()
   }
@@ -266,129 +270,136 @@ export function MemberProfileView({ profile, session }: Props) {
 
   return (
     <div className="space-y-5">
-      {/* Hero Card */}
-      <div className="bg-card rounded-xl border border-border shadow-sm p-6">
-        <div className="flex items-start gap-4">
-          <div className="flex-shrink-0 w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center text-2xl font-bold select-none">
-            {initials}
+      {/* Hero Card — Compact Identity Card */}
+      <div className="bg-card rounded-xl border border-border shadow-sm p-5">
+        <div className="flex gap-3 items-start">
+          {/* Avatar with status ring */}
+          <div className="relative flex-shrink-0">
+            <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center text-lg font-bold select-none">
+              {initials}
+            </div>
+            <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-card ${displayProfile.status === 'active' ? 'bg-green-500' : 'bg-gray-400'}`} />
           </div>
+
+          {/* Identity block */}
           <div className="flex-1 min-w-0">
-            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+            <div className="flex items-start justify-between gap-2">
               <div>
-                <h1 className="text-2xl font-bold text-foreground leading-tight">{displayProfile.name}</h1>
-                <p className="text-sm text-muted-foreground mt-0.5">
+                <h1 className="text-lg font-bold text-foreground leading-tight">{displayProfile.name}</h1>
+                <p className="text-xs text-muted-foreground mt-0.5">
                   ITS {displayProfile.its_no}
                   <span className="mx-1.5">·</span>
                   Sabeel {displayProfile.sabeel_no}
                 </p>
               </div>
-              <div className="flex items-center gap-2">
-                <span className={`flex-shrink-0 inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${statusCls}`}>
-                  {statusLabel}
-                </span>
-                {canEditContact && !editingContact && (
-                  <button
-                    onClick={() => { setContactForm({ phone: displayProfile.phone ?? '', alternate_phone: displayProfile.alternate_phone ?? '', email: displayProfile.email ?? '', status: displayProfile.status }); setEditingContact(true) }}
-                    className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
-                    title="Edit contact info"
-                  >
-                    <Pencil className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
+              {canEditContact && (
+                <button
+                  onClick={() => {
+                    setContactForm({
+                      phone: displayProfile.phone ?? '',
+                      alternate_phone: displayProfile.alternate_phone ?? '',
+                      email: displayProfile.email ?? '',
+                      status: displayProfile.status,
+                    })
+                    setContactEditOpen(true)
+                  }}
+                  className="flex-shrink-0 p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+                  title="Edit contact info"
+                >
+                  <Pencil className="w-4 h-4" />
+                </button>
+              )}
             </div>
-            <div className="flex flex-wrap items-center gap-2 mt-3">
+
+            {/* Badges */}
+            <div className="flex flex-wrap items-center gap-1.5 mt-2">
+              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${statusCls}`}>
+                {statusLabel}
+              </span>
               <GenderPill gender={displayProfile.gender} />
               <BaligPill status={displayProfile.balig_status} />
             </div>
           </div>
         </div>
 
-        <div className="border-t border-border my-5" />
+        {/* Contact info row */}
+        <div className="border-t border-border mt-4 pt-4 grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-3">
+          {displayProfile.date_of_birth && <InfoField label="Date of Birth" value={displayProfile.date_of_birth} />}
+          <InfoField label="Phone" value={displayProfile.phone ?? '—'} />
+          {isStaff && <InfoField label="Alt. Phone" value={displayProfile.alternate_phone ?? '—'} />}
+          {isStaff && <InfoField label="Email" value={displayProfile.email ?? '—'} />}
+        </div>
+      </div>
 
-        {/* Contact view */}
-        {!editingContact && (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-4">
-            {displayProfile.date_of_birth && <InfoField label="Date of Birth" value={displayProfile.date_of_birth} />}
-            <InfoField label="Phone" value={displayProfile.phone ?? '—'} />
-            {isStaff && <InfoField label="Alt. Phone" value={displayProfile.alternate_phone ?? '—'} />}
-            {isStaff && <InfoField label="Email" value={displayProfile.email ?? '—'} />}
-          </div>
-        )}
-
-        {/* Contact edit form */}
-        {editingContact && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs text-muted-foreground mb-1">Phone</label>
-                <input
+      {/* Contact Edit Dialog */}
+      <Dialog open={contactEditOpen} onOpenChange={(open) => { if (!open) { setContactError('') } setContactEditOpen(open) }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Contact Info</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-phone">Phone</Label>
+              <Input
+                id="edit-phone"
+                type="tel"
+                value={contactForm.phone}
+                onChange={e => setContactForm(f => ({ ...f, phone: e.target.value }))}
+              />
+            </div>
+            {isStaff && (
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-altphone">Alt. Phone</Label>
+                <Input
+                  id="edit-altphone"
                   type="tel"
-                  value={contactForm.phone}
-                  onChange={e => setContactForm(f => ({ ...f, phone: e.target.value }))}
-                  className="w-full border border-border rounded-lg h-9 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                  value={contactForm.alternate_phone}
+                  onChange={e => setContactForm(f => ({ ...f, alternate_phone: e.target.value }))}
                 />
               </div>
-              {isStaff && (
-                <div>
-                  <label className="block text-xs text-muted-foreground mb-1">Alt. Phone</label>
-                  <input
-                    type="tel"
-                    value={contactForm.alternate_phone}
-                    onChange={e => setContactForm(f => ({ ...f, alternate_phone: e.target.value }))}
-                    className="w-full border border-border rounded-lg h-9 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-                  />
-                </div>
-              )}
-              {isStaff && (
-                <div>
-                  <label className="block text-xs text-muted-foreground mb-1">Email</label>
-                  <input
-                    type="email"
-                    value={contactForm.email}
-                    onChange={e => setContactForm(f => ({ ...f, email: e.target.value }))}
-                    className="w-full border border-border rounded-lg h-9 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-                  />
-                </div>
-              )}
-              {isStaff && (
-                <div>
-                  <label className="block text-xs text-muted-foreground mb-1">Status</label>
-                  <select
-                    value={contactForm.status}
-                    onChange={e => setContactForm(f => ({ ...f, status: e.target.value }))}
-                    className="w-full border border-border rounded-lg h-9 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-                  >
-                    <option value="active">Active</option>
-                    <option value="deceased">Deceased</option>
-                    <option value="relocated">Relocated</option>
-                    <option value="left_community">Left Community</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
-                </div>
-              )}
-            </div>
-            {contactError && (
-              <p className="text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2">{contactError}</p>
             )}
-            <div className="flex gap-2">
-              <button
-                onClick={() => setEditingContact(false)}
-                className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted/40 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={saveContact}
-                disabled={contactSaving}
-                className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg font-medium hover:opacity-90 disabled:opacity-60 transition-opacity flex items-center gap-1.5"
-              >
-                {contactSaving ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Saving…</> : 'Save'}
-              </button>
-            </div>
+            {isStaff && (
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-email">Email</Label>
+                <Input
+                  id="edit-email"
+                  type="email"
+                  value={contactForm.email}
+                  onChange={e => setContactForm(f => ({ ...f, email: e.target.value }))}
+                />
+              </div>
+            )}
+            {isStaff && (
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-status">Status</Label>
+                <select
+                  id="edit-status"
+                  value={contactForm.status}
+                  onChange={e => setContactForm(f => ({ ...f, status: e.target.value }))}
+                  className="w-full border border-border rounded-lg h-9 px-3 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                >
+                  <option value="active">Active</option>
+                  <option value="deceased">Deceased</option>
+                  <option value="relocated">Relocated</option>
+                  <option value="left_community">Left Community</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+          {contactError && (
+            <p className="text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2">{contactError}</p>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setContactEditOpen(false)} disabled={contactSaving}>
+              Cancel
+            </Button>
+            <Button onClick={saveContact} disabled={contactSaving}>
+              {contactSaving ? <><Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />Saving…</> : 'Save'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Location Card — staff and own profile */}
       {(isStaff || isOwnProfile) && (
