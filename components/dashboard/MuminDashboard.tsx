@@ -1,20 +1,6 @@
 import Link from 'next/link'
 import type { MuminStats } from '@/lib/dashboard/getStats'
-
-const UMOOR_LIST = [
-  'Deeniyah',
-  'Talimiyah',
-  'Kharejiyah',
-  'Dakheliyah',
-  'Sehhat',
-  'Faizul Mawaidil Burhaniyah',
-  'Mawarid Bashariyah',
-  'Iqtesaadiyah',
-  'Maliyah',
-  'Amlaak',
-  'Marafiq Burhaniyah',
-  'Qaza',
-]
+import { MuminPortalTabs } from './MuminPortalTabs'
 
 interface Props {
   stats: MuminStats
@@ -49,9 +35,12 @@ export default function MuminDashboard({ stats }: Props) {
     <div className="max-w-2xl mx-auto space-y-6 p-4 md:p-6">
       {/* Hero Card */}
       <div className="bg-card border border-border rounded-2xl p-6 text-center shadow-sm">
-        {/* Avatar */}
-        <div className="w-20 h-20 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-2xl font-bold mx-auto mb-4">
-          {initials}
+        {/* Avatar with status ring */}
+        <div className="relative inline-block mx-auto mb-4">
+          <div className="w-20 h-20 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-2xl font-bold">
+            {initials}
+          </div>
+          <span className={`absolute bottom-1 right-1 w-4 h-4 rounded-full border-2 border-card ${stats.status === 'active' ? 'bg-green-500' : 'bg-gray-400'}`} />
         </div>
         <h1 className="text-2xl font-bold text-foreground">{stats.name}</h1>
         <div className="flex items-center justify-center gap-4 mt-2 text-sm text-muted-foreground">
@@ -120,23 +109,8 @@ export default function MuminDashboard({ stats }: Props) {
         </div>
       </div>
 
-      {/* My 12 Umoor */}
-      <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
-        <div className="px-5 py-3.5 border-b border-border bg-muted/40 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-foreground">My 12 Umoor</h2>
-          <span className="text-xs text-muted-foreground">Coming soon</span>
-        </div>
-        <div className="p-4 flex flex-wrap gap-2">
-          {UMOOR_LIST.map((umoor) => (
-            <span
-              key={umoor}
-              className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground border border-border"
-            >
-              {umoor}
-            </span>
-          ))}
-        </div>
-      </div>
+      {/* My Profile & My Forms tabs */}
+      <MuminPortalTabs itsNo={stats.its_no} />
 
       {/* View Full Profile Button */}
       <div className="flex justify-center">
