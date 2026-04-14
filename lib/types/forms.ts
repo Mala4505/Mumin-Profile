@@ -18,10 +18,10 @@ export interface FillerAccess {
 
 export interface AudienceFilters {
   all?: boolean
-  gender?: 'male' | 'female'
+  gender?: 'M' | 'F'
   age_from?: number
   age_to?: number
-  balig_status?: boolean
+  balig_status?: "Balig" | "Ghair Balig"
   sector_ids?: string[]
   subsector_ids?: string[]
   masool_its_nos?: string[]

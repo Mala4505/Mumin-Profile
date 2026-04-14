@@ -58,11 +58,11 @@ export function Step2Audience({ draft, update, onNext, onBack }: Props) {
   }
 
   function setGender(v: string) {
-    update({ audience_filters: { ...filters, gender: v === '' ? undefined : v as 'male' | 'female' } })
+    update({ audience_filters: { ...filters, gender: v === '' ? undefined : v as 'M' | 'F' } })
   }
 
   function setBalig(checked: boolean) {
-    update({ audience_filters: { ...filters, balig_status: checked ? true : undefined } })
+    update({ audience_filters: { ...filters, balig_status: checked ? "Balig" : undefined } })
   }
 
   function setAgeFrom(v: string) {

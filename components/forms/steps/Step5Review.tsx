@@ -26,7 +26,7 @@ function audienceSummary(filters: FormDraft['audience_filters'] | undefined): st
   if (!filters || filters.all !== false) return 'All members'
 
   const parts: string[] = []
-  if (filters.gender) parts.push(filters.gender === 'male' ? 'Male only' : 'Female only')
+  if (filters.gender) parts.push(filters.gender === 'M' ? 'Male only' : 'Female only')
   if (filters.balig_status) parts.push('Balig members only')
   if (filters.age_from != null || filters.age_to != null) {
     const from = filters.age_from ?? 0
