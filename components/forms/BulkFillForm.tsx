@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import { Loader2, CheckCircle, XCircle, AlertTriangle, Save, Send } from 'lucide-react'
 import type { Form, FormQuestion } from '@/lib/types/forms'
 import type { Role } from '@/lib/types/app'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { LumaSpin } from '@/components/ui/luma-spin'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -25,60 +27,6 @@ interface BulkFillFormProps {
 // ─── Save status indicator ─────────────────────────────────────────────────────
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
-
-// ─── Confirmation Modal ────────────────────────────────────────────────────────
-
-function ConfirmModal({
-  onConfirm,
-  onCancel,
-  submitting,
-}: {
-  onConfirm: () => void
-  onCancel: () => void
-  submitting: boolean
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-card border border-border rounded-xl shadow-xl max-w-md w-full p-6">
-        <div className="flex items-start gap-3 mb-4">
-          <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center shrink-0">
-            <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-          </div>
-          <div>
-            <h2 className="font-semibold text-foreground text-base mb-1">
-              Confirm Submission
-            </h2>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              Are you sure this data is confirmed and accurate? You take
-              responsibility for this submission. This action cannot be undone.
-            </p>
-          </div>
-        </div>
-        <div className="flex gap-3 justify-end">
-          <button
-            onClick={onCancel}
-            disabled={submitting}
-            className="px-4 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            disabled={submitting}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {submitting ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Send className="w-4 h-4" />
-            )}
-            {submitting ? 'Submitting…' : 'Submit'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 
@@ -296,9 +244,8 @@ export function BulkFillForm({ formId, role }: BulkFillFormProps) {
   // ── Render: loading ──────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        <p className="text-sm text-muted-foreground">Loading form…</p>
+      <div className="flex items-center justify-center py-16">
+        <LumaSpin size={40} />
       </div>
     )
   }
@@ -340,14 +287,17 @@ export function BulkFillForm({ formId, role }: BulkFillFormProps) {
   // ── Render: main ─────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col h-full">
-      {/* ── Confirmation modal ──────────────────────────────────────────────── */}
-      {showConfirm && (
-        <ConfirmModal
-          onConfirm={handleSubmitConfirmed}
-          onCancel={() => setShowConfirm(false)}
-          submitting={submitting}
-        />
-      )}
+      {/* ── Confirmation dialog ─────────────────────────────────────────────── */}
+      <ConfirmDialog
+        open={showConfirm}
+        onOpenChange={setShowConfirm}
+        title="Confirm Submission"
+        description="Are you sure this data is confirmed and accurate? You take responsibility for this submission. This action cannot be undone."
+        confirmLabel="Submit"
+        cancelLabel="Cancel"
+        onConfirm={handleSubmitConfirmed}
+        loading={submitting}
+      />
 
       {/* ── Sticky header ───────────────────────────────────────────────────── */}
       <div className="sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b border-border px-4 md:px-6 py-3 flex flex-wrap items-center gap-3">

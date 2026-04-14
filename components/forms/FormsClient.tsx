@@ -17,7 +17,7 @@ import {
   List,
 } from 'lucide-react'
 import type { Role } from '@/lib/types/app'
-import { Dialog, DialogContent } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
@@ -580,6 +580,7 @@ export function FormsClient({ role }: FormsClientProps) {
         }}
       >
         <DialogContent className="max-w-2xl overflow-y-auto max-h-[90vh]">
+          <DialogTitle className="sr-only">Form Builder</DialogTitle>
           <FormBuilder
             onComplete={() => {
               setShowBuilder(false)

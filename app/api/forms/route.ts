@@ -31,6 +31,7 @@ export async function GET() {
       .from('form_response')
       .select('form_id')
       .in('form_id', formIds)
+      .eq('submitted', true)
 
     for (const row of rCounts ?? []) {
       responseCounts[row.form_id] = (responseCounts[row.form_id] ?? 0) + 1

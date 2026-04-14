@@ -61,6 +61,7 @@ export interface MemberListItem {
   building_id: number | null
   landmark: string | null
   head_its_no: number | null
+  hof_name: string | null
 }
 
 // Filters for member list
@@ -68,6 +69,7 @@ export interface MemberFilters {
   sector_id?: number
   subsector_id?: number
   building_id?: number
+  musaid_its_no?: number
   gender?: 'M' | 'F'
   balig_status?: 'Balig' | 'Ghair Balig'
   status?: MuminStatus

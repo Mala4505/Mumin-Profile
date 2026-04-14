@@ -15,6 +15,7 @@ import {
   ClipboardList,
   ClipboardCheck,
   FileText,
+  LineChart,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -64,6 +65,12 @@ const NAV_ITEMS: NavItem[] = [
     href: ROUTES.REQUESTS,
     icon: ClipboardList,
     roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid'],
+  },
+  {
+    label: 'Analytics',
+    href: '/analytics',
+    icon: LineChart,
+    roles: ['SuperAdmin'],
   },
   {
     label: 'Admin',

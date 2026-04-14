@@ -1,6 +1,56 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getSession } from '@/lib/auth/getSession'
+
+export async function GET(
+  _: NextRequest,
+  { params }: { params: Promise<{ its_no: string }> }
+) {
+  const session = await getSession()
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { its_no } = await params
+  const targetItsNo = parseInt(its_no)
+  if (isNaN(targetItsNo)) return NextResponse.json({ error: 'Invalid ITS No' }, { status: 400 })
+
+  // Mumin can only view their own profile values
+  if (session.role === 'Mumin' && session.its_no !== targetItsNo) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const admin = createAdminClient()
+
+  // Fetch all profile fields (not just ones with values) so we show all fields
+  const { data: fields, error: fieldsErr } = await admin
+    .from('profile_field')
+    .select('id, caption, field_type, visibility_level, is_data_entry, mumin_can_edit, sort_order, profile_category!inner(name, sort_order)')
+    .order('sort_order')
+
+  if (fieldsErr) return NextResponse.json({ error: fieldsErr.message }, { status: 500 })
+
+  const { data: values } = await admin
+    .from('profile_value')
+    .select('field_id, value, recorded_date')
+    .eq('its_no', targetItsNo)
+
+  const valueByFieldId = new Map((values ?? []).map((v: any) => [v.field_id, v.value]))
+
+  const profileValues = (fields ?? []).map((f: any) => ({
+    field_id: f.id,
+    caption: f.caption,
+    category_name: f.profile_category?.name ?? '',
+    category_sort_order: f.profile_category?.sort_order ?? 0,
+    value: valueByFieldId.get(f.id) ?? null,
+    visibility_level: f.visibility_level,
+    is_data_entry: f.is_data_entry,
+    mumin_can_edit: f.mumin_can_edit,
+    field_type: f.field_type,
+    sort_order: f.sort_order,
+  }))
+
+  return NextResponse.json({ profile_values: profileValues })
+}
 
 function getJwtMeta(accessToken: string): { role?: string; its_no?: number; sector_ids?: number[]; subsector_ids?: number[] } {
   try {
