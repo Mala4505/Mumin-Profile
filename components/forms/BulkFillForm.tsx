@@ -210,7 +210,7 @@ export function BulkFillForm({ formId, role }: BulkFillFormProps) {
         const answer = progress[member.its_no]?.[q.profile_field_id]
         if (answer != null && answer !== '') {
           responses.push({
-            profile_field_id: q.profile_field_id,
+            profile_field_id: q.profile_field_id.toString(),
             its_no: member.its_no,
             answer,
             remarks: progress[member.its_no]?.['_remarks'] ?? '',
@@ -428,9 +428,8 @@ export function BulkFillForm({ formId, role }: BulkFillFormProps) {
                   return (
                     <tr
                       key={member.its_no}
-                      className={`${rowBorderClass} border-b border-border last:border-b-0 ${
-                        idx % 2 === 1 ? 'bg-muted/20' : ''
-                      } transition-colors`}
+                      className={`${rowBorderClass} border-b border-border last:border-b-0 ${idx % 2 === 1 ? 'bg-muted/20' : ''
+                        } transition-colors`}
                     >
                       {/* Member name — sticky */}
                       <td className="sticky left-0 z-10 bg-inherit px-4 py-1.5 font-medium text-foreground whitespace-nowrap text-xs">
@@ -468,7 +467,7 @@ export function BulkFillForm({ formId, role }: BulkFillFormProps) {
                                     onChange={(e) =>
                                       handleCellChange(
                                         member.its_no,
-                                        q.profile_field_id,
+                                        q.profile_field_id.toString(),
                                         e.target.checked ? 'true' : 'false'
                                       )
                                     }
@@ -486,7 +485,7 @@ export function BulkFillForm({ formId, role }: BulkFillFormProps) {
                                   onChange={(e) =>
                                     handleCellChange(
                                       member.its_no,
-                                      q.profile_field_id,
+                                      q.profile_field_id.toString(),
                                       e.target.value
                                     )
                                   }
@@ -501,7 +500,7 @@ export function BulkFillForm({ formId, role }: BulkFillFormProps) {
                                   onChange={(e) =>
                                     handleCellChange(
                                       member.its_no,
-                                      q.profile_field_id,
+                                      q.profile_field_id.toString(),
                                       e.target.value
                                     )
                                   }
