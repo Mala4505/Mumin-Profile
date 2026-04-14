@@ -807,6 +807,51 @@ export type Database = {
         };
         Relationships: [];
       };
+      notifications: {
+        Row: {
+          id: number;
+          its_no: number;
+          type: string;
+          title: string;
+          body: string;
+          related_form_id: string;
+          created_at: string | null;
+        };
+        Insert: {
+          id?: number;
+          its_no: number;
+          type: string;
+          title: string;
+          body: string;
+          related_form_id: string;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: number;
+          its_no?: number;
+          type?: string;
+          title?: string;
+          body?: string;
+          related_form_id?: string;
+          created_at?: string | null;
+        };
+        Relationships: [];
+      };
+      form_audience: {
+        Row: {
+          form_id: string;
+          its_no: number;
+        };
+        Insert: {
+          form_id: string;
+          its_no: number;
+        };
+        Update: {
+          form_id?: string;
+          its_no?: number;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
