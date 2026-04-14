@@ -36,7 +36,7 @@ export default async function SelfFillPage({
     .from('form_audience')
     .select('its_no')
     .eq('form_id', id)
-    .eq('its_no', String(session.its_no))
+    .eq('its_no', Number(session.its_no))
     .single()
 
   if (!inAudience) redirect('/dashboard')
