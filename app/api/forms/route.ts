@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
   const supabase = await createClient()
 
   // Validate all profile_field_ids in questions exist
-  const fieldIds: string[] = (body.questions ?? []).map((q: { profile_field_id: string }) => q.profile_field_id)
+  const fieldIds: number[] = (body.questions ?? []).map((q: { profile_field_id: string }) => q.profile_field_id)
   if (fieldIds.length) {
     const { data: fields } = await supabase.from('profile_field').select('id').in('id', fieldIds)
     const foundIds = new Set((fields ?? []).map((f) => f.id))

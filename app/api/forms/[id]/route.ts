@@ -43,7 +43,7 @@ export async function PUT(
   // Handle publish transition
   if (body.status === 'published' && existing.status !== 'published') {
     // Guard: only allow from draft or pending_approval
-    if (!['draft', 'pending_approval'].includes(existing.status)) {
+    if (!existing.status || !['draft', 'pending_approval'].includes(existing.status)) {
       return NextResponse.json({ error: 'Cannot publish from current status' }, { status: 400 })
     }
     // Materialize audience

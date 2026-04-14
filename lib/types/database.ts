@@ -184,6 +184,12 @@
 //   }
 // }
 
+import type {
+  FormQuestion,
+  AudienceFilters,
+  FillerAccess,
+} from "@/lib/types/forms";
+
 export type Json =
   | string
   | number
@@ -759,11 +765,11 @@ export type Database = {
           title: string;
           description: string | null;
           umoor_category_id: number | null;
-          created_by: number | null;
+          created_by: string | null;
           form_type: "simple" | "detailed" | null;
-          questions: Json | null;
-          audience_filters: Json | null;
-          filler_access: Json | null; // 👈 this is the field you need
+          questions: FormQuestion[] | null;
+          audience_filters: AudienceFilters | null;
+          filler_access: FillerAccess | null;
           status: "draft" | "pending_approval" | "published" | "closed" | null;
           approved_by: number | null;
           approved_at: string | null;
@@ -776,11 +782,11 @@ export type Database = {
           title: string;
           description?: string | null;
           umoor_category_id?: number | null;
-          created_by?: number | null;
+          created_by?: string | null;
           form_type?: "simple" | "detailed" | null;
-          questions?: Json | null;
-          audience_filters?: Json | null;
-          filler_access?: Json | null;
+          questions?: FormQuestion[] | null;
+          audience_filters?: AudienceFilters | null;
+          filler_access?: FillerAccess | null;
           status?: "draft" | "pending_approval" | "published" | "closed" | null;
           approved_by?: number | null;
           approved_at?: string | null;
@@ -793,11 +799,11 @@ export type Database = {
           title?: string;
           description?: string | null;
           umoor_category_id?: number | null;
-          created_by?: number | null;
+          created_by?: string | null;
           form_type?: "simple" | "detailed" | null;
-          questions?: Json | null;
-          audience_filters?: Json | null;
-          filler_access?: Json | null;
+          questions?: FormQuestion[] | null;
+          audience_filters?: AudienceFilters | null;
+          filler_access?: FillerAccess | null;
           status?: "draft" | "pending_approval" | "published" | "closed" | null;
           approved_by?: number | null;
           approved_at?: string | null;
@@ -807,6 +813,7 @@ export type Database = {
         };
         Relationships: [];
       };
+
       notifications: {
         Row: {
           id: number;
@@ -837,6 +844,32 @@ export type Database = {
         };
         Relationships: [];
       };
+
+      form_response: {
+        Row: {
+          id: string;
+          form_id: string;
+          filled_for: number;
+          submitted: boolean;
+          submitted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          form_id: string;
+          filled_for: number;
+          submitted?: boolean;
+          submitted_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          form_id?: string;
+          filled_for?: number;
+          submitted?: boolean;
+          submitted_at?: string | null;
+        };
+        Relationships: [];
+      };
+
       form_audience: {
         Row: {
           form_id: string;
@@ -849,6 +882,49 @@ export type Database = {
         Update: {
           form_id?: string;
           its_no?: number;
+        };
+        Relationships: [];
+      };
+
+      form_progress: {
+        Row: {
+          form_id: string;
+          filler_its_no: string;
+          progress: Json;
+          last_saved: string;
+        };
+        Insert: {
+          form_id: string;
+          filler_its_no: string;
+          progress: Json;
+          last_saved: string;
+        };
+        Update: {
+          form_id?: string;
+          filler_its_no?: string;
+          progress?: Json;
+          last_saved?: string;
+        };
+        Relationships: [];
+      };
+      form_filler_progress: {
+        Row: {
+          form_id: string;
+          filler_its_no: string;
+          progress: Json;
+          last_saved: string;
+        };
+        Insert: {
+          form_id: string;
+          filler_its_no: string;
+          progress: Json;
+          last_saved: string;
+        };
+        Update: {
+          form_id?: string;
+          filler_its_no?: string;
+          progress?: Json;
+          last_saved?: string;
         };
         Relationships: [];
       };

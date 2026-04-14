@@ -2,7 +2,7 @@ export type FormStatus = 'draft' | 'pending_approval' | 'published' | 'closed' |
 export type FormType = 'simple' | 'detailed'
 
 export interface FormQuestion {
-  profile_field_id: string
+  profile_field_id: number
   question_text: string
   sort_order: number
 }
