@@ -46,7 +46,7 @@ export function Step3Questions({ draft, update, onNext, onBack }: Props) {
 
   function addQuestion() {
     const newQ: FormQuestion = {
-      profile_field_id: '',
+      profile_field_id: 0,
       question_text: '',
       sort_order: questions.length,
     }
@@ -60,14 +60,14 @@ export function Step3Questions({ draft, update, onNext, onBack }: Props) {
   function moveUp(index: number) {
     if (index === 0) return
     const next = [...questions]
-    ;[next[index - 1], next[index]] = [next[index], next[index - 1]]
+      ;[next[index - 1], next[index]] = [next[index], next[index - 1]]
     sync(next.map((q, i) => ({ ...q, sort_order: i })))
   }
 
   function moveDown(index: number) {
     if (index === questions.length - 1) return
     const next = [...questions]
-    ;[next[index], next[index + 1]] = [next[index + 1], next[index]]
+      ;[next[index], next[index + 1]] = [next[index + 1], next[index]]
     sync(next.map((q, i) => ({ ...q, sort_order: i })))
   }
 
@@ -75,7 +75,7 @@ export function Step3Questions({ draft, update, onNext, onBack }: Props) {
     const field = fields.find((f) => String(f.id) === field_id)
     const next = questions.map((q, i) =>
       i === index
-        ? { ...q, profile_field_id: field_id, question_text: q.question_text || field?.caption || '' }
+        ? { ...q, profile_field_id: field_id ? Number(field_id) : 0, question_text: q.question_text || field?.caption || '' }
         : q
     )
     sync(next)
@@ -122,9 +122,8 @@ export function Step3Questions({ draft, update, onNext, onBack }: Props) {
           return (
             <div
               key={i}
-              className={`flex gap-3 items-start p-3.5 rounded-lg border bg-background transition-colors ${
-                isInvalid ? 'border-destructive' : 'border-border'
-              }`}
+              className={`flex gap-3 items-start p-3.5 rounded-lg border bg-background transition-colors ${isInvalid ? 'border-destructive' : 'border-border'
+                }`}
             >
               {/* Reorder arrows */}
               <div className="flex flex-col gap-0.5 mt-1 shrink-0">
@@ -167,12 +166,13 @@ export function Step3Questions({ draft, update, onNext, onBack }: Props) {
                       {fields.map((f) => (
                         <option
                           key={f.id}
-                          value={String(f.id)}
-                          disabled={fieldIds.has(String(f.id)) && String(f.id) !== q.profile_field_id}
+                          value={f.id}
+                          disabled={fieldIds.has(f.id) && f.id !== q.profile_field_id}
                         >
                           {f.caption}
-                          {fieldIds.has(String(f.id)) && String(f.id) !== q.profile_field_id ? ' (added)' : ''}
+                          {fieldIds.has(f.id) && f.id !== q.profile_field_id ? ' (added)' : ''}
                         </option>
+
                       ))}
                     </select>
                     <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />

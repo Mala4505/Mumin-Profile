@@ -65,7 +65,7 @@ function ChartsTab({ form, responses, audience }: { form: Form; responses: Respo
       {(form.questions ?? []).map((q) => {
         const answers = responses
           .flatMap((r) => r.responses ?? [])
-          .filter((r) => r.profile_field_id === q.profile_field_id)
+          .filter((r) => r.profile_field_id === q.profile_field_id.toString())
           .map((r) => r.answer)
           .filter(Boolean)
 
@@ -313,7 +313,7 @@ export function FormResponsesClient({ form, responses, audience, role }: Props) 
           </DialogHeader>
           <div className="space-y-3 py-2">
             {detailResponse?.responses.map((r, i) => {
-              const question = form.questions?.find((q) => q.profile_field_id === r.profile_field_id)
+              const question = form.questions?.find((q) => q.profile_field_id.toString() === r.profile_field_id.toString())
               return (
                 <div key={i} className="space-y-0.5">
                   <p className="text-xs text-muted-foreground">{question?.question_text ?? r.profile_field_id}</p>

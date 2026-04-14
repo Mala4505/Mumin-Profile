@@ -121,8 +121,8 @@ export function SelfFillForm({ form, itsNo }: Props) {
                     </label>
                     <input
                       type="text"
-                      value={answers[q.profile_field_id] ?? ''}
-                      onChange={(e) => handleChange(q.profile_field_id, e.target.value)}
+                      value={answers[q.profile_field_id.toString()] ?? ''}
+                      onChange={(e) => handleChange(q.profile_field_id.toString(), e.target.value)}
                       placeholder="Your answer"
                       className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                     />
