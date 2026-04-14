@@ -7,6 +7,10 @@ import {
   LineChart, Line,
 } from 'recharts'
 
+import type { FormRate } from '@/app/api/analytics/form-rates/route'
+import type { ActivityEvent } from '@/app/api/analytics/activity/route'
+
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface OverviewData {
@@ -67,6 +71,85 @@ function WidgetCard({ title, value, sub }: { title: string; value: React.ReactNo
   )
 }
 
+// ─── Form Response Rates ────────────────────────────────────────────────
+function FormResponseRates({ rates }: { rates: FormRate[] }) {
+  if (rates.length === 0) return null
+  return (
+    <div className="bg-card border border-border rounded-lg p-5">
+      <h2 className="text-base font-semibold text-foreground mb-4">Form Response Rates</h2>
+      <div className="space-y-3">
+        {rates.map((form) => {
+          const color = form.pct >= 70 ? '#10B981' : form.pct >= 40 ? '#F59E0B' : '#EF4444'
+          return (
+            <div key={form.id}>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-sm text-foreground truncate max-w-[240px]">{form.title}</span>
+                <span className="text-sm font-semibold tabular-nums ml-2" style={{ color }}>
+                  {form.pct}%
+                </span>
+              </div>
+              <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{ width: `${form.pct}%`, backgroundColor: color }}
+                />
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                {form.responses} of {form.total} members responded
+              </p>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ─── Activity Feed ──────────────────────────────────────────────────────
+function timeAgoFromEvent(dateStr: string): string {
+  const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000)
+  if (diff < 60) return `${diff}s ago`
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
+  return `${Math.floor(diff / 86400)}d ago`
+}
+
+const ACTIVITY_COLORS: Record<string, string> = {
+  submission: '#10B981',
+  import: '#3B82F6',
+  profile: '#F59E0B',
+}
+
+function ActivityFeed({ events }: { events: ActivityEvent[] }) {
+  return (
+    <div className="bg-card border border-border rounded-lg p-5">
+      <h2 className="text-base font-semibold text-foreground mb-4">Recent Activity</h2>
+      {events.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No recent activity.</p>
+      ) : (
+        <ul className="space-y-2.5">
+          {events.map((e, i) => (
+            <li key={i} className="flex items-start gap-2.5">
+              <span
+                className="mt-1.5 w-2 h-2 rounded-full shrink-0"
+                style={{ backgroundColor: ACTIVITY_COLORS[e.type] ?? '#94a3b8' }}
+              />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-foreground leading-snug">{e.label}</p>
+              </div>
+              <span className="text-[10px] text-muted-foreground whitespace-nowrap mt-0.5">
+                {timeAgoFromEvent(e.timestamp)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function AnalyticsDashboard() {
@@ -85,12 +168,16 @@ export function AnalyticsDashboard() {
   const [drillMembers, setDrillMembers] = React.useState<MemberRow[]>([])
   const [drillLoading, setDrillLoading] = React.useState(false)
 
+  const [formRates, setFormRates] = React.useState<FormRate[]>([])
+  const [activity, setActivity] = React.useState<ActivityEvent[]>([])
+
+
   // ── Fetch overview ─────────────────────────────────────────────────────────
   React.useEffect(() => {
     fetch('/api/analytics/overview')
       .then(r => r.json())
       .then(setOverview)
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setOverviewLoading(false))
   }, [])
 
@@ -112,12 +199,12 @@ export function AnalyticsDashboard() {
     fetch('/api/analytics/profile-completion')
       .then(r => r.json())
       .then(setProfileCompletion)
-      .catch(() => {})
+      .catch(() => { })
 
     fetch('/api/analytics/form-activity')
       .then(r => r.json())
       .then(setSubmissionActivity)
-      .catch(() => {})
+      .catch(() => { })
   }, [])
 
   // ── Drill-down: fetch members for selected group ───────────────────────────
@@ -130,6 +217,20 @@ export function AnalyticsDashboard() {
       .catch(() => setDrillMembers([]))
       .finally(() => setDrillLoading(false))
   }, [selectedGroup, groupBy])
+
+  React.useEffect(() => {
+    fetch('/api/analytics/form-rates')
+      .then(r => r.json())
+      .then(setFormRates)
+      .catch(() => { })
+
+    fetch('/api/analytics/activity')
+      .then(r => r.json())
+      .then(setActivity)
+      .catch(() => { })
+  }, [])
+
+
 
   // ── Bar click handler ──────────────────────────────────────────────────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -206,6 +307,7 @@ export function AnalyticsDashboard() {
         )}
       </div>
 
+
       {/* ── Charts Section ────────────────────────────────────────────────── */}
       <div className="space-y-6">
 
@@ -216,11 +318,10 @@ export function AnalyticsDashboard() {
             <button
               key={g}
               onClick={() => setGroupBy(g)}
-              className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
-                groupBy === g
-                  ? 'bg-primary text-primary-foreground border-primary'
-                  : 'bg-card text-foreground border-border hover:border-primary/50'
-              }`}
+              className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${groupBy === g
+                ? 'bg-primary text-primary-foreground border-primary'
+                : 'bg-card text-foreground border-border hover:border-primary/50'
+                }`}
             >
               {g.charAt(0).toUpperCase() + g.slice(1)}
             </button>
@@ -234,6 +335,7 @@ export function AnalyticsDashboard() {
             </button>
           )}
         </div>
+
 
         {/* Bar chart — members per group */}
         <div className="bg-card border border-border rounded-lg p-5">
@@ -355,6 +457,8 @@ export function AnalyticsDashboard() {
         </div>
       </div>
 
+
+
       {/* ── Drill-down Table ──────────────────────────────────────────────── */}
       <div>
         <h2 className="text-base font-semibold text-foreground mb-3">
@@ -407,6 +511,9 @@ export function AnalyticsDashboard() {
         )}
       </div>
 
+      <FormResponseRates rates={formRates} />
+      <ActivityFeed events={activity} />
+      
     </div>
   )
 }

@@ -12,7 +12,7 @@ interface Notification {
   related_form_id?: string
 }
 
-export function NotificationBell() {
+export default function NotificationBell() {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
