@@ -820,6 +820,7 @@ export type Database = {
           its_no: number;
           type: string;
           title: string;
+          read: boolean;
           body: string;
           related_form_id: string;
           created_at: string | null;
@@ -829,6 +830,7 @@ export type Database = {
           its_no: number;
           type: string;
           title: string;
+          read?: boolean;
           body: string;
           related_form_id: string;
           created_at?: string | null;
@@ -838,6 +840,7 @@ export type Database = {
           its_no?: number;
           type?: string;
           title?: string;
+          read?: boolean;
           body?: string;
           related_form_id?: string;
           created_at?: string | null;
