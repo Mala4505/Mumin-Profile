@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/getSession'
 import { createClient } from '@/lib/supabase/server'
 import { materializeAudience } from '@/lib/forms/materializeAudience'
+import { Database } from '@/lib/types/database' // adjust path
 
 export async function GET(
   _: NextRequest,
@@ -83,15 +84,47 @@ export async function PUT(
     }
   }
 
-  const allowedFields = ['title', 'description', 'form_type', 'questions', 'audience_filters',
-    'filler_access', 'expires_at', 'umoor_category_id', 'status', 'published_at']
-  const safeBody: Record<string, unknown> = {}
-  for (const key of allowedFields) {
-    if (key in body) safeBody[key] = body[key]
-  }
+type FormUpdate = Database['public']['Tables']['forms']['Update']
 
-  const { data, error } = await supabase.from('forms').update(safeBody).eq('id', id).select().single()
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+const allowedFields = [
+  'title',
+  'description',
+  'form_type',
+  'questions',
+  'audience_filters',
+  'filler_access',
+  'expires_at',
+  'umoor_category_id',
+  'status',
+  'published_at',
+]
+
+const safeBody: FormUpdate = {}
+for (const key of allowedFields) {
+  if (key in body) {
+    // @ts-expect-error: index assignment is safe because keys are from allowedFields
+    safeBody[key] = body[key]
+  }
+}
+
+const { data, error } = await supabase
+  .from('forms')
+  .update(safeBody)
+  .eq('id', id)
+  .select()
+  .single()
+
+
+  // const allowedFields = ['title', 'description', 'form_type', 'questions', 'audience_filters',
+  //   'filler_access', 'expires_at', 'umoor_category_id', 'status', 'published_at']
+  // const safeBody: Record<string, unknown> = {}
+  // for (const key of allowedFields) {
+  //   if (key in body) safeBody[key] = body[key]
+  // }
+
+  // const { data, error } = await supabase.from('forms').update(safeBody).eq('id', id).select().single()
+  // if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   return NextResponse.json({ form: data })
 }
