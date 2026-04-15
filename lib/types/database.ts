@@ -524,6 +524,7 @@ export type Database = {
           value: string | null;
           updated_by: number | null;
           updated_at: string;
+          data_active: boolean; // <-- add here
         };
         Insert: {
           id?: number;
@@ -532,6 +533,7 @@ export type Database = {
           value?: string | null;
           updated_by?: number | null;
           updated_at?: string;
+          data_active?: boolean; // <-- add here
         };
         Update: {
           id?: number;
@@ -540,6 +542,7 @@ export type Database = {
           value?: string | null;
           updated_by?: number | null;
           updated_at?: string;
+          data_active?: boolean; // <-- add here
         };
         Relationships: [];
       };

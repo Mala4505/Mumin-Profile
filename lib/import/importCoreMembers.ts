@@ -5,6 +5,7 @@ import {
   validateHeaders,
   type CoreRowInput,
 } from "./validateCoreRow";
+import { Database } from "../types/database";
 
 export interface ImportResult {
   importLogId: number;
@@ -294,6 +295,8 @@ export async function importCoreMembers(
       const buildingKey = `${subsectorId}::${row.Building.toLowerCase()}`;
       let buildingRecord = buildingMap.get(buildingKey);
 
+      type BuildingUpdate = Database['public']['Tables']['building']['Update']
+
       if (!buildingRecord) {
         const { data: newBuilding, error: bErr } = await admin
           .from("building")
@@ -330,7 +333,8 @@ export async function importCoreMembers(
           row.Landmark && row.Landmark !== buildingRecord.landmark;
 
         if (needsStreetUpdate || needsLandmarkUpdate) {
-          const updatePayload: Record<string, string> = {};
+          // const updatePayload: Record<string, string> = {};
+          const updatePayload: BuildingUpdate = {};
           if (needsStreetUpdate) updatePayload.street = row.Street!;
           if (needsLandmarkUpdate) updatePayload.landmark = row.Landmark!;
 
