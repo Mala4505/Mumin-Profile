@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   KeyRound,
   ArrowRightCircle,
+  Clock,
 } from 'lucide-react'
 import { LoadingDots } from '@/components/ui/loading-dots'
 
@@ -39,12 +40,14 @@ export function LoginForm() {
   const [paciNo, setPaciNo] = useState('')
   const [showPaci, setShowPaci] = useState(false)
   const [error, setError] = useState('')
+  const [restricted, setRestricted] = useState(false)
   const [step, setStep] = useState<Step>(null)
 
   const loading = step !== null
 
   async function handleSubmit() {
     setError('')
+    setRestricted(false)
 
     try {
       // Step 1 — validate ITS + PACI server-side
@@ -58,6 +61,11 @@ export function LoginForm() {
       const data = await res.json()
 
       if (!res.ok) {
+        if (data.error === 'ACCESS_RESTRICTED') {
+          setRestricted(true)
+          setStep(null)
+          return
+        }
         setError(data.error ?? 'Invalid ITS No or password. Please try again.')
         setStep(null)
         return
@@ -89,6 +97,64 @@ export function LoginForm() {
 
   const currentStep = step ? STEP_LABELS[step] : null
 
+  // ── Restricted state — replace the form entirely ──────────────────────────
+  if (restricted) {
+    return (
+      <div className="w-full max-w-md">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-foreground tracking-tight">Sign In</h1>
+          <p className="text-muted-foreground text-sm mt-2">
+            Enter your ITS number and password
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-amber-300/40 bg-amber-50 dark:bg-amber-400/10 p-6 space-y-4">
+          {/* Icon + heading */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-400/20 shrink-0">
+              <Clock className="w-5 h-5 text-amber-600 dark:text-amber-400" aria-hidden="true" />
+            </div>
+            <div>
+              <p className="font-semibold text-amber-900 dark:text-amber-300 text-sm">
+                Access Not Yet Enabled
+              </p>
+              <p className="text-amber-700/80 dark:text-amber-400/80 text-xs mt-0.5">
+                Portal rollout is in progress
+              </p>
+            </div>
+          </div>
+
+          {/* Body */}
+          <p className="text-sm text-amber-800 dark:text-amber-300/90 leading-relaxed">
+            Your account has been found but portal access has not been enabled
+            for your record yet. The system is being rolled out in phases.
+          </p>
+
+          <p className="text-sm text-amber-800 dark:text-amber-300/90 leading-relaxed">
+            Please contact your <span className="font-semibold">Masool</span> to
+            request access.
+          </p>
+
+          {/* Try different account */}
+          <div className="pt-2 border-t border-amber-300/30">
+            <button
+              type="button"
+              onClick={() => {
+                setRestricted(false)
+                setItsNo('')
+                setPaciNo('')
+              }}
+              className="text-xs text-amber-700 dark:text-amber-400 underline underline-offset-2 hover:text-amber-900 dark:hover:text-amber-200 transition-colors"
+            >
+              Try a different ITS number
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Normal login form ─────────────────────────────────────────────────────
   return (
     <div className="w-full max-w-md">
       {/* Header */}
@@ -194,9 +260,211 @@ export function LoginForm() {
             </>
           )}
         </button>
-
-
       </form>
     </div>
   )
 }
+
+
+// 'use client'
+
+// import { useState } from 'react'
+// import { useRouter } from 'next/navigation'
+// import { createClient } from '@/lib/supabase/client'
+// import {
+//   Hash,
+//   Lock,
+//   Eye,
+//   EyeOff,
+//   AlertCircle,
+//   LogIn,
+//   ShieldCheck,
+//   KeyRound,
+//   ArrowRightCircle,
+// } from 'lucide-react'
+// import { LoadingDots } from '@/components/ui/loading-dots'
+
+// type Step = 'verifying' | 'signing-in' | 'redirecting' | null
+
+// const STEP_LABELS: Record<NonNullable<Step>, { icon: React.ReactNode; text: string }> = {
+//   verifying: {
+//     icon: <ShieldCheck className="w-3.5 h-3.5" />,
+//     text: 'Verifying credentials...',
+//   },
+//   'signing-in': {
+//     icon: <KeyRound className="w-3.5 h-3.5" />,
+//     text: 'Signing in...',
+//   },
+//   redirecting: {
+//     icon: <ArrowRightCircle className="w-3.5 h-3.5" />,
+//     text: 'Redirecting to dashboard...',
+//   },
+// }
+
+// export function LoginForm() {
+//   const router = useRouter()
+//   const [itsNo, setItsNo] = useState('')
+//   const [paciNo, setPaciNo] = useState('')
+//   const [showPaci, setShowPaci] = useState(false)
+//   const [error, setError] = useState('')
+//   const [step, setStep] = useState<Step>(null)
+
+//   const loading = step !== null
+
+//   async function handleSubmit() {
+//     setError('')
+
+//     try {
+//       // Step 1 — validate ITS + PACI server-side
+//       setStep('verifying')
+//       const res = await fetch('/api/auth/login', {
+//         method: 'POST',
+//         headers: { 'Content-Type': 'application/json' },
+//         body: JSON.stringify({ its_no: itsNo, paci_no: paciNo }),
+//       })
+
+//       const data = await res.json()
+
+//       if (!res.ok) {
+//         setError(data.error ?? 'Invalid ITS No or password. Please try again.')
+//         setStep(null)
+//         return
+//       }
+
+//       // Step 2 — sign in with derived credentials
+//       setStep('signing-in')
+//       const supabase = createClient()
+//       const { error: authError } = await supabase.auth.signInWithPassword({
+//         email: data.email,
+//         password: data.password,
+//       })
+
+//       if (authError) {
+//         setError('Sign in failed. Please try again.')
+//         setStep(null)
+//         return
+//       }
+
+//       // Step 3 — redirect
+//       setStep('redirecting')
+//       router.push('/dashboard')
+//       router.refresh()
+//     } catch {
+//       setError('Something went wrong. Please try again.')
+//       setStep(null)
+//     }
+//   }
+
+//   const currentStep = step ? STEP_LABELS[step] : null
+
+//   return (
+//     <div className="w-full max-w-md">
+//       {/* Header */}
+//       <div className="mb-8">
+//         <h1 className="text-3xl font-bold text-foreground tracking-tight">Sign In</h1>
+//         <p className="text-muted-foreground text-sm mt-2">
+//           Enter your ITS number and password
+//         </p>
+//       </div>
+
+//       <form action={handleSubmit} className="space-y-6" noValidate>
+//         {/* ITS Number */}
+//         <div>
+//           <label
+//             htmlFor="its_no"
+//             className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-2"
+//           >
+//             <Hash className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
+//             ITS Number
+//           </label>
+//           <input
+//             id="its_no"
+//             type="text"
+//             inputMode="numeric"
+//             pattern="[0-9]*"
+//             value={itsNo}
+//             onChange={e => setItsNo(e.target.value)}
+//             disabled={loading}
+//             className="w-full border border-border rounded-lg h-11 px-3 bg-white text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+//             placeholder="e.g. 10000001"
+//             required
+//             autoFocus
+//             autoComplete="username"
+//           />
+//         </div>
+
+//         {/* Password (PACI) */}
+//         <div>
+//           <label
+//             htmlFor="paci_no"
+//             className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-2"
+//           >
+//             <Lock className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
+//             Password
+//           </label>
+//           <div className="relative">
+//             <input
+//               id="paci_no"
+//               type={showPaci ? 'text' : 'password'}
+//               inputMode="numeric"
+//               value={paciNo}
+//               onChange={e => setPaciNo(e.target.value)}
+//               disabled={loading}
+//               className="w-full border border-border rounded-lg h-11 px-3 pr-11 bg-white text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+//               placeholder="Enter your PACI number"
+//               required
+//               autoComplete="current-password"
+//             />
+//             <button
+//               type="button"
+//               onClick={() => setShowPaci(prev => !prev)}
+//               disabled={loading}
+//               className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground transition-colors disabled:pointer-events-none"
+//               aria-label={showPaci ? 'Hide password' : 'Show password'}
+//             >
+//               {showPaci ? (
+//                 <EyeOff className="w-4 h-4" aria-hidden="true" />
+//               ) : (
+//                 <Eye className="w-4 h-4" aria-hidden="true" />
+//               )}
+//             </button>
+//           </div>
+//           <p className="text-xs text-muted-foreground mt-1.5 italic">
+//             Use your house PACI number as your password
+//           </p>
+//         </div>
+
+//         {/* Error message */}
+//         {error && (
+//           <div
+//             role="alert"
+//             className="flex items-start gap-2 bg-destructive/10 border border-destructive/30 text-destructive rounded-lg px-3 py-2.5 text-sm"
+//           >
+//             <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
+//             <span>{error}</span>
+//           </div>
+//         )}
+
+//         {/* Submit */}
+//         <button
+//           type="submit"
+//           disabled={loading}
+//           className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-lg h-11 font-semibold hover:opacity-90 disabled:opacity-80 transition-opacity cursor-pointer disabled:cursor-not-allowed"
+//         >
+//           {loading ? (
+//             <LoadingDots size={5} color="#0F172A">
+//               <span className="text-sm font-semibold">{currentStep?.text ?? 'Loading'}</span>
+//             </LoadingDots>
+//           ) : (
+//             <>
+//               <LogIn className="w-4 h-4" aria-hidden="true" />
+//               Sign In
+//             </>
+//           )}
+//         </button>
+
+
+//       </form>
+//     </div>
+//   )
+// }
