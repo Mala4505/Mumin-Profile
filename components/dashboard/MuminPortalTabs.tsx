@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Pencil, Check, X, Loader2, FileText, Clock, CheckCircle2 } from 'lucide-react'
+import { Pencil, Check, X, Loader2, FileText, Clock, CheckCircle2, Activity } from 'lucide-react'
 import Link from 'next/link'
 import { LumaSpin } from '@/components/ui/luma-spin'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
@@ -28,6 +28,12 @@ interface Form {
   is_expired: boolean
 }
 
+interface ActivityItem {
+  form_id: string
+  form_title: string
+  submitted_at: string
+}
+
 interface Props {
   itsNo: number
 }
@@ -46,6 +52,21 @@ function groupByCategory(values: ProfileValue[]) {
       name,
       fields: fields.sort((a, b) => a.sort_order - b.sort_order),
     }))
+}
+
+function isExpiringSoon(expiresAt: string | null): boolean {
+  if (!expiresAt) return false
+  const ms = new Date(expiresAt).getTime() - Date.now()
+  return ms > 0 && ms < 24 * 60 * 60 * 1000
+}
+
+function formatRelative(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime()
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+  if (days === 0) return 'Today'
+  if (days === 1) return 'Yesterday'
+  if (days < 7) return `${days} days ago`
+  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
 function EditableProfileField({
@@ -144,15 +165,16 @@ function EditableProfileField({
 }
 
 export function MuminPortalTabs({ itsNo }: Props) {
-  const [activeTab, setActiveTab] = useState<'profile' | 'forms'>('profile')
+  const [activeTab, setActiveTab] = useState<'profile' | 'forms' | 'activity'>('profile')
 
   // Profile tab state
   const [profileValues, setProfileValues] = useState<ProfileValue[]>([])
   const [profileLoading, setProfileLoading] = useState(true)
 
-  // Forms tab state
+  // Forms + Activity tab state (loaded together on first forms/activity tab visit)
   const [forms, setForms] = useState<Form[]>([])
   const [submittedFormIds, setSubmittedFormIds] = useState<Set<string>>(new Set())
+  const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([])
   const [formsLoading, setFormsLoading] = useState(false)
   const [formsLoaded, setFormsLoaded] = useState(false)
 
@@ -165,31 +187,21 @@ export function MuminPortalTabs({ itsNo }: Props) {
   }, [itsNo])
 
   useEffect(() => {
-    if (activeTab === 'forms' && !formsLoaded) {
+    if ((activeTab === 'forms' || activeTab === 'activity') && !formsLoaded) {
       setFormsLoading(true)
-      fetch('/api/forms')
-        .then((r) => r.json())
-        .then(async (d) => {
-          const allForms: Form[] = d.forms ?? []
-          // Filter: only published, non-expired forms in audience
-          const now = new Date()
-          const relevant = allForms.filter(
-            (f) => f.status === 'published' && (!f.expires_at || new Date(f.expires_at) >= now)
-          )
-          setForms(allForms.filter((f) => f.status === 'published'))
 
-          // Check which ones are already submitted
-          const submitted = new Set<string>()
-          await Promise.all(
-            relevant.map(async (f) => {
-              try {
-                const r = await fetch(`/api/forms/${f.id}/progress`)
-                const d2 = await r.json()
-                if (d2.progress?.submitted) submitted.add(f.id)
-              } catch {}
-            })
-          )
-          setSubmittedFormIds(submitted)
+      Promise.all([
+        fetch('/api/forms').then((r) => r.json()),
+        fetch(`/api/members/${itsNo}/submissions`).then((r) => r.json()),
+      ])
+        .then(([formsData, submissionsData]) => {
+          const allForms: Form[] = formsData.forms ?? []
+          const published = allForms.filter((f) => f.status === 'published')
+          setForms(published)
+
+          const ids: string[] = submissionsData.submittedFormIds ?? []
+          setSubmittedFormIds(new Set(ids))
+          setRecentActivity(submissionsData.recentActivity ?? [])
         })
         .catch(() => {})
         .finally(() => {
@@ -197,7 +209,7 @@ export function MuminPortalTabs({ itsNo }: Props) {
           setFormsLoaded(true)
         })
     }
-  }, [activeTab, formsLoaded])
+  }, [activeTab, formsLoaded, itsNo])
 
   const handleFieldSaved = (fieldId: number, newValue: string) => {
     setProfileValues((prev) =>
@@ -215,7 +227,7 @@ export function MuminPortalTabs({ itsNo }: Props) {
 
   return (
     <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'profile' | 'forms')}>
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'profile' | 'forms' | 'activity')}>
         <TabsList className="w-full rounded-none border-b border-border h-auto p-0">
           <TabsTrigger
             value="profile"
@@ -234,8 +246,15 @@ export function MuminPortalTabs({ itsNo }: Props) {
               </span>
             )}
           </TabsTrigger>
+          <TabsTrigger
+            value="activity"
+            className="flex-1 py-3 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-primary/5"
+          >
+            Activity
+          </TabsTrigger>
         </TabsList>
 
+        {/* Profile Tab */}
         <TabsContent value="profile" className="p-4 mt-0">
           {profileLoading ? (
             <div className="flex items-center justify-center py-8">
@@ -266,6 +285,7 @@ export function MuminPortalTabs({ itsNo }: Props) {
           )}
         </TabsContent>
 
+        {/* Forms Tab */}
         <TabsContent value="forms" className="p-4 mt-0">
           {formsLoading ? (
             <div className="flex items-center justify-center py-8">
@@ -294,15 +314,20 @@ export function MuminPortalTabs({ itsNo }: Props) {
                         className="border border-border rounded-lg p-3 flex items-start justify-between gap-3"
                       >
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <FileText className="w-4 h-4 text-primary shrink-0" />
                             <p className="text-sm font-medium text-foreground truncate">{form.title}</p>
+                            {isExpiringSoon(form.expires_at) && (
+                              <span className="text-[10px] font-semibold bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full shrink-0">
+                                Expiring Soon
+                              </span>
+                            )}
                           </div>
                           {form.description && (
                             <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{form.description}</p>
                           )}
                           {form.expires_at && (
-                            <p className="text-xs text-orange-600 mt-1">
+                            <p className={`text-xs mt-1 ${isExpiringSoon(form.expires_at) ? 'text-red-600 font-medium' : 'text-orange-600'}`}>
                               Due: {new Date(form.expires_at).toLocaleDateString()}
                             </p>
                           )}
@@ -340,6 +365,36 @@ export function MuminPortalTabs({ itsNo }: Props) {
                     ))}
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Activity Tab */}
+        <TabsContent value="activity" className="p-4 mt-0">
+          {formsLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <LumaSpin size={36} />
+            </div>
+          ) : recentActivity.length === 0 ? (
+            <div className="text-center py-8">
+              <Activity className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">No submissions yet.</p>
+              <p className="text-xs text-muted-foreground mt-1">Your form activity will appear here.</p>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground mb-3">Your recent form submissions</p>
+              <div className="border-l-2 border-border ml-1 space-y-0">
+                {recentActivity.map((item, i) => (
+                  <div key={`${item.form_id}-${i}`} className="relative pl-5 pb-4 last:pb-0">
+                    <div className="absolute -left-[5px] top-1 w-2.5 h-2.5 rounded-full bg-primary/30 border-2 border-background" />
+                    <p className="text-sm font-medium text-foreground leading-tight">{item.form_title}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Submitted · {formatRelative(item.submitted_at)}
+                    </p>
+                  </div>
+                ))}
               </div>
             </div>
           )}

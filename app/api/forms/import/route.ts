@@ -16,11 +16,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/getSession'
 import { createClient } from '@/lib/supabase/server'
 
-interface CsvRow {
-  its_no: number
-  [fieldId: number]: string
-}
-
 function parseCsv(text: string): string[][] {
   return text
     .split(/\r?\n/)
@@ -58,7 +53,7 @@ export async function POST(req: NextRequest) {
   // Verify form exists and is accessible
   const { data: form, error: formErr } = await supabase
     .from('forms')
-    .select('id, status, expires_at, questions')
+    .select('id, status, expires_at')
     .eq('id', formId)
     .single()
 
