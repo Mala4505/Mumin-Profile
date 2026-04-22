@@ -5,6 +5,8 @@ export interface FormQuestion {
   profile_field_id: number
   question_text: string
   sort_order: number
+  behavior?: 'static' | 'historical'
+  field_type?: string   // 'text' | 'date' | 'number' | 'select' | 'multiselect'
 }
 
 export interface FillerAccess {
@@ -33,18 +35,17 @@ export interface Form {
   id: string
   title: string
   description?: string
-  umoor_category_id?: string
-  created_by: string
+  umoor_category_id?: number        // 🔧 optional tweak: number instead of string
+  event_id?: number // Added
+  created_by: number                // ✅ matches DB
   form_type: FormType
-  questions: FormQuestion[]
   audience_filters: AudienceFilters
   filler_access: FillerAccess
   status: FormStatus
-  approved_by?: string
+  approved_by?: number              // ✅ matches DB
   approved_at?: string
   expires_at?: string
   published_at?: string
   created_at: string
-  // computed:
   is_expired?: boolean
 }

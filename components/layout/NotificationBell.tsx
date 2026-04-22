@@ -6,7 +6,7 @@ interface Notification {
   id: string
   type: string
   title: string
-  body: string
+  body: string | null
   read: boolean
   created_at: string
   related_form_id?: string

@@ -7,24 +7,25 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Progress } from '@/components/ui/progress'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import type { Form } from '@/lib/types/forms'
+import type { Form, FormQuestion } from '@/lib/types/forms'
 import type { Role } from '@/lib/types/app'
 
 interface Response {
   id: string
-  filled_for: string
-  responses: Array<{ profile_field_id: string; answer: string }>
+  filled_for: number
+  responses: Array<{ profile_field_id: number; answer: string }>
   submitted_at: string
-  mumin?: { name: string; its_no: string }
+  mumin?: { name: string; its_no: number }
 }
 
 interface AudienceMember {
-  its_no: string
+  its_no: number
   mumin?: { name: string; subsector?: { name: string } }
 }
 
 interface Props {
   form: Form
+  formFields: FormQuestion[]   // ✅ pass in form_fields separately
   responses: Response[]
   audience: AudienceMember[]
   role: Role
@@ -47,7 +48,7 @@ const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   expired:          { label: 'Expired',          className: 'bg-red-100 text-red-600' },
 }
 
-function ChartsTab({ form, responses, audience }: { form: Form; responses: Response[]; audience: AudienceMember[] }) {
+function ChartsTab({ formFields, responses, audience }: { formFields: FormQuestion[]; responses: Response[]; audience: AudienceMember[] }) {
   const completionPct = audience.length > 0
     ? Math.round((responses.length / audience.length) * 100)
     : 0
@@ -62,10 +63,10 @@ function ChartsTab({ form, responses, audience }: { form: Form; responses: Respo
       </div>
 
       {/* Per-question breakdown */}
-      {(form.questions ?? []).map((q) => {
+      {formFields.map((q) => {
         const answers = responses
           .flatMap((r) => r.responses ?? [])
-          .filter((r) => r.profile_field_id === q.profile_field_id.toString())
+          .filter((r) => r.profile_field_id === q.profile_field_id)
           .map((r) => r.answer)
           .filter(Boolean)
 
@@ -78,12 +79,10 @@ function ChartsTab({ form, responses, audience }: { form: Form; responses: Respo
           )
         }
 
-        // Count distinct values
         const counts: Record<string, number> = {}
         for (const a of answers) counts[a] = (counts[a] ?? 0) + 1
         const distinctValues = Object.keys(counts)
 
-        // Bar chart for ≤20 distinct values
         if (distinctValues.length <= 20) {
           const chartData = distinctValues
             .sort((a, b) => counts[b] - counts[a])
@@ -108,7 +107,6 @@ function ChartsTab({ form, responses, audience }: { form: Form; responses: Respo
           )
         }
 
-        // Free-text fallback: top 10 list
         const top10 = distinctValues
           .sort((a, b) => counts[b] - counts[a])
           .slice(0, 10)
@@ -132,7 +130,7 @@ function ChartsTab({ form, responses, audience }: { form: Form; responses: Respo
   )
 }
 
-export function FormResponsesClient({ form, responses, audience, role }: Props) {
+export function FormResponsesClient({ form, formFields, responses, audience, role }: Props) {
   const router = useRouter()
   const [detailResponse, setDetailResponse] = useState<Response | null>(null)
 
@@ -184,11 +182,17 @@ export function FormResponsesClient({ form, responses, audience, role }: Props) 
           </div>
           <div className="flex items-center gap-1.5">
             <Users className="w-4 h-4 text-primary" />
-            <span><span className="font-semibold text-foreground">{completionPct}%</span> <span className="text-muted-foreground">completion</span></span>
+            <span>
+              <span className="font-semibold text-foreground">{completionPct}%</span>{' '}
+              <span className="text-muted-foreground">completion</span>
+            </span>
           </div>
           <div className="flex items-center gap-1.5">
             <Clock className="w-4 h-4 text-amber-500" />
-            <span><span className="font-semibold text-foreground">{pending.length}</span> <span className="text-muted-foreground">pending</span></span>
+            <span>
+              <span className="font-semibold text-foreground">{pending.length}</span>{' '}
+              <span className="text-muted-foreground">pending</span>
+            </span>
           </div>
         </div>
 
@@ -196,7 +200,9 @@ export function FormResponsesClient({ form, responses, audience, role }: Props) 
         {audience.length > 0 && (
           <div className="space-y-1">
             <Progress value={completionPct} className="h-2" />
-            <p className="text-xs text-muted-foreground">{responses.length} of {audience.length} members responded</p>
+            <p className="text-xs text-muted-foreground">
+              {responses.length} of {audience.length} members responded
+            </p>
           </div>
         )}
       </div>
@@ -301,7 +307,7 @@ export function FormResponsesClient({ form, responses, audience, role }: Props) 
 
         {/* Charts tab */}
         <TabsContent value="charts" className="mt-4">
-          <ChartsTab form={form} responses={responses} audience={audience} />
+          <ChartsTab formFields={formFields} responses={responses} audience={audience} />
         </TabsContent>
       </Tabs>
 
@@ -313,7 +319,7 @@ export function FormResponsesClient({ form, responses, audience, role }: Props) 
           </DialogHeader>
           <div className="space-y-3 py-2">
             {detailResponse?.responses.map((r, i) => {
-              const question = form.questions?.find((q) => q.profile_field_id.toString() === r.profile_field_id.toString())
+              const question = formFields.find((q) => q.profile_field_id === r.profile_field_id)
               return (
                 <div key={i} className="space-y-0.5">
                   <p className="text-xs text-muted-foreground">{question?.question_text ?? r.profile_field_id}</p>

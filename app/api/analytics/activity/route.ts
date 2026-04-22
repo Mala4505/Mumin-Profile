@@ -21,8 +21,8 @@ export async function GET() {
   const [submissionsRes, importsRes, profilesRes] = await Promise.all([
     // Last 20 form submissions with member name and form title
     supabase
-      .from('form_response')
-      .select('submitted_at, filled_for, form_id, mumin(name), forms(title)')
+      .from('form_responses')
+      .select('submitted_at, filled_for, form_id, mumin!filled_for(name), forms(title)')
       .order('submitted_at', { ascending: false })
       .limit(20),
 

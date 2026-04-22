@@ -67,6 +67,8 @@
 //   return NextResponse.json({ form: data })
 // }
 
+
+// app/api/forms/[id]/approve/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/getSession";
 import { createClient } from "@/lib/supabase/server";
@@ -93,8 +95,9 @@ export async function POST(
     .eq("id", id)
     .single();
 
-  if (formErr || !form)
+  if (formErr || !form) {
     return NextResponse.json({ error: "Form not found" }, { status: 404 });
+  }
   if (form.status !== "pending_approval") {
     return NextResponse.json(
       { error: "Form not in pending_approval state" },
@@ -110,12 +113,12 @@ export async function POST(
     );
   }
 
-  // Update form status
+  // Update form status and record approval
   const { data, error } = await supabase
     .from("forms")
     .update({
       status: "published",
-      approved_by: Number(session.its_no),
+      approved_by: Number(session.its_no),          // ✅ integer
       approved_at: new Date().toISOString(),
       published_at: new Date().toISOString(),
     })
@@ -123,8 +126,9 @@ export async function POST(
     .select()
     .single();
 
-  if (error)
+  if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 
   // Send form_assigned notifications to audience
   const { data: audience } = await supabase
@@ -132,7 +136,7 @@ export async function POST(
     .select("its_no")
     .eq("form_id", id);
 
-  if (audience) {
+  if (audience && audience.length) {
     const notifications: Database["public"]["Tables"]["notifications"]["Insert"][] =
       audience.map((a) => ({
         its_no: a.its_no,

@@ -9,6 +9,8 @@ import {
 
 import type { FormRate } from '@/app/api/analytics/form-rates/route'
 import type { ActivityEvent } from '@/app/api/analytics/activity/route'
+import { FormAnalyticsSection } from './FormAnalyticsSection'
+import { SectorPerformanceSection } from './SectorPerformanceSection'
 
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -513,7 +515,18 @@ export function AnalyticsDashboard() {
 
       <FormResponseRates rates={formRates} />
       <ActivityFeed events={activity} />
-      
+
+      {/* ── Divider ───────────────────────────────────────────────────────── */}
+      <div className="border-t border-border pt-8 space-y-12">
+
+        {/* Step 5 — Form Analytics */}
+        <FormAnalyticsSection />
+
+        {/* Step 6 — Sector Performance Heatmap */}
+        <SectorPerformanceSection />
+
+      </div>
+
     </div>
   )
 }

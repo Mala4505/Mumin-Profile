@@ -57,7 +57,6 @@
 //   return NextResponse.json({ form, responses: responses ?? [], audience: audience ?? [] })
 // }
 
-
 // app/api/forms/[id]/responses/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/getSession'
@@ -81,15 +80,16 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Form not found' }, { status: 404 })
   }
 
-  if ((session.role === 'Masool' || session.role === 'Musaid')) {
+  if (session.role === 'Masool' || session.role === 'Musaid') {
     const fillerAccess = form.filler_access as FillerAccess | null
     if (!fillerAccess || !isAuthorizedFiller(fillerAccess, session)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
   }
 
+  // ✅ pluralized table name and type-safe join
   const { data: responses, error: respErr } = await supabase
-    .from('form_response')
+    .from('form_responses')
     .select('*, mumin!filled_for(name, its_no)')
     .eq('form_id', id)
     .eq('submitted', true)

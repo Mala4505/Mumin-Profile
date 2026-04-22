@@ -15,7 +15,7 @@ export async function GET() {
   since.setDate(since.getDate() - 30)
 
   const { data, error } = await supabase
-    .from('form_response')
+    .from('form_responses')
     .select('submitted_at')
     .gte('submitted_at', since.toISOString())
     .order('submitted_at', { ascending: true })

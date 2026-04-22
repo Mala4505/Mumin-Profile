@@ -1,178 +1,123 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Loader2, CheckCircle, XCircle, AlertTriangle, Save, Send } from 'lucide-react'
-import type { Form, FormQuestion } from '@/lib/types/forms'
+import {
+  Loader2,
+  CheckCircle,
+  XCircle,
+  Send,
+  History,
+  UserCircle,
+  ChevronLeft,
+  Search,
+  AlertTriangle,
+} from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import type { Form } from '@/lib/types/forms'
 import type { Role } from '@/lib/types/app'
-import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { LumaSpin } from '@/components/ui/luma-spin'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 
-// ─── Types ─────────────────────────────────────────────────────────────────────
+interface FormField {
+  profile_field_id: number
+  question_text: string
+  sort_order: number
+  field_type: string
+  behavior: 'static' | 'historical'
+}
 
 interface AudienceMember {
-  its_no: string
+  its_no: number
   name: string
 }
 
 // progress[memberItsNo][profileFieldId] = answer
 // progress[memberItsNo]['_remarks'] = remarks text
-type Progress = Record<string, Record<string, string>>
+type Progress = Record<number, Record<string, string>>
 
 interface BulkFillFormProps {
   formId: string
   role: Role
+  itsNo: number
 }
 
-// ─── Save status indicator ─────────────────────────────────────────────────────
-
-type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
-
-// ─── Main Component ────────────────────────────────────────────────────────────
-
-export function BulkFillForm({ formId, role }: BulkFillFormProps) {
+export function BulkFillForm({ formId, role, itsNo }: BulkFillFormProps) {
   const router = useRouter()
+  const supabase = createClient()
 
-  // ── Data state ──────────────────────────────────────────────────────────────
   const [form, setForm] = useState<Form | null>(null)
-  const [audience, setAudience] = useState<AudienceMember[]>([])
+  const [questions, setQuestions] = useState<FormField[]>([])
+  const [members, setMembers] = useState<AudienceMember[]>([])
+  const [searchQuery, setSearchQuery] = useState('')
   const [progress, setProgress] = useState<Progress>({})
-  const [audienceWarning, setAudienceWarning] = useState(false)
 
-  // ── UI state ────────────────────────────────────────────────────────────────
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
-  const [showConfirm, setShowConfirm] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitSuccess, setSubmitSuccess] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
 
-  // ── Auto-save timer ref ──────────────────────────────────────────────────────
-  const autoSaveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  // Ref to always have latest progress in the interval closure without re-scheduling
-  const progressRef = useRef<Progress>(progress)
-  progressRef.current = progress
-
-  // ── Fetch on mount ──────────────────────────────────────────────────────────
   useEffect(() => {
-    async function loadAll() {
+    async function loadData() {
       setLoading(true)
       setLoadError(null)
 
-      // 1. Fetch form
-      let fetchedForm: Form | null = null
       try {
-        const res = await fetch(`/api/forms/${formId}`)
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({ error: 'Unknown error' }))
-          throw new Error(body.error ?? `Failed to load form (${res.status})`)
+        // 1. Fetch form metadata
+        const formRes = await fetch(`/api/forms/${formId}`)
+        if (!formRes.ok) {
+          const b = await formRes.json().catch(() => ({}))
+          throw new Error(b.error ?? `Failed to load form (${formRes.status})`)
         }
-        const json = await res.json()
-        fetchedForm = json.form ?? json
-        setForm(fetchedForm)
-      } catch (e) {
-        setLoadError(e instanceof Error ? e.message : 'Failed to load form')
-        setLoading(false)
-        return
-      }
+        const { form: formData } = await formRes.json()
+        setForm(formData)
 
-      // 2. Fetch audience (may not exist yet — fail gracefully)
-      try {
-        const res = await fetch(`/api/forms/${formId}/audience`)
-        if (res.status === 404 || res.status === 501) {
-          setAudienceWarning(true)
-        } else if (!res.ok) {
-          setAudienceWarning(true)
+        // 2. Fetch questions from form_fields (the relational table)
+        const fieldsRes = await fetch(`/api/forms/${formId}/fields`)
+        if (!fieldsRes.ok) {
+          const b = await fieldsRes.json().catch(() => ({}))
+          throw new Error(b.error ?? `Failed to load form fields (${fieldsRes.status})`)
+        }
+        const { fields } = await fieldsRes.json()
+        setQuestions(
+          (fields ?? []).sort((a: FormField, b: FormField) => a.sort_order - b.sort_order)
+        )
+
+        // 3. Fetch audience from form_audience JOIN mumin
+        const { data: audienceData, error: audErr } = await (supabase as any)
+          .from('form_audience')
+          .select('its_no, mumin!inner(name)')
+          .eq('form_id', formId)
+
+        if (audErr) {
+          // form_audience might not exist yet — show a warning but don't crash
+          console.warn('form_audience query failed:', audErr.message)
+          setLoadError(
+            'Audience could not be loaded. Ensure the form_audience migration has been run in Supabase.'
+          )
         } else {
-          const json = await res.json()
-          const members: AudienceMember[] = json.audience ?? json.members ?? []
-          setAudience(members)
+          setMembers(
+            (audienceData ?? []).map((a: any) => ({
+              its_no: a.its_no,
+              name: a.mumin?.name ?? `ITS ${a.its_no}`,
+            }))
+          )
         }
-      } catch {
-        setAudienceWarning(true)
+      } catch (err: any) {
+        setLoadError(err.message)
+      } finally {
+        setLoading(false)
       }
-
-      // 3. Fetch saved progress (fail silently — not critical)
-      try {
-        const res = await fetch(`/api/forms/${formId}/progress`)
-        if (res.ok) {
-          const json = await res.json()
-          if (json.progress && typeof json.progress === 'object') {
-            setProgress(json.progress as Progress)
-          }
-        }
-      } catch {
-        // Progress restore failed — start fresh, that's fine
-      }
-
-      setLoading(false)
     }
 
-    loadAll()
-  }, [formId])
+    loadData()
+  }, [formId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Auto-save interval (every 30 s) ─────────────────────────────────────────
-  const saveProgress = useCallback(
-    async (currentProgress: Progress) => {
-      setSaveStatus('saving')
-      try {
-        const res = await fetch(`/api/forms/${formId}/progress`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ progress: currentProgress }),
-        })
-        if (!res.ok) throw new Error('Save failed')
-        setSaveStatus('saved')
-        // Reset to idle after 2 s
-        setTimeout(() => setSaveStatus('idle'), 2000)
-      } catch {
-        setSaveStatus('error')
-        setTimeout(() => setSaveStatus('idle'), 3000)
-      }
-    },
-    [formId]
-  )
-
-  useEffect(() => {
-    // Only start timer once data is loaded
-    if (loading || !form) return
-
-    autoSaveTimerRef.current = setInterval(() => {
-      saveProgress(progressRef.current)
-    }, 30_000)
-
-    return () => {
-      if (autoSaveTimerRef.current !== null) {
-        clearInterval(autoSaveTimerRef.current)
-        autoSaveTimerRef.current = null
-      }
-    }
-  }, [loading, form, saveProgress])
-
-  // ── Row completion check ─────────────────────────────────────────────────────
-  const isRowComplete = useCallback(
-    (memberItsNo: string): boolean => {
-      if (!form) return false
-      const answers = progress[memberItsNo] ?? {}
-      const allAnswered = form.questions.every(
-        (q) => answers[q.profile_field_id] != null && answers[q.profile_field_id] !== ''
-      )
-      const hasRemark = Boolean(answers['_remarks'])
-      return allAnswered || hasRemark
-    },
-    [form, progress]
-  )
-
-  const completeCount = audience.filter((m) => isRowComplete(m.its_no)).length
-  const isAllComplete = audience.length > 0 && completeCount === audience.length
-
-  // ── Cell change handler ──────────────────────────────────────────────────────
-  function handleCellChange(
-    memberItsNo: string,
-    fieldKey: string,
-    value: string
-  ) {
+  const handleCellChange = (memberItsNo: number, fieldKey: string, value: string) => {
     setProgress((prev) => ({
       ...prev,
       [memberItsNo]: {
@@ -182,112 +127,74 @@ export function BulkFillForm({ formId, role }: BulkFillFormProps) {
     }))
   }
 
-  // ── Blur → autosave ──────────────────────────────────────────────────────────
-  function handleCellBlur() {
-    saveProgress(progressRef.current)
-  }
-
-  // ── Manual save ─────────────────────────────────────────────────────────────
-  function handleManualSave() {
-    saveProgress(progressRef.current)
-  }
-
-  // ── Submit ──────────────────────────────────────────────────────────────────
   async function handleSubmitConfirmed() {
     if (!form) return
     setSubmitting(true)
     setSubmitError(null)
 
-    const responses: Array<{
-      profile_field_id: string
-      its_no: string
-      answer: string
-      remarks: string
-    }> = []
-
-    for (const member of audience) {
-      for (const q of form.questions) {
-        const answer = progress[member.its_no]?.[q.profile_field_id]
-        if (answer != null && answer !== '') {
-          responses.push({
-            profile_field_id: q.profile_field_id.toString(),
-            its_no: member.its_no,
-            answer,
-            remarks: progress[member.its_no]?.['_remarks'] ?? '',
-          })
-        }
-      }
-    }
+    // Build relational payload: one entry per (member × field) answer
+    const payload = Object.entries(progress).flatMap(([memberItsNo, fields]) =>
+      Object.entries(fields)
+        .filter(([key]) => key !== '_remarks')
+        .map(([fieldId, answer]) => ({
+          its_no: parseInt(memberItsNo),
+          field_id: parseInt(fieldId),
+          answer,
+          remarks: fields['_remarks'] ?? '',
+        }))
+    )
 
     try {
-      const res = await fetch(`/api/forms/${formId}/respond`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ responses }),
+      const { error: rpcErr } = await (supabase.rpc as any)('process_form_submission', {
+        p_form_id: formId,
+        p_filled_by: itsNo,
+        p_responses: payload,
       })
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({ error: 'Unknown error' }))
-        throw new Error(body.error ?? `Submission failed (${res.status})`)
-      }
+
+      if (rpcErr) throw rpcErr
       setSubmitSuccess(true)
       setShowConfirm(false)
-      // Redirect after brief success display
-      setTimeout(() => router.push('/forms'), 2000)
-    } catch (e) {
-      setSubmitError(e instanceof Error ? e.message : 'Submission failed')
+      setTimeout(() => router.push('/forms'), 1800)
+    } catch (err: any) {
+      setSubmitError(err.message ?? 'Submission failed.')
       setShowConfirm(false)
     } finally {
       setSubmitting(false)
     }
   }
 
-  // ── Render: loading ──────────────────────────────────────────────────────────
+  // ── Loading / error states ───────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-16">
-        <LumaSpin size={40} />
+      <div className="flex flex-col items-center justify-center p-24 gap-4">
+        <LumaSpin />
+        <p className="text-sm text-muted-foreground animate-pulse">Loading audience data…</p>
       </div>
     )
   }
 
-  // ── Render: load error ────────────────────────────────────────────────────────
-  if (loadError || !form) {
-    return (
-      <div className="p-4 md:p-8 flex flex-col items-center justify-center min-h-[60vh] gap-4">
-        <div className="bg-destructive/10 border border-destructive/30 text-destructive rounded-xl px-6 py-4 text-sm max-w-md text-center">
-          <XCircle className="w-6 h-6 mx-auto mb-2" />
-          <p className="font-medium mb-1">Failed to load form</p>
-          <p className="text-destructive/80">{loadError ?? 'Form not found'}</p>
-        </div>
-        <button
-          onClick={() => router.back()}
-          className="px-4 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted/40 transition-colors"
-        >
-          Go Back
-        </button>
-      </div>
-    )
-  }
-
-  // ── Render: submit success ────────────────────────────────────────────────────
   if (submitSuccess) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
         <div className="w-14 h-14 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
           <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
         </div>
-        <p className="text-base font-semibold text-foreground">
-          Form submitted successfully!
-        </p>
+        <p className="text-base font-semibold text-foreground">Form submitted successfully!</p>
         <p className="text-sm text-muted-foreground">Redirecting to forms…</p>
       </div>
     )
   }
 
-  // ── Render: main ─────────────────────────────────────────────────────────────
+  const isExpired = !!(form?.expires_at && new Date(form.expires_at) < new Date())
+  const filteredMembers = members.filter(
+    (m) =>
+      m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      m.its_no.toString().includes(searchQuery)
+  )
+  const filledCount = Object.keys(progress).length
+
   return (
-    <div className="flex flex-col h-full">
-      {/* ── Confirmation dialog ─────────────────────────────────────────────── */}
+    <>
       <ConfirmDialog
         open={showConfirm}
         onOpenChange={setShowConfirm}
@@ -299,71 +206,55 @@ export function BulkFillForm({ formId, role }: BulkFillFormProps) {
         loading={submitting}
       />
 
-      {/* ── Sticky header ───────────────────────────────────────────────────── */}
-      <div className="sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b border-border px-4 md:px-6 py-3 flex flex-wrap items-center gap-3">
-        {/* Title */}
-        <div className="flex-1 min-w-0">
-          <h1 className="font-semibold text-foreground text-base truncate">
-            {form.title}
-          </h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {audience.length > 0
-              ? `${completeCount} of ${audience.length} members complete`
-              : 'No audience members loaded'}
-          </p>
+      <div className="space-y-6 pb-20">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-6 rounded-2xl border border-border shadow-sm">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 text-muted-foreground mb-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => router.back()}
+                className="-ml-2 h-8 gap-1 text-xs"
+              >
+                <ChevronLeft className="w-3 h-3" /> Back
+              </Button>
+              <span className="text-xs">•</span>
+              <span className="text-xs font-mono">{formId.slice(0, 8)}</span>
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight">{form?.title}</h1>
+            {form?.description && (
+              <p className="text-sm text-muted-foreground">{form.description}</p>
+            )}
+          </div>
+
+          <div className="flex items-center gap-3">
+            {isExpired ? (
+              <div className="bg-destructive/10 text-destructive px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-semibold">
+                <XCircle className="w-4 h-4" /> Form Expired
+              </div>
+            ) : (
+              <Button
+                onClick={() => setShowConfirm(true)}
+                disabled={submitting || filledCount === 0}
+                className="px-6 shadow-lg shadow-primary/20 gap-2"
+              >
+                {submitting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
+                {submitting ? 'Processing…' : 'Submit All Records'}
+              </Button>
+            )}
+          </div>
         </div>
 
-        {/* Save status */}
-        <div className="flex items-center gap-1.5 text-xs">
-          {saveStatus === 'saving' && (
-            <span className="flex items-center gap-1 text-muted-foreground">
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              Saving…
-            </span>
-          )}
-          {saveStatus === 'saved' && (
-            <span className="flex items-center gap-1 text-green-600 dark:text-green-400">
-              <CheckCircle className="w-3.5 h-3.5" />
-              Saved
-            </span>
-          )}
-          {saveStatus === 'error' && (
-            <span className="flex items-center gap-1 text-destructive">
-              <XCircle className="w-3.5 h-3.5" />
-              Save failed
-            </span>
-          )}
-        </div>
-
-        {/* Actions */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleManualSave}
-            disabled={saveStatus === 'saving'}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Save className="w-3.5 h-3.5" />
-            Save Progress
-          </button>
-          <button
-            onClick={() => setShowConfirm(true)}
-            disabled={!isAllComplete || submitting}
-            title={!isAllComplete ? 'Complete all rows before submitting' : undefined}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Send className="w-3.5 h-3.5" />
-            Submit
-          </button>
-        </div>
-      </div>
-
-      {/* ── Body ────────────────────────────────────────────────────────────── */}
-      <div className="flex-1 p-4 md:p-6 space-y-4">
-        {/* Audience warning */}
-        {audienceWarning && (
+        {/* Load error banner */}
+        {loadError && (
           <div className="flex items-center gap-2.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 text-amber-800 dark:text-amber-300 rounded-lg px-4 py-3 text-sm">
             <AlertTriangle className="w-4 h-4 shrink-0" />
-            Audience not loaded — please contact admin.
+            {loadError}
           </div>
         )}
 
@@ -375,166 +266,185 @@ export function BulkFillForm({ formId, role }: BulkFillFormProps) {
           </div>
         )}
 
-        {/* Empty audience (no warning, just no rows) */}
-        {!audienceWarning && audience.length === 0 && (
+        {/* Filter bar */}
+        <div className="relative group">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+          <Input
+            placeholder="Filter members by name or ITS…"
+            className="pl-10 h-11 bg-card"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+
+        {/* Empty state */}
+        {!loadError && members.length === 0 && (
           <div className="bg-card border border-border rounded-xl px-5 py-16 text-center">
-            <p className="text-sm font-medium text-foreground mb-1">
-              No audience members assigned
-            </p>
+            <p className="text-sm font-medium text-foreground mb-1">No audience members assigned</p>
             <p className="text-xs text-muted-foreground">
-              Contact your admin to assign audience members to this form.
+              Publish this form first so the audience is materialised.
             </p>
           </div>
         )}
 
-        {/* Table */}
-        {audience.length > 0 && (
-          <div className="overflow-x-auto rounded-xl border border-border bg-card">
-            <table className="w-full text-sm border-collapse">
-              {/* Header */}
-              <thead>
-                <tr className="border-b border-border bg-muted/40">
-                  {/* Member name col */}
-                  <th className="sticky left-0 z-10 bg-muted/40 text-left px-4 py-2.5 font-medium text-muted-foreground text-xs uppercase tracking-wide whitespace-nowrap min-w-[160px]">
-                    Member
-                  </th>
-                  {/* Question cols */}
-                  {form.questions
-                    .slice()
-                    .sort((a, b) => a.sort_order - b.sort_order)
-                    .map((q) => (
+        {/* Data grid */}
+        {members.length > 0 && (
+          <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm border-collapse">
+                <thead>
+                  <tr className="bg-muted/40 border-b border-border">
+                    <th className="p-4 font-semibold text-foreground sticky left-0 bg-muted/40 z-10 backdrop-blur-sm whitespace-nowrap">
+                      Member Details
+                    </th>
+                    {questions.map((q) => (
                       <th
                         key={q.profile_field_id}
-                        className="text-left px-3 py-2.5 font-medium text-muted-foreground text-xs uppercase tracking-wide whitespace-nowrap min-w-[140px]"
+                        className="p-4 font-semibold text-foreground min-w-[180px]"
                       >
-                        {q.question_text}
+                        <div className="flex flex-col gap-1">
+                          <span>{q.question_text}</span>
+                          <div
+                            className={`flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded-md w-fit ${
+                              q.behavior === 'static'
+                                ? 'bg-blue-100 text-blue-700'
+                                : 'bg-amber-100 text-amber-700'
+                            }`}
+                          >
+                            {q.behavior === 'static' ? (
+                              <UserCircle className="w-3 h-3" />
+                            ) : (
+                              <History className="w-3 h-3" />
+                            )}
+                            {q.behavior === 'static' ? 'Profile' : 'Timeline'}
+                          </div>
+                        </div>
                       </th>
                     ))}
-                  {/* Remarks col */}
-                  <th className="text-left px-3 py-2.5 font-medium text-muted-foreground text-xs uppercase tracking-wide whitespace-nowrap min-w-[180px]">
-                    Remarks
-                  </th>
-                </tr>
-              </thead>
-
-              {/* Body */}
-              <tbody>
-                {audience.map((member, idx) => {
-                  const complete = isRowComplete(member.its_no)
-                  const rowBorderClass = complete
-                    ? 'border-l-4 border-green-500'
-                    : 'border-l-4 border-red-400'
-
-                  return (
+                    <th className="p-4 font-semibold text-foreground min-w-[180px]">Remarks</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {filteredMembers.map((member) => (
                     <tr
                       key={member.its_no}
-                      className={`${rowBorderClass} border-b border-border last:border-b-0 ${idx % 2 === 1 ? 'bg-muted/20' : ''
-                        } transition-colors`}
+                      className="hover:bg-muted/20 transition-colors group"
                     >
-                      {/* Member name — sticky */}
-                      <td className="sticky left-0 z-10 bg-inherit px-4 py-1.5 font-medium text-foreground whitespace-nowrap text-xs">
-                        <div className="flex flex-col">
-                          <span>{member.name}</span>
-                          <span className="text-muted-foreground font-normal">
-                            {member.its_no}
-                          </span>
+                      <td className="p-4 sticky left-0 bg-card group-hover:bg-muted/20 z-10 border-r border-border/50">
+                        <div className="font-semibold text-foreground">{member.name}</div>
+                        <div className="text-xs font-mono text-muted-foreground">
+                          {member.its_no}
                         </div>
                       </td>
-
-                      {/* Question cells */}
-                      {form.questions
-                        .slice()
-                        .sort((a, b) => a.sort_order - b.sort_order)
-                        .map((q) => {
-                          const currentValue =
-                            progress[member.its_no]?.[q.profile_field_id] ?? ''
-
-                          // Determine field_type from profile_field_id heuristic
-                          // (actual field_type lives on ProfileField, not FormQuestion)
-                          // We detect via the question metadata if available — fall back to text
-                          const fieldType = (q as FormQuestion & { field_type?: string }).field_type
-
-                          return (
-                            <td
-                              key={q.profile_field_id}
-                              className="px-3 py-1.5 align-middle"
-                            >
-                              {fieldType === 'boolean' ? (
-                                <label className="flex items-center gap-2 cursor-pointer select-none">
-                                  <input
-                                    type="checkbox"
-                                    checked={currentValue === 'true'}
-                                    onChange={(e) =>
-                                      handleCellChange(
-                                        member.its_no,
-                                        q.profile_field_id.toString(),
-                                        e.target.checked ? 'true' : 'false'
-                                      )
-                                    }
-                                    onBlur={handleCellBlur}
-                                    className="w-4 h-4 rounded accent-primary cursor-pointer"
-                                  />
-                                  <span className="text-xs text-muted-foreground">
-                                    {currentValue === 'true' ? 'Yes' : 'No'}
-                                  </span>
-                                </label>
-                              ) : fieldType === 'number' ? (
-                                <input
-                                  type="number"
-                                  value={currentValue}
-                                  onChange={(e) =>
-                                    handleCellChange(
-                                      member.its_no,
-                                      q.profile_field_id.toString(),
-                                      e.target.value
-                                    )
-                                  }
-                                  onBlur={handleCellBlur}
-                                  className="w-24 bg-transparent border border-border rounded-md px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors"
-                                  placeholder="0"
-                                />
-                              ) : (
-                                <input
-                                  type="text"
-                                  value={currentValue}
-                                  onChange={(e) =>
-                                    handleCellChange(
-                                      member.its_no,
-                                      q.profile_field_id.toString(),
-                                      e.target.value
-                                    )
-                                  }
-                                  onBlur={handleCellBlur}
-                                  className="w-32 bg-transparent border border-border rounded-md px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors"
-                                  placeholder="—"
-                                />
-                              )}
-                            </td>
-                          )
-                        })}
-
-                      {/* Remarks cell */}
-                      <td className="px-3 py-1.5 align-middle">
+                      {questions.map((q) => {
+                        const val = progress[member.its_no]?.[q.profile_field_id] ?? ''
+                        return (
+                          <td key={q.profile_field_id} className="p-3">
+                            <FieldInput
+                              fieldType={q.field_type}
+                              value={val}
+                              disabled={isExpired}
+                              onChange={(v) =>
+                                handleCellChange(
+                                  member.its_no,
+                                  q.profile_field_id.toString(),
+                                  v
+                                )
+                              }
+                            />
+                          </td>
+                        )
+                      })}
+                      {/* Remarks */}
+                      <td className="p-3">
                         <input
                           type="text"
+                          disabled={isExpired}
                           value={progress[member.its_no]?.['_remarks'] ?? ''}
                           onChange={(e) =>
                             handleCellChange(member.its_no, '_remarks', e.target.value)
                           }
-                          onBlur={handleCellBlur}
-                          className="w-full min-w-[160px] bg-transparent border border-border rounded-md px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors"
-                          placeholder="Optional remarks…"
+                          placeholder="Optional…"
+                          className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed placeholder:text-muted-foreground/40"
                         />
                       </td>
                     </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+                  ))}
+                  {filteredMembers.length === 0 && (
+                    <tr>
+                      <td
+                        colSpan={questions.length + 2}
+                        className="p-12 text-center text-muted-foreground"
+                      >
+                        <AlertTriangle className="w-6 h-6 mx-auto mb-2 opacity-20" />
+                        No members match your filter.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
+
+        <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground py-4">
+          <CheckCircle className="w-3 h-3 text-primary" />
+          {filledCount} of {members.length} members have at least one answer entered.
+        </div>
       </div>
-    </div>
+    </>
   )
 }
 
+// ── Field input renderer ───────────────────────────────────────────────────────
+function FieldInput({
+  fieldType,
+  value,
+  disabled,
+  onChange,
+}: {
+  fieldType: string
+  value: string
+  disabled: boolean
+  onChange: (v: string) => void
+}) {
+  const base =
+    'w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed'
+
+  if (fieldType === 'number') {
+    return (
+      <input
+        type="number"
+        disabled={disabled}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="0"
+        className={`${base} w-28`}
+      />
+    )
+  }
+
+  if (fieldType === 'date') {
+    return (
+      <input
+        type="date"
+        disabled={disabled}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={`${base} w-40`}
+      />
+    )
+  }
+
+  // text / select / multiselect — plain text input (select options not yet in schema)
+  return (
+    <input
+      type="text"
+      disabled={disabled}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder="Type response…"
+      className={`${base} w-36`}
+    />
+  )
+}

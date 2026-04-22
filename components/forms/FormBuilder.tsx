@@ -20,6 +20,7 @@ export interface FormDraft {
   questions: FormQuestion[]      // ✅ updated
   audience_filters: AudienceFilters
   filler_access: FillerAccess
+  viewable_by_roles?: string     // 'all' or 'staff_only'
 }
 
 const STEPS = ['Basic Info', 'Audience', 'Form Fields', 'Access', 'Review']
@@ -58,7 +59,7 @@ export function FormBuilder({ onComplete, role }: { onComplete: () => void; role
         ))}
       </div>
 
-      {step === 0 && <Step1BasicInfo draft={draft} update={update} onNext={next} />}
+      {step === 0 && <Step1BasicInfo draft={draft} update={update} onNext={next} userRole={role} />}
       {step === 1 && <Step2Audience draft={draft} update={update} onNext={next} onBack={back} />}
       {step === 2 && <Step3Questions draft={draft} update={update} onNext={next} onBack={back} />}
       {step === 3 && <Step4Access draft={draft} update={update} onNext={next} onBack={back} />}

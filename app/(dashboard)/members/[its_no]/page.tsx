@@ -2,6 +2,7 @@ import { redirect, notFound } from 'next/navigation'
 import { ChevronRight } from 'lucide-react'
 import { getSession } from '@/lib/auth/getSession'
 import { getMemberProfile } from '@/lib/members/getMemberProfile'
+import { getFilteredResponses } from '@/lib/members/getFilteredResponses'
 import { MemberProfileView } from '@/components/members/MemberProfileView'
 
 interface PageProps {
@@ -22,6 +23,8 @@ export default async function MemberProfilePage({ params }: PageProps) {
   const profile = await getMemberProfile(itsNo)
   if (!profile) notFound()
 
+  const historicalResponses = await getFilteredResponses(itsNo, session)
+
   return (
     <div className="p-4 md:p-6 lg:p-8">
       {/* Breadcrumb */}
@@ -36,7 +39,7 @@ export default async function MemberProfilePage({ params }: PageProps) {
         <span className="text-foreground font-medium">{profile.name}</span>
       </nav>
 
-      <MemberProfileView profile={profile} session={session} />
+      <MemberProfileView profile={profile} session={session} initialResponses={historicalResponses} />
     </div>
   )
 }

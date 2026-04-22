@@ -39,8 +39,8 @@ export async function GET() {
   const rates = await Promise.all(
     (forms as Array<{ id: string; title: string }>).map(async (form) => {
       const { count } = await supabase
-        .from('form_response')
-        .select('its_no', { count: 'exact', head: true })
+        .from('form_responses')
+        .select('filled_for', { count: 'exact', head: true })
         .eq('form_id', form.id)
 
       const responses = count ?? 0

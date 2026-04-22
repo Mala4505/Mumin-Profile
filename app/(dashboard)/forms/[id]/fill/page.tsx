@@ -12,5 +12,5 @@ export default async function FillFormPage({
   if (!session) redirect('/login')
   if (!['Masool', 'Musaid'].includes(session.role)) redirect('/dashboard')
 
-  return <BulkFillForm formId={id} role={session.role} />
+  return <BulkFillForm formId={id} role={session.role} itsNo={session.its_no} />
 }

@@ -56,6 +56,7 @@
 //   return NextResponse.json({ success: true })
 // }
 
+
 // app/api/forms/[id]/respond/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/getSession";
@@ -116,11 +117,27 @@ export async function POST(
   }
 
   const { responses } = await req.json();
-  const { error: rpcErr } = await supabase.rpc("submit_form_responses", {
-    form_id: id,
-    filled_by: String(session.its_no),
-    responses,
-  } as any);
+
+  // Normalize payload: SelfFillForm sends { profile_field_id, its_no, answer, remarks }
+  // but process_form_submission RPC expects { field_id, its_no, answer, remarks }
+  const normalized = (responses as Array<{
+    profile_field_id?: number
+    field_id?: number
+    its_no: number
+    answer: string
+    remarks?: string
+  }>).map((r) => ({
+    field_id: r.field_id ?? r.profile_field_id,
+    its_no: r.its_no,
+    answer: r.answer,
+    remarks: r.remarks ?? '',
+  }));
+
+  const { error: rpcErr } = await supabase.rpc('process_form_submission', {
+    p_form_id: id,
+    p_filled_by: Number(session.its_no),
+    p_responses: normalized,
+  });
 
   if (rpcErr)
     return NextResponse.json({ error: rpcErr.message }, { status: 500 });
