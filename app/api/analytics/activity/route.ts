@@ -22,7 +22,7 @@ export async function GET() {
     // Last 20 form submissions with member name and form title
     supabase
       .from('form_responses')
-      .select('submitted_at, filled_for, form_id, mumin!filled_for(name), forms(title)')
+      .select('submitted_at, filled_for, form_id')
       .order('submitted_at', { ascending: false })
       .limit(20),
 
@@ -36,7 +36,7 @@ export async function GET() {
     // Most recent profile update per member
     supabase
       .from('profile_value')
-      .select('its_no, updated_at, mumin(name)')
+      .select('its_no, updated_at')
       .order('updated_at', { ascending: false })
       .limit(50),
   ])
@@ -48,12 +48,10 @@ export async function GET() {
     submitted_at: string | null
     filled_for: number
     form_id: string
-    mumin: { name: string } | null
-    forms: { title: string } | null
   }>) {
     if (!row.submitted_at) continue
-    const memberName = row.mumin?.name ?? `ITS ${row.filled_for}`
-    const formTitle = row.forms?.title ?? 'a form'
+    const memberName = `ITS ${row.filled_for}`
+    const formTitle = 'a form'
     events.push({
       type: 'submission',
       label: `${memberName} submitted ${formTitle}`,
@@ -86,11 +84,10 @@ export async function GET() {
   for (const row of (profilesRes.data ?? []) as Array<{
     its_no: number
     updated_at: string
-    mumin: { name: string } | null
   }>) {
     if (seenIts.has(row.its_no)) continue
     seenIts.add(row.its_no)
-    const memberName = row.mumin?.name ?? `ITS ${row.its_no}`
+    const memberName = `ITS ${row.its_no}`
     events.push({
       type: 'profile',
       label: `Profile updated — ${memberName}`,

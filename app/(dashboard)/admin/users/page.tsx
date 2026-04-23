@@ -43,7 +43,7 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
       .limit(2000)
 
     if (roleFilter) {
-      query = query.eq('role', roleFilter)
+      query = query.eq('role', roleFilter as 'SuperAdmin' | 'Admin' | 'Masool' | 'Musaid' | 'Mumin')
     }
 
     if (search) {

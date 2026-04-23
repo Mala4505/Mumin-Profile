@@ -21,7 +21,7 @@ export async function GET() {
   // Fetch profile categories with fields and value counts
   const { data: categories, error: catError } = await supabase
     .from('profile_category')
-    .select('name, profile_field!category_id(id)')
+    .select('name, profile_field(id)')
     .order('sort_order', { ascending: true })
 
   if (catError) return NextResponse.json([])
@@ -29,7 +29,7 @@ export async function GET() {
   // For each category, count distinct members who have at least one value for its fields
   const result: Array<{ name: string; value: number }> = []
 
-  for (const cat of (categories ?? []) as Array<{
+  for (const cat of (categories ?? []) as unknown as Array<{
     name: string
     profile_field: Array<{ id: string }>
   }>) {

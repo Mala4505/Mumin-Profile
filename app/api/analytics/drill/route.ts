@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
   }
 
   // Filter to the selected group
-  const filtered = ((muminRows ?? []) as MuminWithJoins[]).filter(row => {
+  const filtered = ((muminRows ?? []) as unknown as MuminWithJoins[]).filter(row => {
     if (groupBy === 'subsector') return row.subsector?.subsector_name === name
     return row.subsector?.sector?.sector_name === name
   })

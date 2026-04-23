@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   // Fetch all mumin with their subsector join
   const { data: muminRows, error } = await supabase
     .from('mumin')
-    .select('subsector_id, subsector!subsector_id(subsector_name, sector_id, sector!sector_id(sector_name))')
+    .select('subsector_id, subsector(subsector_name, sector_id, sector(sector_name))')
     .eq('status', 'active')
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
   // Aggregate by sector or subsector
   const counts = new Map<string, number>()
 
-  for (const row of (muminRows ?? []) as Array<{
+  for (const row of (muminRows ?? []) as unknown as Array<{
     subsector_id: number | null
     subsector: { subsector_name: string; sector_id: number; sector: { sector_name: string } } | null
   }>) {
