@@ -42,11 +42,11 @@ export interface FormAnswersResponse {
 async function resolveSubsectorIds(
   session: Awaited<ReturnType<typeof getSession>> & object,
   supabase: Awaited<ReturnType<typeof createClient>>
-): Promise<string[] | null> {
+): Promise<number[] | null> {
   if (session.role === 'SuperAdmin') return null
 
   if (session.role === 'Musaid') {
-    return (session.subsector_ids ?? []) as string[]
+    return session.subsector_ids ?? []
   }
 
   // Admin or Masool: assigned to sectors — resolve their subsectors
