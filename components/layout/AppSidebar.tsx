@@ -70,7 +70,7 @@ const NAV_ITEMS: NavItem[] = [
     label: 'Analytics',
     href: '/analytics',
     icon: LineChart,
-    roles: ['SuperAdmin'],
+    roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid'],
   },
   {
     label: 'Admin',

@@ -1,8 +1,8 @@
 import { redirect } from 'next/navigation'
-import { Download } from 'lucide-react'
 import { getSession } from '@/lib/auth/getSession'
 import { getMembers } from '@/lib/members/getMembers'
 import { MembersShell } from '@/components/members/MembersShell'
+import { ExportButton } from '@/components/members/ExportButton'
 import type { MemberFilters } from '@/lib/types/app'
 
 interface PageProps {
@@ -57,13 +57,7 @@ export default async function MembersPage({ searchParams }: PageProps) {
           </p>
         </div>
         {session.role !== 'Mumin' && mode === 'loaded' && (
-          <a
-            href={`/reports?${new URLSearchParams(params as Record<string, string>).toString()}`}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors self-start sm:self-auto"
-          >
-            <Download className="w-4 h-4" />
-            Export Excel
-          </a>
+          <ExportButton filters={params} />
         )}
       </div>
       <MembersShell

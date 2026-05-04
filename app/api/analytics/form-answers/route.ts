@@ -37,9 +37,33 @@ export interface FormAnswersResponse {
   textEntries: TextEntry[]
 }
 
+// Returns the subsector IDs that the session user is scoped to.
+// Returns null for SuperAdmin (no filter), empty array if role has no assignments.
+async function resolveSubsectorIds(
+  session: Awaited<ReturnType<typeof getSession>> & object,
+  supabase: Awaited<ReturnType<typeof createClient>>
+): Promise<string[] | null> {
+  if (session.role === 'SuperAdmin') return null
+
+  if (session.role === 'Musaid') {
+    return (session.subsector_ids ?? []) as string[]
+  }
+
+  // Admin or Masool: assigned to sectors — resolve their subsectors
+  const sectorIds = session.sector_ids ?? []
+  if (!sectorIds.length) return []
+
+  const { data } = await supabase
+    .from('subsector')
+    .select('id')
+    .in('sector_id', sectorIds)
+
+  return (data ?? []).map((s: any) => s.id)
+}
+
 export async function GET(req: NextRequest) {
   const session = await getSession()
-  if (!session || session.role !== 'SuperAdmin') {
+  if (!session) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
@@ -52,7 +76,7 @@ export async function GET(req: NextRequest) {
 
   const supabase = await createClient()
 
-  // Fetch form fields
+  // Fetch form fields (unscoped — all roles see the same field list)
   const { data: formFieldsData } = await supabase
     .from('form_fields')
     .select('field_id, sort_order, is_required, profile_field(id, caption, field_type, behavior)')
@@ -76,12 +100,34 @@ export async function GET(req: NextRequest) {
   const field = fields.find(f => f.id === fieldId)
   if (!field) return NextResponse.json({ error: 'Field not in this form' }, { status: 404 })
 
-  // Fetch all responses for this form + field
-  const { data: responses, error } = await supabase
+  // Resolve scope: for non-SuperAdmin, get the ITS numbers of their assigned Mumineen
+  const scopedSubsectorIds = await resolveSubsectorIds(session, supabase)
+  let itsNoFilter: number[] | null = null
+
+  if (scopedSubsectorIds !== null) {
+    if (scopedSubsectorIds.length === 0) {
+      return NextResponse.json({ fields, field, distribution: [], bySector: [], textEntries: [] })
+    }
+    const { data: scopedMembers } = await supabase
+      .from('mumin')
+      .select('its_no')
+      .in('subsector_id', scopedSubsectorIds)
+      .eq('status', 'active')
+    itsNoFilter = (scopedMembers ?? []).map((m: any) => m.its_no)
+  }
+
+  // Fetch responses for this form + field, scoped if needed
+  let responsesQuery = supabase
     .from('form_responses')
     .select('answer, filled_for, submitted_at')
     .eq('form_id', formId)
     .eq('profile_field_id', fieldId)
+
+  if (itsNoFilter !== null) {
+    responsesQuery = responsesQuery.in('filled_for', itsNoFilter)
+  }
+
+  const { data: responses, error } = await responsesQuery
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
@@ -127,6 +173,7 @@ export async function GET(req: NextRequest) {
   }
 
   // Select/radio/number — build sector/subsector breakdown
+  // Sector breakdown is naturally scoped because uniqueFilledForIds is already scoped
   const { data: memberData } = await supabase
     .from('mumin')
     .select('its_no, subsector_id, subsector!subsector_id(subsector_name, sector_id, sector!sector_id(sector_name))')

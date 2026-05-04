@@ -12,7 +12,7 @@ export interface AnalyticsForm {
 
 export async function GET() {
   const session = await getSession()
-  if (!session || session.role !== 'SuperAdmin') {
+  if (!session) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 

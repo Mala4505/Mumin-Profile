@@ -3,8 +3,6 @@ export type ImportTableKey =
   | 'subsector'
   | 'sector'
   | 'profile_category'
-  | 'profile_field'
-  | 'profile_value'
   | 'user_sector'
   | 'user_subsector'
   | 'profile_field_with_values'
@@ -13,12 +11,11 @@ export type ImportAction = 'add' | 'update' | 'upsert' | 'delete'
 
 export interface TableConfig {
   label: string
-  uniqueKey: string | string[]          // single col or composite
+  uniqueKey: string | string[]
   requiredFields: string[]
   optionalFields: string[]
-  csvHeaders: string[]                  // in order for template
+  csvHeaders: string[]
   sampleRow: Record<string, string>
-  supportsProfileValueFlow?: boolean    // true only for profile_value
 }
 
 export const IMPORT_TABLES: Record<ImportTableKey, TableConfig> = {
@@ -53,23 +50,6 @@ export const IMPORT_TABLES: Record<ImportTableKey, TableConfig> = {
     optionalFields: ['sort_order'],
     csvHeaders: ['id', 'name', 'sort_order'],
     sampleRow: { id: 'uuid-here', name: 'Health', sort_order: '1' },
-  },
-  profile_field: {
-    label: 'Profile Fields',
-    uniqueKey: 'id',
-    requiredFields: ['id', 'caption', 'category_id', 'field_type'],
-    optionalFields: ['visibility_level', 'is_data_entry', 'mumin_can_edit', 'sort_order'],
-    csvHeaders: ['id', 'caption', 'category_id', 'field_type', 'visibility_level', 'is_data_entry', 'mumin_can_edit', 'sort_order'],
-    sampleRow: { id: 'uuid-here', caption: 'Blood Type', category_id: 'uuid-here', field_type: 'static', visibility_level: 'admin', is_data_entry: 'true', mumin_can_edit: 'false', sort_order: '1' },
-  },
-  profile_value: {
-    label: 'Profile Values',
-    uniqueKey: ['its_no', 'field_id'],               // composite; recorded_date added for time-series
-    requiredFields: ['its_no', 'field_id', 'value'],
-    optionalFields: ['recorded_date', 'data_active'],
-    csvHeaders: ['its_no', 'field_id', 'value', 'recorded_date', 'data_active'],
-    sampleRow: { its_no: '10000001', field_id: 'uuid-here', value: 'A+', recorded_date: '', data_active: 'true' },
-    supportsProfileValueFlow: true,
   },
   user_sector: {
     label: 'Masool Assignments',

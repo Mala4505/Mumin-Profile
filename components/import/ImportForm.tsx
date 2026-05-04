@@ -18,7 +18,6 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
 export function ImportForm() {
   const [table, setTable] = useState<ImportTableKey | ''>('')
   const [action, setAction] = useState<ImportAction>('upsert')
-  const [fieldType, setFieldType] = useState<'static' | 'time-series'>('static')
   const [rows, setRows] = useState<Record<string, string>[]>([])
   const [errors, setErrors] = useState<RowError[]>([])
   const [validRows, setValidRows] = useState<Record<string, string>[]>([])
@@ -41,7 +40,6 @@ export function ImportForm() {
       transform: (v) => v.trim(),
     })
     const config = IMPORT_TABLES[table]
-    // Skip validation for profile_field_with_values — columns are dynamic and can't be pre-defined
     const result = table === 'profile_field_with_values'
       ? { errors: [], validRows: parsed.data }
       : validateImportRows(parsed.data, config)
@@ -63,21 +61,16 @@ export function ImportForm() {
     let totalInserted = 0, totalUpdated = 0, totalFailed = 0
     const allFailedRows: Record<string, string>[] = []
 
-    const endpoint =
-      table === 'profile_value'
-        ? '/api/import/profile-values'
-        : table === 'profile_field_with_values'
-        ? '/api/import/profile-field-values'
-        : '/api/import/upsert'
+    const endpoint = table === 'profile_field_with_values'
+      ? '/api/import/profile-field-values'
+      : '/api/import/upsert'
 
     for (let i = 0; i < batches.length; i++) {
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(
-          table === 'profile_value'
-            ? { rows: batches[i], fieldType }
-            : table === 'profile_field_with_values'
+          table === 'profile_field_with_values'
             ? { rows: batches[i] }
             : { table, rows: batches[i], action, onConflictColumn }
         ),
@@ -115,7 +108,7 @@ export function ImportForm() {
   const progressPct = progress.total > 0 ? (progress.current / progress.total) * 100 : 0
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-5 max-w-2xl">
       {/* Selectors */}
       <div className="flex gap-3 flex-wrap">
         <Select value={table} onValueChange={(v) => { setTable(v as ImportTableKey); setValidated(false); setDone(false) }}>
@@ -142,23 +135,6 @@ export function ImportForm() {
         </Button>
       </div>
 
-      {/* Profile Value Flow — only shown when table = profile_value */}
-      {table === 'profile_value' && (
-        <div className="flex items-center gap-3 p-3 border rounded-lg bg-muted/30">
-          <span className="text-sm font-medium">Field Type:</span>
-          <Select value={fieldType} onValueChange={(v) => setFieldType(v as 'static' | 'time-series')}>
-            <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="static">Static (no date)</SelectItem>
-              <SelectItem value="time-series">Time-series (with date)</SelectItem>
-            </SelectContent>
-          </Select>
-          <span className="text-xs text-muted-foreground">
-            {fieldType === 'static' ? 'One value per member per field' : 'Multiple values per member per field, each with a date'}
-          </span>
-        </div>
-      )}
-
       {/* Combined Profile Field + Value info banner */}
       {table === 'profile_field_with_values' && (
         <div className="flex items-start gap-3 p-3 border rounded-lg bg-blue-50 border-blue-200 text-sm text-blue-800">
@@ -174,7 +150,7 @@ export function ImportForm() {
       {/* File Upload */}
       {table && (
         <div>
-          <label className="block text-sm font-medium mb-1">Upload CSV</label>
+          <label className="block text-sm font-medium mb-1.5">Upload CSV</label>
           <input
             type="file"
             accept=".csv"
@@ -225,8 +201,8 @@ export function ImportForm() {
 
       {/* Summary */}
       {done && (
-        <div className="rounded-lg border p-4 bg-muted space-y-1">
-          <p className="font-medium">Import Complete</p>
+        <div className="rounded-lg border p-4 bg-muted space-y-2">
+          <p className="font-medium text-sm">Import Complete</p>
           <p className="text-sm">Inserted: {stats.inserted} · Updated: {stats.updated} · Skipped: {stats.skipped} · Failed: {stats.failed}</p>
           {failedRows.length > 0 && (
             <Button variant="outline" size="sm" onClick={downloadErrorReport}>

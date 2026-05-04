@@ -9,6 +9,7 @@ import {
 
 import type { FormRate } from '@/app/api/analytics/form-rates/route'
 import type { ActivityEvent } from '@/app/api/analytics/activity/route'
+import type { Role } from '@/lib/types/app'
 import { FormAnalyticsSection } from './FormAnalyticsSection'
 import { SectorPerformanceSection } from './SectorPerformanceSection'
 
@@ -154,7 +155,7 @@ function ActivityFeed({ events }: { events: ActivityEvent[] }) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export function AnalyticsDashboard() {
+export function AnalyticsDashboard({ role }: { role: Role }) {
   // ── State ──────────────────────────────────────────────────────────────────
   const [overview, setOverview] = React.useState<OverviewData | null>(null)
   const [overviewLoading, setOverviewLoading] = React.useState(true)
@@ -173,18 +174,21 @@ export function AnalyticsDashboard() {
   const [formRates, setFormRates] = React.useState<FormRate[]>([])
   const [activity, setActivity] = React.useState<ActivityEvent[]>([])
 
+  const isSuperAdmin = role === 'SuperAdmin'
 
-  // ── Fetch overview ─────────────────────────────────────────────────────────
+  // ── Fetch overview (SuperAdmin only) ───────────────────────────────────────
   React.useEffect(() => {
+    if (!isSuperAdmin) return
     fetch('/api/analytics/overview')
       .then(r => r.json())
       .then(setOverview)
       .catch(() => { })
       .finally(() => setOverviewLoading(false))
-  }, [])
+  }, [isSuperAdmin])
 
-  // ── Fetch group data (members per sector/subsector) ────────────────────────
+  // ── Fetch group data (SuperAdmin only) ────────────────────────────────────
   React.useEffect(() => {
+    if (!isSuperAdmin) return
     setGroupLoading(true)
     setSelectedGroup(null)
     setDrillMembers([])
@@ -194,10 +198,11 @@ export function AnalyticsDashboard() {
       .then((d: GroupItem[]) => setGroupData(d))
       .catch(() => setGroupData([]))
       .finally(() => setGroupLoading(false))
-  }, [groupBy])
+  }, [groupBy, isSuperAdmin])
 
-  // ── Fetch profile completion & submission activity once ────────────────────
+  // ── Fetch profile completion & submission activity (SuperAdmin only) ───────
   React.useEffect(() => {
+    if (!isSuperAdmin) return
     fetch('/api/analytics/profile-completion')
       .then(r => r.json())
       .then(setProfileCompletion)
@@ -207,10 +212,11 @@ export function AnalyticsDashboard() {
       .then(r => r.json())
       .then(setSubmissionActivity)
       .catch(() => { })
-  }, [])
+  }, [isSuperAdmin])
 
-  // ── Drill-down: fetch members for selected group ───────────────────────────
+  // ── Drill-down (SuperAdmin only) ──────────────────────────────────────────
   React.useEffect(() => {
+    if (!isSuperAdmin) return
     if (!selectedGroup) { setDrillMembers([]); return }
     setDrillLoading(true)
     fetch(`/api/analytics/drill?groupBy=${groupBy}&name=${encodeURIComponent(selectedGroup)}`)
@@ -218,19 +224,22 @@ export function AnalyticsDashboard() {
       .then((d: MemberRow[]) => setDrillMembers(d))
       .catch(() => setDrillMembers([]))
       .finally(() => setDrillLoading(false))
-  }, [selectedGroup, groupBy])
+  }, [selectedGroup, groupBy, isSuperAdmin])
 
+  // ── Form rates (all roles) + activity (SuperAdmin only) ───────────────────
   React.useEffect(() => {
     fetch('/api/analytics/form-rates')
       .then(r => r.json())
       .then(setFormRates)
       .catch(() => { })
 
-    fetch('/api/analytics/activity')
-      .then(r => r.json())
-      .then(setActivity)
-      .catch(() => { })
-  }, [])
+    if (isSuperAdmin) {
+      fetch('/api/analytics/activity')
+        .then(r => r.json())
+        .then(setActivity)
+        .catch(() => { })
+    }
+  }, [isSuperAdmin])
 
 
 
@@ -244,6 +253,25 @@ export function AnalyticsDashboard() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function handlePieClick(data: any) {
     if (data?.name) setSelectedGroup((prev: string | null) => prev === data.name ? null : data.name)
+  }
+
+  // ── Non-SuperAdmin: scoped view ───────────────────────────────────────────
+  if (!isSuperAdmin) {
+    return (
+      <div className="space-y-8">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">
+            {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }).toUpperCase()}
+          </p>
+          <h1 className="text-[28px] font-bold text-foreground leading-tight">Analytics</h1>
+          <p className="text-sm text-muted-foreground mt-1">Showing analytics for your assigned Mumineen</p>
+        </div>
+        <FormResponseRates rates={formRates} />
+        <div className="border-t border-border pt-8">
+          <FormAnalyticsSection />
+        </div>
+      </div>
+    )
   }
 
   // ─────────────────────────────────────────────────────────────────────────
