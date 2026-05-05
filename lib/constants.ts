@@ -33,6 +33,7 @@ export const ROUTES = {
   REPORTS: '/reports',
   FORMS: '/forms',
   ADMIN_USERS: '/admin/users',
+  ANALYTICS: '/analytics',
   REQUESTS: '/requests',
   ADMIN_REQUESTS: '/admin/requests',
   CHANGE_PASSWORD: '/change-password',

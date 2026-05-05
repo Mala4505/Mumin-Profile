@@ -13,6 +13,7 @@ import {
   LogOut,
   ClipboardList,
   ClipboardCheck,
+  LineChart,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -76,6 +77,12 @@ const NAV_ITEMS: NavItem[] = [
     href: ROUTES.ADMIN_USERS,
     icon: Settings,
     roles: ['SuperAdmin'],
+  },
+    {
+    label: 'Analytics',
+    href: ROUTES.ANALYTICS,
+    icon: LineChart,
+    roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid'],
   },
   {
     label: 'Request Review',
