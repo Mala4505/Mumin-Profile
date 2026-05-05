@@ -70,7 +70,7 @@ export default async function RequestsPage({ searchParams }: PageProps) {
   // Step 1: get mumin in scope, filtered by search if present
   let muminQuery = admin
     .from('mumin')
-    .select('sabeel_no, subsector_id, its_no, name')
+    .select('sabeel_no, subsector_id, its_no, name, phone')
     .not('sabeel_no', 'is', null)
     .limit(10000)
 
@@ -105,11 +105,13 @@ export default async function RequestsPage({ searchParams }: PageProps) {
 
   const { data: scopedMumin } = await muminQuery
 
-  // Deduplicate: one entry per sabeel_no, keep subsector_id for display
+  // Deduplicate: one entry per sabeel_no, keep subsector_id + first mumin as guaranteed fallback
   const sabeelToSubsector = new Map<string, number>()
+  const sabeelToFirstMumin = new Map<string, { its_no: number; name: string; phone: string | null }>()
   for (const m of (scopedMumin ?? []) as any[]) {
     if (m.sabeel_no && !sabeelToSubsector.has(m.sabeel_no)) {
       sabeelToSubsector.set(m.sabeel_no, m.subsector_id)
+      sabeelToFirstMumin.set(m.sabeel_no, { its_no: m.its_no, name: m.name, phone: m.phone ?? null })
     }
   }
   const sabeelNos = Array.from(sabeelToSubsector.keys())
@@ -155,8 +157,13 @@ export default async function RequestsPage({ searchParams }: PageProps) {
     }
   }
 
-  // Step 5: fetch one fallback mumin per sabeel (for sabeels with no head_its_no in family table)
-  const sabeelsWithNoHof = sabeelNos.filter(s => !sabeelToHeadIts.has(s))
+  // Step 5: fetch one fallback mumin per sabeel (for sabeels with no head_its_no, or where
+  // head_its_no points to a mumin record that wasn't found in the mumin table)
+  const sabeelsWithNoHof = sabeelNos.filter(s => {
+    const headIts = sabeelToHeadIts.get(s)
+    if (!headIts) return true
+    return !hofMuminMap.has(headIts)
+  })
   const fallbackMuminMap = new Map<string, { its_no: number; name: string; phone: string | null }>()
 
   if (sabeelsWithNoHof.length > 0) {
@@ -191,7 +198,9 @@ export default async function RequestsPage({ searchParams }: PageProps) {
   // Step 7: assemble the final families list
   const families = sabeelNos.map(sabeelNo => {
     const headIts = sabeelToHeadIts.get(sabeelNo)
-    const hof = headIts ? hofMuminMap.get(headIts) : fallbackMuminMap.get(sabeelNo)
+    const hof = (headIts ? hofMuminMap.get(headIts) : undefined)
+      ?? fallbackMuminMap.get(sabeelNo)
+      ?? sabeelToFirstMumin.get(sabeelNo)
     const subsectorId = sabeelToSubsector.get(sabeelNo)
     const paciNo = sabeelToPaci.get(sabeelNo)
 

@@ -193,9 +193,59 @@ export function RequestsClient({ families, initialRequests, mode, currentSearch,
   // ── Loaded state ─────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
+      {/* Search bar */}
+      <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
+        {searchBar}
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Family List */}
-        {/* ... same as your part 1 ... */}
+        <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm flex flex-col">
+          <div className="px-4 py-3 border-b border-border bg-muted/40 flex items-center justify-between shrink-0">
+            <h2 className="font-semibold text-foreground text-sm">
+              Families{' '}
+              <span className="text-muted-foreground font-normal">({families.length})</span>
+            </h2>
+          </div>
+          {families.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center px-4">
+              <p className="text-sm text-muted-foreground">No families found. Try a different search.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-border overflow-y-auto max-h-[520px]">
+              {families.map(f => (
+                <button
+                  key={f.sabeel_no}
+                  type="button"
+                  onClick={() => { setSelected(f); setRemark(''); setSubmitError('') }}
+                  className={`w-full text-left px-4 py-3 hover:bg-muted/40 transition-colors flex items-start justify-between gap-3 ${
+                    selected?.sabeel_no === f.sabeel_no
+                      ? 'bg-primary/5 border-l-2 border-l-primary'
+                      : ''
+                  }`}
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-mono text-xs text-muted-foreground">{f.sabeel_no}</span>
+                      {f.subsector_name && (
+                        <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                          {f.subsector_name}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm font-medium text-foreground truncate mt-0.5">{f.hof_name}</p>
+                    {f.building_name !== '—' && (
+                      <p className="text-xs text-muted-foreground truncate">{f.building_name}</p>
+                    )}
+                  </div>
+                  {f.hof_phone && (
+                    <span className="text-xs text-muted-foreground shrink-0 mt-1">{f.hof_phone}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Request Form */}
         <div className="bg-card border border-border rounded-xl p-5 flex flex-col gap-4">
@@ -204,7 +254,30 @@ export function RequestsClient({ families, initialRequests, mode, currentSearch,
           {selected ? (
             <>
               {/* Selected family info */}
-              {/* ... same as your part 1 ... */}
+              <div className="bg-muted/40 rounded-lg p-3 border border-border space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Selected Family
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSelected(null)}
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Change
+                  </button>
+                </div>
+                <p className="text-sm font-semibold text-foreground">{selected.hof_name}</p>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <span className="font-mono text-xs text-muted-foreground">Sabeel: {selected.sabeel_no}</span>
+                  {selected.building_name !== '—' && (
+                    <span className="text-xs text-muted-foreground">{selected.building_name}</span>
+                  )}
+                  {selected.hof_phone && (
+                    <span className="text-xs text-muted-foreground">{selected.hof_phone}</span>
+                  )}
+                </div>
+              </div>
 
               {/* Remark */}
               <div>
@@ -215,7 +288,11 @@ export function RequestsClient({ families, initialRequests, mode, currentSearch,
                       key={r}
                       type="button"
                       onClick={() => setRemark(r)}
-                      className="px-2.5 py-1 rounded-full text-xs border border-border text-foreground bg-background hover:bg-muted/40 hover:border-primary/50 transition-colors"
+                      className={`px-2.5 py-1 rounded-full text-xs border transition-colors ${
+                        remark === r
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-border text-foreground bg-background hover:bg-muted/40 hover:border-primary/50'
+                      }`}
                     >
                       {r}
                     </button>

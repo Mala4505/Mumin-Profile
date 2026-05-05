@@ -10,6 +10,11 @@ import {
 import type { FormRate } from '@/app/api/analytics/form-rates/route'
 import type { ActivityEvent } from '@/app/api/analytics/activity/route'
 import type { Role } from '@/lib/types/app'
+import { Search } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
 import { FormAnalyticsSection } from './FormAnalyticsSection'
 import { SectorPerformanceSection } from './SectorPerformanceSection'
 
@@ -41,6 +46,8 @@ interface GroupItem {
 interface MemberRow {
   its_no: number
   name: string
+  gender: string | null
+  status: string | null
   sector_name: string | null
   subsector_name: string | null
   last_profile_update: string | null
@@ -170,11 +177,35 @@ export function AnalyticsDashboard({ role }: { role: Role }) {
   const [selectedGroup, setSelectedGroup] = React.useState<string | null>(null)
   const [drillMembers, setDrillMembers] = React.useState<MemberRow[]>([])
   const [drillLoading, setDrillLoading] = React.useState(false)
+  const [drillSearch, setDrillSearch] = React.useState('')
+  const [drillGender, setDrillGender] = React.useState<string>('__all__')
+  const [drillStatus, setDrillStatus] = React.useState<string>('__all__')
 
   const [formRates, setFormRates] = React.useState<FormRate[]>([])
   const [activity, setActivity] = React.useState<ActivityEvent[]>([])
 
   const isSuperAdmin = role === 'SuperAdmin'
+
+  const filteredDrillMembers = React.useMemo(() => {
+    const q = drillSearch.trim().toLowerCase()
+    return drillMembers.filter(m => {
+      if (drillGender !== '__all__' && m.gender !== drillGender) return false
+      if (drillStatus !== '__all__' && m.status !== drillStatus) return false
+      if (q) {
+        if (!m.name.toLowerCase().includes(q) && !String(m.its_no).includes(q)) return false
+      }
+      return true
+    })
+  }, [drillMembers, drillSearch, drillGender, drillStatus])
+
+  const drillGenders = React.useMemo(
+    () => [...new Set(drillMembers.map(m => m.gender).filter((g): g is string => !!g))].sort(),
+    [drillMembers]
+  )
+  const drillStatuses = React.useMemo(
+    () => [...new Set(drillMembers.map(m => m.status).filter((s): s is string => !!s))].sort(),
+    [drillMembers]
+  )
 
   // ── Fetch overview (SuperAdmin only) ───────────────────────────────────────
   React.useEffect(() => {
@@ -192,6 +223,9 @@ export function AnalyticsDashboard({ role }: { role: Role }) {
     setGroupLoading(true)
     setSelectedGroup(null)
     setDrillMembers([])
+    setDrillSearch('')
+    setDrillGender('__all__')
+    setDrillStatus('__all__')
 
     fetch(`/api/analytics/groups?groupBy=${groupBy}`)
       .then(r => r.json())
@@ -508,35 +542,80 @@ export function AnalyticsDashboard({ role }: { role: Role }) {
           </div>
         ) : (
           <div className="bg-card border border-border rounded-lg overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border bg-muted/30">
-                    <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">ITS No</th>
-                    <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Name</th>
-                    <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hidden sm:table-cell">Sector</th>
-                    <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hidden md:table-cell">Subsector</th>
-                    <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hidden lg:table-cell">Last Profile Update</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {drillMembers.map((m) => (
-                    <tr key={m.its_no} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
-                      <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">{m.its_no}</td>
-                      <td className="px-4 py-2.5 font-medium text-foreground">{m.name}</td>
-                      <td className="px-4 py-2.5 text-muted-foreground hidden sm:table-cell">{m.sector_name ?? '—'}</td>
-                      <td className="px-4 py-2.5 text-muted-foreground hidden md:table-cell">{m.subsector_name ?? '—'}</td>
-                      <td className="px-4 py-2.5 text-muted-foreground text-xs hidden lg:table-cell">
-                        {m.last_profile_update ? formatDate(m.last_profile_update) : '—'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            {/* Filter bar */}
+            <div className="px-4 py-3 border-b border-border flex flex-wrap items-center gap-2">
+              <span className="bg-blue-50 border border-blue-200 text-blue-700 text-xs px-2 py-0.5 rounded-full dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300">
+                {selectedGroup}
+              </span>
+              <div className="ml-auto flex items-center gap-2">
+                {drillGenders.length > 0 && (
+                  <Select value={drillGender} onValueChange={setDrillGender}>
+                    <SelectTrigger className="h-7 text-xs w-28">
+                      <SelectValue placeholder="All Genders" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">All Genders</SelectItem>
+                      {drillGenders.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                )}
+                {drillStatuses.length > 1 && (
+                  <Select value={drillStatus} onValueChange={setDrillStatus}>
+                    <SelectTrigger className="h-7 text-xs w-28">
+                      <SelectValue placeholder="All Statuses" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">All Statuses</SelectItem>
+                      {drillStatuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                )}
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                  <Input
+                    placeholder="Name or ITS…"
+                    className="pl-7 h-7 text-xs w-36"
+                    value={drillSearch}
+                    onChange={e => setDrillSearch(e.target.value)}
+                  />
+                </div>
+              </div>
             </div>
-            <div className="px-4 py-2 border-t border-border text-xs text-muted-foreground">
-              {drillMembers.length} member{drillMembers.length !== 1 ? 's' : ''} shown
-            </div>
+            {filteredDrillMembers.length === 0 ? (
+              <div className="p-8 text-center text-muted-foreground text-sm">No members match the current filters.</div>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border bg-muted/30">
+                        <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">ITS No</th>
+                        <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Name</th>
+                        <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hidden sm:table-cell">Sector</th>
+                        <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hidden md:table-cell">Subsector</th>
+                        <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hidden lg:table-cell">Last Profile Update</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredDrillMembers.map((m) => (
+                        <tr key={m.its_no} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
+                          <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">{m.its_no}</td>
+                          <td className="px-4 py-2.5 font-medium text-foreground">{m.name}</td>
+                          <td className="px-4 py-2.5 text-muted-foreground hidden sm:table-cell">{m.sector_name ?? '—'}</td>
+                          <td className="px-4 py-2.5 text-muted-foreground hidden md:table-cell">{m.subsector_name ?? '—'}</td>
+                          <td className="px-4 py-2.5 text-muted-foreground text-xs hidden lg:table-cell">
+                            {m.last_profile_update ? formatDate(m.last_profile_update) : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="px-4 py-2 border-t border-border text-xs text-muted-foreground">
+                  {filteredDrillMembers.length} of {drillMembers.length} member{drillMembers.length !== 1 ? 's' : ''} shown
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>

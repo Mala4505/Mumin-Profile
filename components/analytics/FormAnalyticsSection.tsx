@@ -18,6 +18,8 @@ import type {
   FormFieldMeta, AnswerDist, SectorBreakdown, TextEntry, FormAnswersResponse,
 } from '@/app/api/analytics/form-answers/route'
 import type { EventTrendResponse } from '@/app/api/analytics/event-trend/route'
+import { RespondentsTable } from './RespondentsTable'
+import type { RespondentRow } from '@/app/api/analytics/form-respondents/route'
 
 // ── Palette ──────────────────────────────────────────────────────────────────
 
@@ -68,13 +70,24 @@ function FieldTypeBadge({ type, behavior }: { type: string; behavior: string }) 
 }
 
 // Pie chart for answer distribution
-function DistributionPie({ data }: { data: AnswerDist[] }) {
+function DistributionPie({
+  data,
+  selectedAnswer,
+  onSliceClick,
+}: {
+  data: AnswerDist[]
+  selectedAnswer?: string | null
+  onSliceClick?: (answer: string) => void
+}) {
   const total = data.reduce((s, d) => s + d.count, 0)
   return (
     <div className="bg-card border border-border rounded-xl p-5">
       <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
         <span className="w-1.5 h-4 rounded-full bg-amber-500 inline-block" />
         Answer Distribution
+        {onSliceClick && (
+          <span className="text-xs text-muted-foreground font-normal ml-1">· click a slice to filter</span>
+        )}
         <span className="ml-auto text-xs text-muted-foreground font-normal">{total} total</span>
       </h3>
       <ResponsiveContainer width="100%" height={220}>
@@ -92,9 +105,16 @@ function DistributionPie({ data }: { data: AnswerDist[] }) {
               (percent ?? 0) > 0.05 ? `${Math.round((percent ?? 0) * 100)}%` : ''
             }
             labelLine={false}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            onClick={onSliceClick ? ((data: any) => onSliceClick(data.answer)) : undefined}
+            style={{ cursor: onSliceClick ? 'pointer' : 'default' }}
           >
-            {data.map((_, i) => (
-              <Cell key={i} fill={PALETTE[i % PALETTE.length]} />
+            {data.map((d, i) => (
+              <Cell
+                key={i}
+                fill={PALETTE[i % PALETTE.length]}
+                opacity={selectedAnswer && selectedAnswer !== d.answer ? 0.4 : 1}
+              />
             ))}
           </Pie>
           <Tooltip
@@ -114,16 +134,23 @@ function SectorBarChart({
   data,
   answers,
   groupBy,
+  selectedSector,
+  onSegmentClick,
 }: {
   data: SectorBreakdown[]
   answers: string[]
   groupBy: 'sector' | 'subsector'
+  selectedSector?: string | null
+  onSegmentClick?: (sector: string, answer: string) => void
 }) {
   return (
     <div className="bg-card border border-border rounded-xl p-5">
       <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
         <span className="w-1.5 h-4 rounded-full bg-blue-500 inline-block" />
         By {groupBy === 'sector' ? 'Sector' : 'Subsector'}
+        {onSegmentClick && (
+          <span className="text-xs text-muted-foreground font-normal ml-1">· click a bar to filter</span>
+        )}
       </h3>
       <ResponsiveContainer width="100%" height={220}>
         <BarChart
@@ -153,7 +180,18 @@ function SectorBarChart({
               fill={PALETTE[i % PALETTE.length]}
               radius={i === answers.length - 1 ? [3, 3, 0, 0] : [0, 0, 0, 0]}
               maxBarSize={40}
-            />
+              style={{ cursor: onSegmentClick ? 'pointer' : 'default' }}
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              onClick={onSegmentClick ? (barData: any) => onSegmentClick(barData.name, ans) : undefined}
+            >
+              {data.map((entry, j) => (
+                <Cell
+                  key={j}
+                  fill={PALETTE[i % PALETTE.length]}
+                  opacity={selectedSector && selectedSector !== entry.name ? 0.4 : 1}
+                />
+              ))}
+            </Bar>
           ))}
         </BarChart>
       </ResponsiveContainer>
@@ -346,14 +384,19 @@ export function FormAnalyticsSection() {
   const [showTrend, setShowTrend] = React.useState(false)
   const [trendData, setTrendData] = React.useState<EventTrendResponse | null>(null)
   const [trendLoading, setTrendLoading] = React.useState(false)
+  const [selectedAnswer, setSelectedAnswer] = React.useState<string | null>(null)
+  const [selectedSector, setSelectedSector] = React.useState<string | null>(null)
+  const [respondents, setRespondents] = React.useState<RespondentRow[]>([])
+  const [respondentsLoading, setRespondentsLoading] = React.useState(false)
 
   // Load forms on mount
   React.useEffect(() => {
     fetch('/api/analytics/forms')
       .then(r => r.json())
       .then((data: AnalyticsForm[]) => {
-        setForms(data)
-        if (data.length > 0) setSelectedFormId(data[0].id)
+        const list = Array.isArray(data) ? data : []
+        setForms(list)
+        if (list.length > 0) setSelectedFormId(list[0].id)
       })
       .catch(() => {})
       .finally(() => setFormsLoading(false))
@@ -389,10 +432,33 @@ export function FormAnalyticsSection() {
       `/api/analytics/form-answers?form_id=${selectedFormId}&field_id=${selectedFieldId}&group_by=${groupBy}`
     )
       .then(r => r.json())
-      .then((data: FormAnswersResponse) => setAnswersData(data))
+      .then((data: FormAnswersResponse) => {
+        if (Array.isArray((data as any).distribution)) setAnswersData(data)
+      })
       .catch(() => {})
       .finally(() => setAnswersLoading(false))
   }, [selectedFormId, selectedFieldId, groupBy])
+
+  // Reset filters when field changes
+  React.useEffect(() => {
+    setSelectedAnswer(null)
+    setSelectedSector(null)
+    setRespondents([])
+  }, [selectedFieldId])
+
+  // Fetch all respondents for non-text fields
+  React.useEffect(() => {
+    if (!selectedFormId || !selectedFieldId) return
+    const field = fields.find(f => f.id === selectedFieldId)
+    if (!field || field.field_type === 'text') return
+
+    setRespondentsLoading(true)
+    fetch(`/api/analytics/form-respondents?form_id=${selectedFormId}&field_id=${selectedFieldId}`)
+      .then(r => r.json())
+      .then((data: RespondentRow[]) => setRespondents(Array.isArray(data) ? data : []))
+      .catch(() => setRespondents([]))
+      .finally(() => setRespondentsLoading(false))
+  }, [selectedFormId, selectedFieldId, fields])
 
   // Load trend when requested
   React.useEffect(() => {
@@ -413,9 +479,13 @@ export function FormAnalyticsSection() {
   const selectedField = fields.find(f => f.id === selectedFieldId)
   const isTextType = selectedField?.field_type === 'text'
   const hasEvent = !!selectedForm?.event_id
-  const uniqueAnswers = answersData
+  const uniqueAnswers = answersData?.distribution
     ? [...new Set(answersData.distribution.map(d => d.answer))]
     : []
+  const availableSectors = React.useMemo(
+    () => [...new Set(respondents.map(r => r.sector_name).filter(Boolean))].sort(),
+    [respondents]
+  )
 
   return (
     <div className="space-y-6">
@@ -527,25 +597,51 @@ export function FormAnalyticsSection() {
         <>
           {isTextType ? (
             <TextEntriesTable entries={answersData.textEntries} />
-          ) : answersData.distribution.length === 0 ? (
-            <div className="bg-card border border-border rounded-xl p-10 text-center text-sm text-muted-foreground">
-              No responses recorded for this field yet.
-            </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <DistributionPie data={answersData.distribution} />
-              {answersData.bySector.length > 0 ? (
-                <SectorBarChart
-                  data={answersData.bySector}
-                  answers={uniqueAnswers}
-                  groupBy={groupBy}
-                />
+            <>
+              {answersData.distribution.length === 0 ? (
+                <div className="bg-card border border-border rounded-xl p-10 text-center text-sm text-muted-foreground">
+                  No responses recorded for this field yet.
+                </div>
               ) : (
-                <div className="bg-card border border-border rounded-xl p-5 flex items-center justify-center text-sm text-muted-foreground">
-                  No sector data available.
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <DistributionPie
+                    data={answersData.distribution}
+                    selectedAnswer={selectedAnswer}
+                    onSliceClick={answer =>
+                      setSelectedAnswer(prev => prev === answer ? null : answer)
+                    }
+                  />
+                  {answersData.bySector.length > 0 ? (
+                    <SectorBarChart
+                      data={answersData.bySector}
+                      answers={uniqueAnswers}
+                      groupBy={groupBy}
+                      selectedSector={selectedSector}
+                      onSegmentClick={(sector, answer) => {
+                        setSelectedSector(prev => prev === sector ? null : sector)
+                        setSelectedAnswer(prev => prev === answer ? null : answer)
+                      }}
+                    />
+                  ) : (
+                    <div className="bg-card border border-border rounded-xl p-5 flex items-center justify-center text-sm text-muted-foreground">
+                      No sector data available.
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
+              <RespondentsTable
+                key={selectedFieldId ?? 0}
+                respondents={respondents}
+                loading={respondentsLoading}
+                selectedAnswer={selectedAnswer}
+                selectedSector={selectedSector}
+                onAnswerClear={() => setSelectedAnswer(null)}
+                onSectorClear={() => setSelectedSector(null)}
+                onSectorChange={setSelectedSector}
+                availableSectors={availableSectors}
+              />
+            </>
           )}
 
           {/* Event Trend toggle */}

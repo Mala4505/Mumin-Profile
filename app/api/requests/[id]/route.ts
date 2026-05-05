@@ -52,3 +52,39 @@ export async function PATCH(
 
   return NextResponse.json(data)
 }
+
+// DELETE — requester deletes their own request (SuperAdmin can delete any)
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const meta = getJwtMeta(session.access_token)
+  if (!['SuperAdmin', 'Admin', 'Masool', 'Musaid'].includes(meta.role ?? '')) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const { id } = await params
+  const requestId = parseInt(id)
+  if (isNaN(requestId)) return NextResponse.json({ error: 'Invalid id' }, { status: 400 })
+
+  const admin = createAdminClient()
+
+  let query = admin.from('change_request').delete().eq('id', requestId)
+
+  // Non-SuperAdmin can only delete their own requests
+  if (meta.role !== 'SuperAdmin') {
+    query = query.eq('requested_by', meta.its_no!)
+  }
+
+  const { error } = await query
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  return NextResponse.json({ success: true })
+}
