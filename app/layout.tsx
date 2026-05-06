@@ -10,7 +10,7 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 })
 
 export const metadata: Metadata = {
-  title: 'Masool / Musaid System',
+  title: 'Masool/Musaid System',
   description: 'Mufaddal Mohallah Kuwait',
 }
 
