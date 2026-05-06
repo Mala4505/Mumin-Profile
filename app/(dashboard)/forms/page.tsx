@@ -16,7 +16,7 @@ export default async function FormsPage() {
           Forms
         </h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          Create, manage and review community forms
+          Create, manage and review masool/musaid forms
         </p>
       </div>
       <FormsClient role={session.role} />

@@ -131,7 +131,7 @@ export function MobileHeader({ role, userName }: MobileHeaderProps) {
       </button>
 
       {/* Center: App name */}
-      <span className="text-foreground font-bold text-base tracking-tight">Mumin System</span>
+      <span className="text-foreground font-bold text-base tracking-tight">Masool/Musaid System</span>
 
       {/* Right: User avatar dropdown */}
       <DropdownMenu>
@@ -170,7 +170,7 @@ export function MobileHeader({ role, userName }: MobileHeaderProps) {
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-base select-none">
                 M
               </div>
-              <SheetTitle className="text-foreground font-bold">Mumin System</SheetTitle>
+              <SheetTitle className="text-foreground font-bold">Masool/Musaid System</SheetTitle>
             </div>
           </SheetHeader>
 

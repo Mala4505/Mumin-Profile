@@ -29,7 +29,7 @@ export async function generateExcel(
   sheetName = 'Members'
 ): Promise<Uint8Array> {
   const workbook = new ExcelJS.Workbook()
-  workbook.creator = 'Mumin System'
+  workbook.creator = 'Masool/Musaid System'
   workbook.created = new Date()
 
   const sheet = workbook.addWorksheet(sheetName)

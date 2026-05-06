@@ -14,8 +14,8 @@ export default function LoginPage() {
       <div className="hidden lg:flex lg:w-1/2 bg-navy flex-col justify-between p-12 relative overflow-hidden">
         {/* Top: branding */}
         <div>
-          <div className="text-white text-2xl font-bold tracking-tight">Mumin System</div>
-          <div className="text-white/60 text-sm mt-1">Dawoodi Bohra Community Register</div>
+          <div className="text-white text-2xl font-bold tracking-tight">Masool/Musaid System</div>
+          <div className="text-white/60 text-sm mt-1">Mufaddal Mohallah Kuwait</div>
         </div>
 
         {/* Middle: decorative statement */}
@@ -23,10 +23,10 @@ export default function LoginPage() {
           {/* Amber accent line */}
           <div className="w-12 h-1 bg-amber-400 rounded mb-6" aria-hidden="true" />
           <h2 className="text-white text-3xl font-bold leading-tight mb-3">
-            Community Management<br />System
+            Masool/Musaid<br />System
           </h2>
           <p className="text-white/60 text-base">
-            Dawoodi Bohra Community Register
+            Mufaddal Mohallah Kuwait
           </p>
 
           {/* Decorative stacked lines */}
@@ -71,9 +71,9 @@ export default function LoginPage() {
         <div className="w-full max-w-md">
           {/* Mobile: show app name + subtitle */}
           <div className="lg:hidden text-center mb-8">
-            <div className="text-2xl font-bold text-navy">Mumin System</div>
+            <div className="text-2xl font-bold text-navy">Masool/Musaid System</div>
             <div className="text-muted-foreground text-sm mt-1">
-              Dawoodi Bohra Community Register
+              Mufaddal Mohallah Kuwait
             </div>
           </div>
 

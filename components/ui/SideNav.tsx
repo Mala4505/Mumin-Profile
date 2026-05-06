@@ -31,7 +31,7 @@ export function SideNav({ role }: SideNavProps) {
   return (
     <nav className="w-64 bg-white border-r border-gray-200 flex flex-col">
       <div className="px-6 py-5 border-b border-gray-200">
-        <h1 className="text-lg font-bold text-gray-900">Mumin System</h1>
+        <h1 className="text-lg font-bold text-gray-900">Masool/Musaid System</h1>
         <p className="text-xs text-gray-500 mt-0.5">{role}</p>
       </div>
       <div className="flex-1 px-3 py-4 space-y-1">

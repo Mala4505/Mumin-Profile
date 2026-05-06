@@ -155,9 +155,9 @@ export function AppSidebar({ role, itsNo, userName }: AppSidebarProps) {
           </div>
           {!collapsed && (
             <div>
-              <p className="text-sidebar-fg font-bold text-base leading-tight">Mumin System</p>
+              <p className="text-sidebar-fg font-bold text-base leading-tight">Masool/Musaid System</p>
               <p className="text-[11px] leading-tight opacity-50 text-sidebar-fg">
-                Community Management
+                Masool/Musaid
               </p>
             </div>
           )}

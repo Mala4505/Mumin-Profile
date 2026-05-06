@@ -10,8 +10,8 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 })
 
 export const metadata: Metadata = {
-  title: 'Mumin System',
-  description: 'Dawoodi Bohra Community Member Register',
+  title: 'Masool / Musaid System',
+  description: 'Mufaddal Mohallah Kuwait',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
