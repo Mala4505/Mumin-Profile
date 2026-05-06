@@ -109,6 +109,19 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Filter out any mapped fields not actually in this form's form_fields
+  const { data: formFieldRows } = await supabase
+    .from('form_fields')
+    .select('field_id')
+    .eq('form_id', formId)
+
+  const validFormFieldIds = new Set((formFieldRows ?? []).map((ff: any) => ff.field_id))
+  for (const colIdx of Object.keys(headerToFieldId).map(Number)) {
+    if (!validFormFieldIds.has(headerToFieldId[colIdx])) {
+      delete headerToFieldId[colIdx]
+    }
+  }
+
   const mappedColumnIndices = Object.keys(headerToFieldId).map(Number)
   if (mappedColumnIndices.length === 0) {
     return NextResponse.json({ error: 'No columns could be mapped to profile fields. Provide a mapping.' }, { status: 400 })

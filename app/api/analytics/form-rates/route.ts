@@ -77,15 +77,16 @@ export async function GET() {
     (forms as Array<{ id: string; title: string }>).map(async (form) => {
       let query = supabase
         .from('form_responses')
-        .select('filled_for', { count: 'exact', head: true })
+        .select('filled_for')
         .eq('form_id', form.id)
+        .not('filled_for', 'is', null)
 
       if (itsNoFilter !== null) {
         query = query.in('filled_for', itsNoFilter)
       }
 
-      const { count } = await query
-      const responses = count ?? 0
+      const { data: respondentRows } = await query
+      const responses = new Set((respondentRows ?? []).map((r: any) => r.filled_for)).size
       const pct = memberTotal > 0 ? Math.round((responses / memberTotal) * 100) : 0
       return { id: form.id, title: form.title, responses, total: memberTotal, pct }
     })
