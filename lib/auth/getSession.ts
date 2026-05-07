@@ -31,3 +31,42 @@ export async function getSession(): Promise<SessionUser | null> {
     must_change_password: meta.must_change_password ?? false,
   }
 }
+
+
+// import { createClient } from '@/lib/supabase/server'
+// import type { SessionUser, AppMetadata } from '@/lib/types/app'
+
+// export async function getSession(): Promise<SessionUser | null> {
+//   try {
+//     const supabase = await createClient()
+
+//     // 1. Get the session first (cheaper/local check)
+//     const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+//     if (sessionError || !session?.access_token) return null
+
+//     // 2. Validate the user (security check)
+//     // Note: getUser() is safer than getSession() because it re-validates the JWT with the server
+//     const { data: { user }, error: userError } = await supabase.auth.getUser()
+//     if (userError || !user) return null
+
+//     // 3. Decode JWT payload
+//     // We use the access_token from the session we just fetched
+//     const payloadB64 = session.access_token.split('.')[1]
+//     const payload = JSON.parse(Buffer.from(payloadB64, 'base64').toString('utf-8'))
+    
+//     // In Supabase, the Hook data is usually inside 'app_metadata'
+//     const meta = (payload.app_metadata ?? {}) as AppMetadata
+
+//     return {
+//       supabase_auth_id: user.id,
+//       its_no: meta.its_no,
+//       role: meta.role,
+//       sector_ids: meta.sector_ids ?? [],
+//       subsector_ids: meta.subsector_ids ?? [],
+//       must_change_password: meta.must_change_password ?? false,
+//     }
+//   } catch (e) {
+//     console.error("Auth Session Error:", e)
+//     return null
+//   }
+// }

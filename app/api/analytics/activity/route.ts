@@ -12,7 +12,12 @@ export interface ActivityEvent {
 
 export async function GET() {
   const session = await getSession()
-  if (!session || session.role !== 'SuperAdmin') {
+
+  // Verify this list matches your database role names exactly
+  const allowedRoles = ['SuperAdmin', 'Admin', 'Masool', 'Musaid']
+
+  if (!session || !allowedRoles.includes(session.role)) {
+    // If you see this in your network tab, the check above failed
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 

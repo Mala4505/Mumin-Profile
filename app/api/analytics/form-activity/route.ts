@@ -4,7 +4,10 @@ import { createClient } from '@/lib/supabase/server'
 
 export async function GET() {
   const session = await getSession()
-  if (!session || session.role !== 'SuperAdmin') {
+  
+  // 1. Updated Authorization: Allow management roles
+  const allowedRoles = ['SuperAdmin', 'Admin', 'Masool', 'Musaid']
+  if (!session || !allowedRoles.includes(session.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
