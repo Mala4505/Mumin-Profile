@@ -62,6 +62,8 @@ export interface MemberListItem {
   landmark: string | null
   head_its_no: number | null
   hof_name: string | null
+  masool_name: string | null
+  musaid_names: string | null
 }
 
 // Filters for member list

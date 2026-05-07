@@ -23,6 +23,8 @@ export interface MemberListItem {
   landmark: string | null;
   head_its_no: number | null; // from family.head_its_no
   hof_name: string | null; // name of head_its_no member, from view join
+  masool_name: string | null; // Masool assigned to this member's sector
+  musaid_names: string | null; // Musaid(s) assigned to this member's subsector
 }
 
 export async function getMembers(
@@ -60,7 +62,7 @@ export async function getMembers(
   let query = (supabase as any)
     .from("member_directory")
     .select(
-      "its_no,name,gender,balig_status,phone,status,sabeel_no,subsector_id,subsector_name,sector_id,sector_name,paci_no,head_its_no,hof_name,floor_no,flat_no,building_id,building_name,landmark",
+      "its_no,name,gender,balig_status,phone,status,sabeel_no,subsector_id,subsector_name,sector_id,sector_name,paci_no,head_its_no,hof_name,floor_no,flat_no,building_id,building_name,landmark,masool_name,musaid_names",
     )
     .order("name", { ascending: true })
     .limit(10000);
@@ -119,6 +121,8 @@ export async function getMembers(
     landmark: m.landmark ?? null,
     head_its_no: m.head_its_no ?? null,
     hof_name: m.hof_name ?? null,
+    masool_name: m.masool_name ?? null,
+    musaid_names: m.musaid_names ?? null,
   })) as MemberListItem[];
 }
 

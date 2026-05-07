@@ -22,8 +22,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   if (session.role === 'Masool' || session.role === 'Musaid') {
+    const isCreator = Number(session.its_no) === form.created_by
     const fillerAccess = form.filler_access as FillerAccess | null
-    if (!fillerAccess || !isAuthorizedFiller(fillerAccess, session)) {
+    if (!isCreator && (!fillerAccess || !isAuthorizedFiller(fillerAccess, session))) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
   }

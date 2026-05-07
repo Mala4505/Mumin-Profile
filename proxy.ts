@@ -77,8 +77,8 @@ export async function proxy(request: NextRequest) {
 
     // Role-based route protection
     const role = appMeta.role
-    // /admin and /analytics pages: SuperAdmin only
-    if ((pathname.startsWith('/admin') || pathname.startsWith('/analytics')) && role !== 'SuperAdmin') {
+    // /admin pages: SuperAdmin only
+    if (pathname.startsWith('/admin') && role !== 'SuperAdmin') {
       const url = request.nextUrl.clone()
       url.pathname = '/dashboard'
       return NextResponse.redirect(url)

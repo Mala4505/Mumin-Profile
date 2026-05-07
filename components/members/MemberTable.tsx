@@ -203,6 +203,8 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
   const isMumin = role === 'Mumin'
   const isStaff = role !== 'Mumin'
   const showSector = role === 'SuperAdmin' || role === 'Admin'
+  const showMasool = isStaff && role !== 'Masool'
+  const showMusaid = isStaff && role !== 'Musaid'
 
   function handleSort(col: string) {
     if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
@@ -528,6 +530,8 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
                     {isStaff && <SortTh col="landmark" label="Landmark" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />}
                     {showSector && <SortTh col="sector_name" label="Sector" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />}
                     {isStaff && <SortTh col="subsector_name" label="Subsector" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />}
+                    {showMasool && <SortTh col="masool_name" label="Masool" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />}
+                    {showMusaid && <SortTh col="musaid_names" label="Musaid" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />}
                     <SortTh col="status" label="Status" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
                     <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3 whitespace-nowrap">
                       Action
@@ -563,6 +567,8 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
                         {isStaff && <td className="px-4 py-3"><span className="text-sm text-muted-foreground">{member.landmark ?? '—'}</span></td>}
                         {showSector && <td className="px-4 py-3"><span className="text-sm">{member.sector_name}</span></td>}
                         {isStaff && <td className="px-4 py-3"><span className="text-sm">{member.subsector_name}</span></td>}
+                        {showMasool && <td className="px-4 py-3"><span className="text-sm text-muted-foreground">{member.masool_name ?? '—'}</span></td>}
+                        {showMusaid && <td className="px-4 py-3"><span className="text-sm text-muted-foreground">{member.musaid_names ?? '—'}</span></td>}
                         <td className="px-4 py-3"><StatusBadge status={member.status} /></td>
                         <td className="px-4 py-3 text-right">
                           <Link href={`/members/${member.its_no}`}
@@ -602,6 +608,12 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
                           <p className="text-xs text-muted-foreground mt-1.5">
                             {member.subsector_name}{member.paci_no ? ` · PACI ${member.paci_no}` : ''}
                           </p>
+                        )}
+                        {(showMasool && member.masool_name) && (
+                          <p className="text-xs text-muted-foreground mt-0.5">Masool: {member.masool_name}</p>
+                        )}
+                        {(showMusaid && member.musaid_names) && (
+                          <p className="text-xs text-muted-foreground mt-0.5">Musaid: {member.musaid_names}</p>
                         )}
                       </div>
                       <Link href={`/members/${member.its_no}`}

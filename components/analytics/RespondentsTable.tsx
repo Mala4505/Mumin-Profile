@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import Link from 'next/link'
-import { Search, X } from 'lucide-react'
+import { Search, X, Copy, Check } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import {
@@ -28,6 +28,32 @@ export function filterRespondents(
 }
 
 const PAGE_SIZE = 10
+
+function CopyPhone({ phone }: { phone: string | null }) {
+  const [copied, setCopied] = React.useState(false)
+  if (!phone) return <span className="text-muted-foreground">—</span>
+
+  function handleCopy() {
+    navigator.clipboard.writeText(phone!).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    })
+  }
+
+  return (
+    <button
+      onClick={handleCopy}
+      title={copied ? 'Copied!' : 'Copy number'}
+      className="flex items-center gap-1.5 font-mono text-xs text-foreground hover:text-primary transition-colors group"
+    >
+      {phone}
+      {copied
+        ? <Check className="w-3 h-3 text-green-500 shrink-0" />
+        : <Copy className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+      }
+    </button>
+  )
+}
 
 function fmtDate(s: string) {
   return new Date(s).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -144,9 +170,10 @@ export function RespondentsTable({
                   <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground w-28">ITS No</th>
                   <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Name</th>
                   <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Answer</th>
-                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hidden sm:table-cell">Sector</th>
-                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hidden md:table-cell">Subsector</th>
-                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hidden lg:table-cell w-28">Submitted</th>
+                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hidden sm:table-cell">Mobile</th>
+                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hidden md:table-cell">Sector</th>
+                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hidden lg:table-cell">Subsector</th>
+                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hidden xl:table-cell w-28">Submitted</th>
                   <th className="px-4 py-2.5 w-16" />
                 </tr>
               </thead>
@@ -160,9 +187,12 @@ export function RespondentsTable({
                         {r.answer}
                       </span>
                     </td>
-                    <td className="px-4 py-2.5 text-muted-foreground hidden sm:table-cell">{r.sector_name || '—'}</td>
-                    <td className="px-4 py-2.5 text-muted-foreground hidden md:table-cell">{r.subsector_name || '—'}</td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground hidden lg:table-cell whitespace-nowrap">
+                    <td className="px-4 py-2.5 hidden sm:table-cell">
+                      <CopyPhone phone={r.phone} />
+                    </td>
+                    <td className="px-4 py-2.5 text-muted-foreground hidden md:table-cell">{r.sector_name || '—'}</td>
+                    <td className="px-4 py-2.5 text-muted-foreground hidden lg:table-cell">{r.subsector_name || '—'}</td>
+                    <td className="px-4 py-2.5 text-xs text-muted-foreground hidden xl:table-cell whitespace-nowrap">
                       {fmtDate(r.submitted_at)}
                     </td>
                     <td className="px-4 py-2.5 text-right">

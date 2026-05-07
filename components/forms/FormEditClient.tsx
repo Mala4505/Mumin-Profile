@@ -1,0 +1,421 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import {
+  ChevronLeft, ChevronUp, ChevronDown, Trash2, Plus,
+  Loader2, CheckCircle, XCircle, Save, History, UserCircle,
+} from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import type { Role } from '@/lib/types/app'
+
+interface FormField {
+  id: string
+  field_id: number
+  sort_order: number
+  is_required: boolean
+  profile_field: {
+    id: number
+    caption: string
+    field_type: string
+    behavior: string
+  }
+}
+
+interface ProfileField {
+  id: number
+  caption: string
+  field_type: string
+  behavior: string
+}
+
+interface Props {
+  form: {
+    id: string
+    title: string
+    description: string
+    status: string
+    form_type: string
+    created_by: number
+    created_at: string
+  }
+  fields: FormField[]
+  role: Role
+  itsNo: number
+}
+
+const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
+  draft:            { label: 'Draft',            className: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400' },
+  pending_approval: { label: 'Pending Approval', className: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' },
+  published:        { label: 'Published',        className: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
+  closed:           { label: 'Closed',           className: 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-500' },
+  expired:          { label: 'Expired',          className: 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' },
+}
+
+export function FormEditClient({ form, fields: initialFields, role, itsNo }: Props) {
+  const router = useRouter()
+  const [title, setTitle] = useState(form.title)
+  const [description, setDescription] = useState(form.description)
+  const [status, setStatus] = useState(form.status)
+  const [fields, setFields] = useState<FormField[]>(initialFields)
+  const [saving, setSaving] = useState(false)
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+
+  const [profileFields, setProfileFields] = useState<ProfileField[]>([])
+  const [showAdd, setShowAdd] = useState(false)
+  const [fieldSearch, setFieldSearch] = useState('')
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase
+      .from('profile_field')
+      .select('id, caption, field_type, behavior')
+      .order('caption')
+      .then(({ data }) => setProfileFields(data ?? []))
+  }, [])
+
+  const fieldIds = new Set(fields.map(f => f.field_id))
+
+  function showToast(type: 'success' | 'error', msg: string) {
+    setToast({ type, msg })
+    setTimeout(() => setToast(null), 4000)
+  }
+
+  function addField(pf: ProfileField) {
+    if (fieldIds.has(pf.id)) return
+    setFields(prev => [
+      ...prev,
+      {
+        id: `new-${pf.id}`,
+        field_id: pf.id,
+        sort_order: prev.length,
+        is_required: false,
+        profile_field: { id: pf.id, caption: pf.caption, field_type: pf.field_type, behavior: pf.behavior },
+      },
+    ])
+    setShowAdd(false)
+    setFieldSearch('')
+  }
+
+  function removeField(index: number) {
+    setFields(prev => prev.filter((_, i) => i !== index).map((f, i) => ({ ...f, sort_order: i })))
+  }
+
+  function moveUp(index: number) {
+    if (index === 0) return
+    setFields(prev => {
+      const next = [...prev]
+      ;[next[index - 1], next[index]] = [next[index], next[index - 1]]
+      return next.map((f, i) => ({ ...f, sort_order: i }))
+    })
+  }
+
+  function moveDown(index: number) {
+    setFields(prev => {
+      if (index >= prev.length - 1) return prev
+      const next = [...prev]
+      ;[next[index], next[index + 1]] = [next[index + 1], next[index]]
+      return next.map((f, i) => ({ ...f, sort_order: i }))
+    })
+  }
+
+  async function save(overrideStatus?: string) {
+    setSaving(true)
+    try {
+      const [metaRes, fieldsRes] = await Promise.all([
+        fetch(`/api/forms/${form.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title,
+            description,
+            ...(overrideStatus ? { status: overrideStatus } : {}),
+          }),
+        }),
+        fetch(`/api/forms/${form.id}/fields`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fields: fields.map((f, i) => ({
+              field_id: f.field_id,
+              sort_order: i,
+              is_required: f.is_required,
+            })),
+          }),
+        }),
+      ])
+
+      if (!metaRes.ok) {
+        const b = await metaRes.json().catch(() => ({}))
+        throw new Error(b.error ?? 'Failed to save form')
+      }
+      if (!fieldsRes.ok) {
+        const b = await fieldsRes.json().catch(() => ({}))
+        throw new Error(b.error ?? 'Failed to save fields')
+      }
+
+      if (overrideStatus) setStatus(overrideStatus)
+      showToast('success', overrideStatus === 'pending_approval' ? 'Submitted for approval.' : 'Form saved.')
+    } catch (e) {
+      showToast('error', e instanceof Error ? e.message : 'Save failed')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const statusCfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.draft
+  const isAdmin = role === 'SuperAdmin' || role === 'Admin'
+  const filteredProfileFields = profileFields.filter(
+    pf =>
+      !fieldIds.has(pf.id) &&
+      (fieldSearch === '' || pf.caption.toLowerCase().includes(fieldSearch.toLowerCase()))
+  )
+
+  return (
+    <div className="space-y-6">
+      {/* Toast */}
+      {toast && (
+        <div
+          className={`fixed bottom-5 right-5 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-lg text-sm font-medium ${
+            toast.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+          }`}
+        >
+          {toast.type === 'success' ? <CheckCircle className="w-4 h-4 shrink-0" /> : <XCircle className="w-4 h-4 shrink-0" />}
+          {toast.msg}
+        </div>
+      )}
+
+      {/* Header */}
+      <div className="flex items-center justify-between gap-3">
+        <button
+          onClick={() => router.push('/forms')}
+          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ChevronLeft className="w-4 h-4" />
+          Back to Forms
+        </button>
+        <div className="flex items-center gap-2">
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusCfg.className}`}>
+            {statusCfg.label}
+          </span>
+          <button
+            onClick={() => save()}
+            disabled={saving}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-60"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            Save
+          </button>
+        </div>
+      </div>
+
+      {/* Basic Info */}
+      <div className="bg-card border border-border rounded-xl p-5 space-y-4 shadow-sm">
+        <h2 className="text-sm font-semibold text-foreground">Form Details</h2>
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">Title</label>
+            <input
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              className="w-full h-9 px-3 text-sm bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">Description</label>
+            <textarea
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              rows={3}
+              className="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors resize-none"
+            />
+          </div>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span>
+              Type:{' '}
+              <span className="text-foreground font-medium capitalize">{form.form_type}</span>
+            </span>
+            <span>·</span>
+            <span>
+              Created:{' '}
+              <span className="text-foreground font-medium">
+                {new Date(form.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
+              </span>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Fields */}
+      <div className="bg-card border border-border rounded-xl p-5 space-y-4 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">Form Fields</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {fields.length} field{fields.length !== 1 ? 's' : ''}
+            </p>
+          </div>
+          <button
+            onClick={() => setShowAdd(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-sm text-foreground hover:bg-muted/40 transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Add Field
+          </button>
+        </div>
+
+        {fields.length === 0 ? (
+          <div className="border border-dashed border-border rounded-lg px-5 py-8 text-center">
+            <p className="text-sm text-muted-foreground">No fields yet. Add fields to your form.</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {fields.map((f, i) => (
+              <div key={f.id} className="flex items-center gap-3 p-3 border border-border rounded-lg bg-background">
+                <div className="flex flex-col gap-0.5 shrink-0">
+                  <button
+                    onClick={() => moveUp(i)}
+                    disabled={i === 0}
+                    className="p-0.5 rounded hover:bg-muted disabled:opacity-30"
+                  >
+                    <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" />
+                  </button>
+                  <button
+                    onClick={() => moveDown(i)}
+                    disabled={i === fields.length - 1}
+                    className="p-0.5 rounded hover:bg-muted disabled:opacity-30"
+                  >
+                    <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+                  </button>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">{f.profile_field.caption}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-xs text-muted-foreground capitalize">{f.profile_field.field_type}</span>
+                    <span
+                      className={`text-[10px] flex items-center gap-0.5 px-1.5 py-0.5 rounded-full font-medium ${
+                        f.profile_field.behavior === 'static'
+                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                          : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                      }`}
+                    >
+                      {f.profile_field.behavior === 'static' ? (
+                        <UserCircle className="w-2.5 h-2.5" />
+                      ) : (
+                        <History className="w-2.5 h-2.5" />
+                      )}
+                      {f.profile_field.behavior === 'static' ? 'Profile' : 'Event'}
+                    </span>
+                    <label className="flex items-center gap-1 text-xs text-muted-foreground cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={f.is_required}
+                        onChange={e =>
+                          setFields(prev =>
+                            prev.map((ff, idx) => (idx === i ? { ...ff, is_required: e.target.checked } : ff))
+                          )
+                        }
+                        className="rounded"
+                      />
+                      Required
+                    </label>
+                  </div>
+                </div>
+                <button
+                  onClick={() => removeField(i)}
+                  className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors shrink-0"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Status Actions */}
+      {status === 'draft' && (
+        <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded-xl p-5">
+          <p className="text-sm text-amber-800 dark:text-amber-300 mb-3">
+            This form is a draft. Save your changes, then submit for approval to publish.
+          </p>
+          <button
+            onClick={() => save('pending_approval')}
+            disabled={saving}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-amber-600 text-white text-sm font-medium hover:bg-amber-700 transition-colors disabled:opacity-60"
+          >
+            {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+            Submit for Approval
+          </button>
+        </div>
+      )}
+
+      {status === 'pending_approval' && isAdmin && (
+        <div className="bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800 rounded-xl p-5">
+          <p className="text-sm text-green-800 dark:text-green-300 mb-3">
+            This form is awaiting approval. You can publish it directly.
+          </p>
+          <button
+            onClick={() => save('published')}
+            disabled={saving}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-60"
+          >
+            {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+            Publish Form
+          </button>
+        </div>
+      )}
+
+      {/* Add Field Modal */}
+      {showAdd && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-card border border-border rounded-xl shadow-xl w-full max-w-md overflow-hidden">
+            <div className="p-4 border-b border-border flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-foreground">Add Field</h3>
+              <button
+                onClick={() => { setShowAdd(false); setFieldSearch('') }}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <XCircle className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              <input
+                type="text"
+                placeholder="Search fields..."
+                value={fieldSearch}
+                onChange={e => setFieldSearch(e.target.value)}
+                autoFocus
+                className="w-full h-9 px-3 text-sm bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+              />
+              <div className="max-h-64 overflow-y-auto space-y-1">
+                {filteredProfileFields.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-6">No fields found.</p>
+                ) : (
+                  filteredProfileFields.map(pf => (
+                    <button
+                      key={pf.id}
+                      onClick={() => addField(pf)}
+                      className="w-full text-left px-3 py-2.5 rounded-lg hover:bg-muted/40 transition-colors flex items-center justify-between gap-3"
+                    >
+                      <span className="text-sm text-foreground truncate">{pf.caption}</span>
+                      <span
+                        className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0 ${
+                          pf.behavior === 'static'
+                            ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                            : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                        }`}
+                      >
+                        {pf.behavior === 'static' ? 'Profile' : 'Event'}
+                      </span>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
