@@ -273,6 +273,21 @@ export interface SectorBreakdown {
   [answer: string]: string | number;
 }
 
+export interface TextEntry {
+  its_no: number;
+  name: string;
+  value: string;
+  submitted_at: string;
+}
+
+// Ensure your main response type also includes it
+export interface FormAnswersResponse {
+  meta: FormFieldMeta;
+  distribution?: AnswerDist[];
+  breakdown?: SectorBreakdown[];
+  textEntries?: TextEntry[]; // Ensure this matches what you send
+}
+
 export async function GET(req: NextRequest) {
   try {
     const session = await getSession()
