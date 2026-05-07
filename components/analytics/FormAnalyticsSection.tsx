@@ -210,7 +210,7 @@ function TextEntriesTable({ entries }: { entries: TextEntry[] }) {
       entries.filter(
         e =>
           e.name.toLowerCase().includes(search.toLowerCase()) ||
-          e.answer.toLowerCase().includes(search.toLowerCase())
+          e.value.toLowerCase().includes(search.toLowerCase())
       ),
     [entries, search]
   )
@@ -253,7 +253,7 @@ function TextEntriesTable({ entries }: { entries: TextEntry[] }) {
                   <tr key={i} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
                     <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">{e.its_no}</td>
                     <td className="px-4 py-2.5 font-medium text-foreground">{e.name}</td>
-                    <td className="px-4 py-2.5 text-foreground max-w-xs">{e.answer}</td>
+                    <td className="px-4 py-2.5 text-foreground max-w-xs">{e.value}</td>
                     <td className="px-4 py-2.5 text-xs text-muted-foreground hidden sm:table-cell whitespace-nowrap">
                       {fmtDate(e.submitted_at)}
                     </td>
@@ -414,9 +414,9 @@ export function FormAnalyticsSection() {
     fetch(`/api/analytics/form-answers?form_id=${selectedFormId}`)
       .then(r => r.json())
       .then((data: FormAnswersResponse) => {
-        setFields(data.fields ?? [])
-        if (data.fields && data.fields.length > 0) {
-          setSelectedFieldId(data.fields[0].id)
+        setFields(data.meta ? [data.meta] : [])
+        if (data.meta) {
+          setSelectedFieldId(data.meta.id)
         }
       })
       .catch(() => {})
@@ -612,9 +612,9 @@ export function FormAnalyticsSection() {
                       setSelectedAnswer(prev => prev === answer ? null : answer)
                     }
                   />
-                  {answersData.bySector.length > 0 ? (
+                  {answersData.breakdown.length > 0 ? (
                     <SectorBarChart
-                      data={answersData.bySector}
+                      data={answersData.breakdown}
                       answers={uniqueAnswers}
                       groupBy={groupBy}
                       selectedSector={selectedSector}

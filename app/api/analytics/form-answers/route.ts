@@ -272,20 +272,18 @@ export interface SectorBreakdown {
   total: number;
   [answer: string]: string | number;
 }
-
 export interface TextEntry {
   its_no: number;
   name: string;
-  value: string;
+  value: string; // Use 'value' to match Supabase
   submitted_at: string;
 }
 
-// Ensure your main response type also includes it
 export interface FormAnswersResponse {
-  meta: FormFieldMeta;
-  distribution?: AnswerDist[];
-  breakdown?: SectorBreakdown[];
-  textEntries?: TextEntry[]; // Ensure this matches what you send
+  meta: FormFieldMeta;      // Instead of 'fields'
+  distribution: AnswerDist[];
+  breakdown: SectorBreakdown[]; // Instead of 'bySector'
+  textEntries: TextEntry[];
 }
 
 export async function GET(req: NextRequest) {
