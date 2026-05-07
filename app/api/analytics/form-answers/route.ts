@@ -116,22 +116,61 @@ export async function GET(req: NextRequest) {
     itsNoFilter = (scopedMembers ?? []).map((m: any) => m.its_no)
   }
 
-  // Fetch responses for this form + field, scoped if needed
-  let responsesQuery = supabase
-    .from('form_responses')
-    .select('answer, filled_for, submitted_at')
-    .eq('form_id', formId)
-    .eq('profile_field_id', fieldId)
+  // Fetch responses for this form + field, scoped if needed.
+  // Static fields: use profile_value (current upserted value) scoped to members who submitted this form.
+  // Historical fields: use form_responses (full audit trail — each submission is a distinct data point).
+  let responses: Array<{ answer: string | null; filled_for: number | null; submitted_at: string }> = []
 
-  if (itsNoFilter !== null) {
-    responsesQuery = responsesQuery.in('filled_for', itsNoFilter)
+  if (field.behavior === 'static') {
+    // Get the distinct members who submitted this field for this form
+    const { data: submitterRows } = await supabase
+      .from('form_responses')
+      .select('filled_for')
+      .eq('form_id', formId)
+      .eq('profile_field_id', fieldId)
+      .not('filled_for', 'is', null)
+
+    let submitterIds = [...new Set((submitterRows ?? []).map((r: any) => r.filled_for as number))]
+    if (itsNoFilter !== null) {
+      const filterSet = new Set(itsNoFilter)
+      submitterIds = submitterIds.filter(id => filterSet.has(id))
+    }
+
+    if (submitterIds.length === 0) {
+      return NextResponse.json({ fields, field, distribution: [], bySector: [], textEntries: [] })
+    }
+
+    const { data: pvData, error } = await supabase
+      .from('profile_value')
+      .select('its_no, value, updated_at')
+      .eq('field_id', fieldId)
+      .eq('data_active', true)
+      .in('its_no', submitterIds)
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+    responses = (pvData ?? []).map((pv: any) => ({
+      answer: pv.value,
+      filled_for: pv.its_no,
+      submitted_at: pv.updated_at,
+    }))
+  } else {
+    let responsesQuery = supabase
+      .from('form_responses')
+      .select('answer, filled_for, submitted_at')
+      .eq('form_id', formId)
+      .eq('profile_field_id', fieldId)
+
+    if (itsNoFilter !== null) {
+      responsesQuery = responsesQuery.in('filled_for', itsNoFilter)
+    }
+
+    const { data, error } = await responsesQuery
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    responses = data ?? []
   }
 
-  const { data: responses, error } = await responsesQuery
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-  if (!responses || responses.length === 0) {
+  if (responses.length === 0) {
     return NextResponse.json({ fields, field, distribution: [], bySector: [], textEntries: [] })
   }
 

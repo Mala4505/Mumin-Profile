@@ -73,12 +73,32 @@ export async function GET() {
     memberTotal = count ?? 0
   }
 
+  // Pre-fetch valid field IDs for all forms so orphaned form_responses rows are excluded
+  const formIds = (forms as Array<{ id: string; title: string }>).map(f => f.id)
+  const { data: allFormFields } = await supabase
+    .from('form_fields')
+    .select('form_id, field_id')
+    .in('form_id', formIds)
+
+  const formFieldMap = new Map<string, number[]>()
+  for (const ff of (allFormFields ?? []) as any[]) {
+    const existing = formFieldMap.get(ff.form_id) ?? []
+    existing.push(ff.field_id)
+    formFieldMap.set(ff.form_id, existing)
+  }
+
   const rates = await Promise.all(
     (forms as Array<{ id: string; title: string }>).map(async (form) => {
+      const validFieldIds = formFieldMap.get(form.id) ?? []
+      if (validFieldIds.length === 0) {
+        return { id: form.id, title: form.title, responses: 0, total: memberTotal, pct: 0 }
+      }
+
       let query = supabase
         .from('form_responses')
         .select('filled_for')
         .eq('form_id', form.id)
+        .in('profile_field_id', validFieldIds)
         .not('filled_for', 'is', null)
 
       if (itsNoFilter !== null) {

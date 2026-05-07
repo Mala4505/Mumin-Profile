@@ -30,18 +30,56 @@ export async function GET(req: NextRequest) {
 
   const supabase = await createClient()
 
-  const [{ data: allMembers }, { data: respondedRows }] = await Promise.all([
+  // Fetch field IDs + behaviors for this form
+  const { data: formFieldRows } = await supabase
+    .from('form_fields')
+    .select('field_id, profile_field!field_id(behavior)')
+    .eq('form_id', formId)
+
+  const staticFieldIds: number[] = []
+  const historicalFieldIds: number[] = []
+
+  for (const ff of (formFieldRows ?? []) as any[]) {
+    const behavior = ff.profile_field?.behavior ?? 'static'
+    if (behavior === 'static') staticFieldIds.push(ff.field_id)
+    else historicalFieldIds.push(ff.field_id)
+  }
+
+  if (staticFieldIds.length === 0 && historicalFieldIds.length === 0) {
+    return NextResponse.json([])
+  }
+
+  // Fetch members, static respondents (profile_value), and historical respondents (form_responses)
+  const [{ data: allMembers }, pvRows, frRows] = await Promise.all([
     supabase
       .from('mumin')
       .select('its_no, subsector_id, subsector!subsector_id(subsector_name, sector_id, sector!sector_id(sector_name))')
       .eq('status', 'active'),
-    supabase
-      .from('form_responses')
-      .select('filled_for')
-      .eq('form_id', formId),
+
+    staticFieldIds.length > 0
+      ? supabase
+          .from('profile_value')
+          .select('its_no')
+          .in('field_id', staticFieldIds)
+          .eq('data_active', true)
+          .then(r => r.data ?? [])
+      : Promise.resolve([]),
+
+    historicalFieldIds.length > 0
+      ? supabase
+          .from('form_responses')
+          .select('filled_for')
+          .eq('form_id', formId)
+          .in('profile_field_id', historicalFieldIds)
+          .not('filled_for', 'is', null)
+          .then(r => r.data ?? [])
+      : Promise.resolve([]),
   ])
 
-  const respondedSet = new Set((respondedRows ?? []).map((r: any) => r.filled_for as number))
+  const respondedSet = new Set<number>([
+    ...(pvRows as any[]).map((r: any) => r.its_no as number),
+    ...(frRows as any[]).map((r: any) => r.filled_for as number),
+  ])
 
   const sectorMap = new Map<number, SectorCompletion>()
   const subsectorMap = new Map<number, SubsectorCompletion>()

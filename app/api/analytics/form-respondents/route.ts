@@ -78,22 +78,67 @@ export async function GET(req: NextRequest) {
     itsNoFilter = (scopedMembers ?? []).map((m: any) => m.its_no)
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let q: any = supabase
-    .from('form_responses')
-    .select('answer, filled_for, submitted_at')
-    .eq('form_id', formId)
-    .eq('profile_field_id', fieldId)
-  if (itsNoFilter !== null) q = q.in('filled_for', itsNoFilter)
+  // Determine field behavior to decide data source
+  const { data: fieldMeta } = await supabase
+    .from('profile_field')
+    .select('behavior')
+    .eq('id', fieldId)
+    .single()
 
-  const { data: responses, error } = await q
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  if (!responses?.length) return NextResponse.json([])
+  const isStatic = fieldMeta?.behavior === 'static'
+
+  let responses: ResponseRecord[]
+
+  if (isStatic) {
+    // Get distinct submitters from form_responses for scope, then read current value from profile_value
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let submitterQuery: any = supabase
+      .from('form_responses')
+      .select('filled_for')
+      .eq('form_id', formId)
+      .eq('profile_field_id', fieldId)
+      .not('filled_for', 'is', null)
+    if (itsNoFilter !== null) submitterQuery = submitterQuery.in('filled_for', itsNoFilter)
+
+    const { data: submitterRows } = await submitterQuery
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const submitterIds = [...new Set((submitterRows ?? []).map((r: any) => r.filled_for as number))]
+
+    if (submitterIds.length === 0) return NextResponse.json([])
+
+    const { data: pvData, error } = await supabase
+      .from('profile_value')
+      .select('its_no, value, updated_at')
+      .eq('field_id', fieldId)
+      .eq('data_active', true)
+      .in('its_no', submitterIds)
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+    responses = (pvData ?? []).map((pv: any) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
+      answer: pv.value,
+      filled_for: pv.its_no,
+      submitted_at: pv.updated_at,
+    }))
+  } else {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let q: any = supabase
+      .from('form_responses')
+      .select('answer, filled_for, submitted_at')
+      .eq('form_id', formId)
+      .eq('profile_field_id', fieldId)
+    if (itsNoFilter !== null) q = q.in('filled_for', itsNoFilter)
+
+    const { data, error } = await q
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    responses = data ?? []
+  }
+
+  if (!responses.length) return NextResponse.json([])
 
   const uniqueIds = [
     ...new Set(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (responses as any[]).map((r: any) => r.filled_for).filter((x: unknown): x is number => x !== null)
+      responses.map(r => r.filled_for).filter((x): x is number => x !== null)
     ),
   ]
 

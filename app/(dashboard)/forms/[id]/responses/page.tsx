@@ -20,9 +20,9 @@ export default async function FormResponsesPage({
   type DbForm = Database['public']['Tables']['forms']['Row']
   const { data: form, error: formErr } = await supabase
     .from('forms')
-    .select('*, questions')
+    .select('*')
     .eq('id', id)
-    .single<DbForm & { questions: Array<{ profile_field_id: number; question_text: string }> | null }>()
+    .single<DbForm>()
 
   if (formErr || !form) redirect('/forms')
 
@@ -45,7 +45,8 @@ export default async function FormResponsesPage({
   }
 
   if (session.role === 'Masool' || session.role === 'Musaid') {
-    if (!isAuthorizedFiller(domainForm.filler_access, session)) {
+    const isCreator = Number(session.its_no) === domainForm.created_by
+    if (!isCreator && !isAuthorizedFiller(domainForm.filler_access, session)) {
       redirect('/forms')
     }
   }
@@ -100,8 +101,20 @@ export default async function FormResponsesPage({
     }
   })
 
-  // Use form questions for the charts tab
-  const formFields = (form.questions as any) ?? []
+  // Load form fields from the relational form_fields table (not the deprecated form.questions JSONB)
+  const { data: fieldRows } = await supabase
+    .from('form_fields')
+    .select('field_id, sort_order, profile_field!inner(caption, field_type, behavior)')
+    .eq('form_id', id)
+    .order('sort_order')
+
+  const formFields = (fieldRows ?? []).map((ff: any) => ({
+    profile_field_id: ff.field_id as number,
+    question_text: (ff.profile_field?.caption ?? '') as string,
+    sort_order: ff.sort_order as number,
+    field_type: ff.profile_field?.field_type as string | undefined,
+    behavior: ff.profile_field?.behavior as 'static' | 'historical' | undefined,
+  }))
 
   // Group responses by person
   type ResponseRow = NonNullable<typeof rawResponses>[number]
