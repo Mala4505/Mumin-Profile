@@ -23,18 +23,11 @@ export async function GET(req: NextRequest) {
   const supabase = await createClient()
 
   let query = supabase
-    .from('mumin')
-    .select(`
-      its_no, name, gender, balig_status, phone, alternate_phone,
-      email, status, sabeel_no, date_of_birth,
-      subsector!inner (
-        subsector_name,
-        sector!inner ( sector_name )
-      )
-    `)
+    .from('member_directory')
+    .select('its_no, name, gender, balig_status, phone, status, sabeel_no, head_its_no, sector_id, sector_name, subsector_id, subsector_name, building_name, floor_no, flat_no, landmark, masool_name, musaid_names')
     .order('name')
 
-  if (filters.sector_id) query = query.eq('subsector.sector.sector_id', filters.sector_id)
+  if (filters.sector_id) query = query.eq('sector_id', filters.sector_id)
   if (filters.subsector_id) query = query.eq('subsector_id', filters.subsector_id)
   if (filters.gender) query = query.eq('gender', filters.gender)
   if (filters.balig_status) query = query.eq('balig_status', filters.balig_status)
@@ -45,20 +38,42 @@ export async function GET(req: NextRequest) {
   const { data, error } = await query
   if (error) return new NextResponse('Export failed', { status: 500 })
 
-  const members = (data ?? []).map((m: any) => ({
-    its_no: m.its_no,
-    name: m.name,
-    gender: m.gender === 'M' ? 'Male' : 'Female',
-    balig_status: m.balig_status,
-    phone: m.phone ?? '',
-    alternate_phone: m.alternate_phone ?? '',
-    email: m.email ?? '',
-    status: m.status,
-    sabeel_no: m.sabeel_no,
-    date_of_birth: m.date_of_birth ?? '',
-    subsector_name: m.subsector?.subsector_name ?? '',
-    sector_name: m.subsector?.sector?.sector_name ?? '',
-  }))
+  let extraMap = new Map<number, { alternate_phone: string | null; email: string | null; date_of_birth: string | null }>()
+  if (session.role === 'SuperAdmin' || session.role === 'Masool' || session.role === 'Musaid') {
+    const its_nos = (data ?? []).map((m: any) => m.its_no)
+    const { data: extras } = await supabase
+      .from('mumin')
+      .select('its_no, alternate_phone, email, date_of_birth')
+      .in('its_no', its_nos)
+    extras?.forEach((e: any) => extraMap.set(e.its_no, e))
+  }
+
+  const members = (data ?? []).map((m: any) => {
+    const extra = extraMap.get(m.its_no)
+    const addressParts = [
+      m.building_name,
+      m.floor_no ? `Floor ${m.floor_no}` : null,
+      m.flat_no ? `Flat ${m.flat_no}` : null,
+    ].filter(Boolean)
+    return {
+      its_no: m.its_no,
+      name: m.name,
+      gender: m.gender === 'M' ? 'Male' : 'Female',
+      balig_status: m.balig_status,
+      phone: m.phone ?? '',
+      alternate_phone: extra?.alternate_phone ?? '',
+      email: extra?.email ?? '',
+      status: m.status,
+      sabeel_no: m.sabeel_no,
+      date_of_birth: extra?.date_of_birth ?? '',
+      hof_its_no: m.head_its_no ? String(m.head_its_no) : '',
+      sector_name: m.sector_name ?? '',
+      subsector_name: m.subsector_name ?? '',
+      address: addressParts.join(', '),
+      masool_name: m.masool_name ?? '',
+      musaid_names: m.musaid_names ?? '',
+    }
+  })
 
   // Determine columns based on role
   const columns = session.role === 'SuperAdmin' || session.role === 'Masool' || session.role === 'Musaid'

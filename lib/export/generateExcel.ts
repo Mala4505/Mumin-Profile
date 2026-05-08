@@ -19,6 +19,10 @@ export interface ExportMember {
   subsector_name: string
   sector_name: string
   date_of_birth: string | null
+  hof_its_no?: string | null
+  address?: string | null
+  masool_name?: string | null
+  musaid_names?: string | null
   // Dynamic profile fields
   [key: string]: string | number | null | undefined
 }
@@ -80,5 +84,9 @@ export const DEFAULT_COLUMNS: ExportColumn[] = [
   { key: 'sabeel_no', header: 'Sabeel No', width: 12 },
   { key: 'sector_name', header: 'Sector', width: 20 },
   { key: 'subsector_name', header: 'SubSector', width: 20 },
+  { key: 'hof_its_no', header: 'Hof ITs', width: 12 },
+  { key: 'address', header: 'Address', width: 35 },
+  { key: 'masool_name', header: 'Masool', width: 20 },
+  { key: 'musaid_names', header: 'Musaid', width: 20 },
   { key: 'status', header: 'Status', width: 12 },
 ]

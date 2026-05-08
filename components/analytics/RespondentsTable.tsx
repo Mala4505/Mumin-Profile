@@ -199,7 +199,8 @@ export function RespondentsTable({
                     </td>
                     <td className="px-4 py-2.5 text-right">
                       <Link
-                        href={`/dashboard/members?search=${r.its_no}`}
+                        // href={`/members?search=${r.its_no}`}
+                        href={`/members/${r.its_no}`}
                         className="text-xs font-medium text-orange-600 hover:text-orange-700"
                       >
                         View →

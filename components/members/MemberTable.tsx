@@ -520,6 +520,8 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
                         Head of Family
                       </th>
                     )}
+                    {isStaff && <SortTh col="head_its_no" label="Hof ITs" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />}
+                    {isStaff && <SortTh col="building_name" label="Building" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />}
                     <SortTh col="gender" label="Gender" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
                     <SortTh col="balig_status" label="Balig" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
                     {isStaff && <SortTh col="phone" label="Phone" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />}
@@ -555,6 +557,18 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
                             {!isHead && member.hof_name
                               ? <span className="text-sm text-muted-foreground">{member.hof_name}</span>
                               : <span className="text-sm text-muted-foreground">—</span>}
+                          </td>
+                        )}
+                        {isStaff && (
+                          <td className="px-4 py-3">
+                            <span className="font-mono text-xs text-muted-foreground">
+                              {member.head_its_no ?? '—'}
+                            </span>
+                          </td>
+                        )}
+                        {isStaff && (
+                          <td className="px-4 py-3">
+                            <span className="text-sm text-muted-foreground">{member.building_name ?? '—'}</span>
                           </td>
                         )}
                         <td className="px-4 py-3"><GenderPill gender={member.gender} /></td>
