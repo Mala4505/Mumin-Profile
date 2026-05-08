@@ -414,10 +414,9 @@ export function FormAnalyticsSection() {
     fetch(`/api/analytics/form-answers?form_id=${selectedFormId}`)
       .then(r => r.json())
       .then((data: FormAnswersResponse) => {
-        setFields(data.meta ? [data.meta] : [])
-        if (data.meta) {
-          setSelectedFieldId(data.meta.id)
-        }
+        const list = data.fields ?? []
+        setFields(list)
+        if (list.length > 0) setSelectedFieldId(list[0].id)
       })
       .catch(() => {})
   }, [selectedFormId])
@@ -612,9 +611,9 @@ export function FormAnalyticsSection() {
                       setSelectedAnswer(prev => prev === answer ? null : answer)
                     }
                   />
-                  {answersData.breakdown.length > 0 ? (
+                  {answersData.bySector.length > 0 ? (
                     <SectorBarChart
-                      data={answersData.breakdown}
+                      data={answersData.bySector}
                       answers={uniqueAnswers}
                       groupBy={groupBy}
                       selectedSector={selectedSector}

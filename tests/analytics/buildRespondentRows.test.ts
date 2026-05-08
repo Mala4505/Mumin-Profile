@@ -35,7 +35,7 @@ describe('buildRespondentRows', () => {
     const responses = [{ answer: 'No', filled_for: 9999, submitted_at: '2026-04-10T00:00:00Z' }]
     const result = buildRespondentRows(responses, new Map())
     expect(result[0].name).toBe('Unknown')
-    expect(result[0].sector_name).toBe('')
+    expect(result[0].sector_name).toBe('N/A')
   })
 
   it('sorts by submitted_at descending', () => {

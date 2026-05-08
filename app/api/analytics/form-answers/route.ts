@@ -280,9 +280,10 @@ export interface TextEntry {
 }
 
 export interface FormAnswersResponse {
-  meta: FormFieldMeta;      // Instead of 'fields'
+  fields: FormFieldMeta[];
+  field?: FormFieldMeta;
   distribution: AnswerDist[];
-  breakdown: SectorBreakdown[]; // Instead of 'bySector'
+  bySector: SectorBreakdown[];
   textEntries: TextEntry[];
 }
 
@@ -390,6 +391,22 @@ export async function GET(req: NextRequest) {
       mData?.forEach((m: any) => memberMap.set(m.its_no, m))
     }
 
+    // Text-type fields: return raw entries instead of aggregates
+    if (field.field_type === 'text') {
+      const textEntries: TextEntry[] = responses
+        .filter(r => r.answer && r.filled_for !== null)
+        .map(r => {
+          const m = memberMap.get(r.filled_for!)
+          return {
+            its_no: r.filled_for!,
+            name: m?.name ?? 'Unknown',
+            value: r.answer!,
+            submitted_at: r.submitted_at,
+          }
+        })
+      return NextResponse.json({ fields, field, distribution: [], bySector: [], textEntries } satisfies FormAnswersResponse)
+    }
+
     // 5. Build Aggregates
     const distMap = new Map<string, number>()
     const sectorMap = new Map<string, Record<string, number>>()
@@ -426,7 +443,7 @@ export async function GET(req: NextRequest) {
       }))
       .sort((a, b) => (b.total as number) - (a.total as number))
 
-    return NextResponse.json({ fields, field, distribution, bySector })
+    return NextResponse.json({ fields, field, distribution, bySector, textEntries: [] } satisfies FormAnswersResponse)
 
   } catch (err: any) {
     console.error('CRITICAL API ERROR:', err.message)

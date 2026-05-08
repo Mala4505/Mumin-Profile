@@ -168,6 +168,7 @@ import { resolveScope } from '@/lib/analytics/resolveScope'
 export interface RespondentRow {
   its_no: string
   name: string
+  answer: string
   phone?: string
   sector_name?: string;
   subsector_name?: string;
@@ -195,6 +196,7 @@ export function buildRespondentRows(
       rows.push({
         its_no: String(r.filled_for),
         name: member.name,
+        answer: r.answer as string,
         phone: member.phone,
         sector_name: member.sector_name,
         subsector_name: member.subsector_name,
