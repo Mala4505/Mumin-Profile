@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/getSession'
 import { createClient } from '@/lib/supabase/server'
+import { resolveScope } from '@/lib/analytics/resolveScope'
 
 export async function GET(req: NextRequest) {
   const session = await getSession()
-  if (!session || session.role !== 'SuperAdmin') {
+  if (!session || !['SuperAdmin', 'Admin', 'Masool', 'Musaid'].includes(session.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
@@ -13,11 +14,18 @@ export async function GET(req: NextRequest) {
   if (!name) return NextResponse.json({ error: 'Missing name param' }, { status: 400 })
 
   const supabase = await createClient()
+  const scopedIds = await resolveScope(session)
 
-  const { data: muminRows, error } = await supabase
+  let query = supabase
     .from('mumin')
-    .select('its_no, name, gender, status, subsector_id, subsector!subsector_id(subsector_name, sector_id, sector!sector_id(sector_name))')
+    .select('its_no, name, gender, status, phone, subsector_id, subsector!subsector_id(subsector_name, sector_id, sector!sector_id(sector_name))')
     .limit(500)
+
+  if (scopedIds !== null) {
+    query = query.in('subsector_id', scopedIds)
+  }
+
+  const { data: muminRows, error } = await query
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
@@ -26,6 +34,7 @@ export async function GET(req: NextRequest) {
     name: string
     gender: string | null
     status: string | null
+    phone: string | null
     subsector_id: number | null
     subsector: { subsector_name: string; sector_id: number; sector: { sector_name: string } } | null
   }
@@ -57,6 +66,7 @@ export async function GET(req: NextRequest) {
     name: row.name,
     gender: row.gender ?? null,
     status: row.status ?? null,
+    phone: row.phone ?? null,
     sector_name: row.subsector?.sector?.sector_name ?? null,
     subsector_name: row.subsector?.subsector_name ?? null,
     last_profile_update: lastUpdateMap.get(row.its_no) ?? null,
