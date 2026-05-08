@@ -483,7 +483,7 @@ export function FormAnalyticsSection() {
     ? [...new Set(answersData.distribution.map(d => d.answer))]
     : []
   const availableSectors = React.useMemo(
-    () => [...new Set(respondents.map(r => r.sector_name).filter(Boolean))].sort(),
+    () => [...new Set(respondents.map(r => r.sector_name).filter((name): name is string => !!name))].sort(),
     [respondents]
   )
 

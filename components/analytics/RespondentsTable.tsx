@@ -18,7 +18,7 @@ export function filterRespondents(
 ): RespondentRow[] {
   const q = search.trim().toLowerCase()
   return respondents.filter(r => {
-    if (selectedAnswer && r.answer !== selectedAnswer) return false
+    if (selectedAnswer && r.phone !== selectedAnswer) return false
     if (selectedSector && r.sector_name !== selectedSector) return false
     if (q) {
       if (!r.name.toLowerCase().includes(q) && !r.its_no.includes(q)) return false
@@ -55,8 +55,10 @@ function CopyPhone({ phone }: { phone: string | null }) {
   )
 }
 
-function fmtDate(s: string) {
-  return new Date(s).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+function fmtDate(s: string | undefined) {
+  return s
+    ? new Date(s).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+    : '—'
 }
 
 interface RespondentsTableProps {
@@ -184,11 +186,11 @@ export function RespondentsTable({
                     <td className="px-4 py-2.5 font-medium text-foreground">{r.name}</td>
                     <td className="px-4 py-2.5">
                       <span className="bg-amber-50 border border-amber-200 text-amber-800 text-xs px-1.5 py-0.5 rounded dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-300">
-                        {r.answer}
+                        {r.phone}
                       </span>
                     </td>
                     <td className="px-4 py-2.5 hidden sm:table-cell">
-                      <CopyPhone phone={r.phone} />
+                      <CopyPhone phone={r.phone || ""} />
                     </td>
                     <td className="px-4 py-2.5 text-muted-foreground hidden md:table-cell">{r.sector_name || '—'}</td>
                     <td className="px-4 py-2.5 text-muted-foreground hidden lg:table-cell">{r.subsector_name || '—'}</td>

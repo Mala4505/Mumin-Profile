@@ -168,14 +168,13 @@ import { resolveScope } from '@/lib/analytics/resolveScope'
 export interface RespondentRow {
   its_no: string
   name: string
-  answer: string
-  sector_name: string
-  subsector_name: string
-  submitted_at: string
+  phone?: string
+  sector_name?: string;
+  subsector_name?: string;
+  submitted_at?: string;
 }
-
 type ResponseRecord = { answer: string | null; filled_for: number | null; submitted_at: string }
-type MemberRecord = { name: string; sector_name: string; subsector_name: string }
+type MemberRecord = { name: string; phone?: string; sector_name: string; subsector_name: string }
 
 /**
  * Builds rows efficiently for large datasets.
@@ -189,20 +188,25 @@ export function buildRespondentRows(
     if (r.filled_for !== null && r.answer) {
       const member = memberMap.get(r.filled_for) ?? { 
         name: 'Unknown', 
+        phone: undefined,
         sector_name: 'N/A', 
         subsector_name: 'N/A' 
       }
       rows.push({
         its_no: String(r.filled_for),
         name: member.name,
-        answer: r.answer,
+        phone: member.phone,
         sector_name: member.sector_name,
         subsector_name: member.subsector_name,
         submitted_at: r.submitted_at,
       })
     }
   }
-  return rows.sort((a, b) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime())
+  return rows.sort((a, b) => {
+    const dateA = a.submitted_at ? new Date(a.submitted_at).getTime() : 0;
+    const dateB = b.submitted_at ? new Date(b.submitted_at).getTime() : 0;
+    return dateB - dateA;
+  })
 }
 
 export async function GET(req: NextRequest) {
@@ -266,7 +270,8 @@ export async function GET(req: NextRequest) {
         .from('mumin')
         .select(`
           its_no, 
-          name, 
+          name,
+          phone,
           subsector:subsector_id (
             subsector_name, 
             sector:sector_id (sector_name)
@@ -279,6 +284,7 @@ export async function GET(req: NextRequest) {
           name: m.name,
           sector_name: m.subsector?.sector?.sector_name ?? 'N/A',
           subsector_name: m.subsector?.subsector_name ?? 'N/A',
+          phone: m.phone ?? undefined
         })
       })
     }
