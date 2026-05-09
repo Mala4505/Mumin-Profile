@@ -42,9 +42,11 @@ interface BulkFillFormProps {
   formId: string
   role: Role
   itsNo: number
+  isHof?: boolean
+  hofSabelNo?: string
 }
 
-export function BulkFillForm({ formId, role, itsNo }: BulkFillFormProps) {
+export function BulkFillForm({ formId, role, itsNo, isHof = false, hofSabelNo }: BulkFillFormProps) {
   const router = useRouter()
   const supabase = createClient()
 
@@ -90,22 +92,25 @@ export function BulkFillForm({ formId, role, itsNo }: BulkFillFormProps) {
         // 3. Fetch audience from form_audience JOIN mumin
         const { data: audienceData, error: audErr } = await (supabase as any)
           .from('form_audience')
-          .select('its_no, mumin!inner(name)')
+          .select('its_no, mumin!inner(name, sabeel_no)')
           .eq('form_id', formId)
 
         if (audErr) {
-          // form_audience might not exist yet — show a warning but don't crash
           console.warn('form_audience query failed:', audErr.message)
           setLoadError(
             'Audience could not be loaded. Ensure the form_audience migration has been run in Supabase.'
           )
         } else {
-          setMembers(
-            (audienceData ?? []).map((a: any) => ({
-              its_no: a.its_no,
-              name: a.mumin?.name ?? `ITS ${a.its_no}`,
-            }))
-          )
+          let audience = (audienceData ?? []).map((a: any) => ({
+            its_no: a.its_no,
+            name: a.mumin?.name ?? `ITS ${a.its_no}`,
+            sabeel_no: a.mumin?.sabeel_no ?? '',
+          }))
+          // HOF can only fill for their own family (same sabeel_no)
+          if (isHof && hofSabelNo) {
+            audience = audience.filter((m: any) => m.sabeel_no === hofSabelNo)
+          }
+          setMembers(audience)
         }
       } catch (err: any) {
         setLoadError(err.message)

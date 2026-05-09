@@ -10,7 +10,19 @@ export default async function FillFormPage({
   const { id } = await params
   const session = await getSession()
   if (!session) redirect('/login')
-  if (!['Masool', 'Musaid'].includes(session.role)) redirect('/dashboard')
 
-  return <BulkFillForm formId={id} role={session.role} itsNo={session.its_no} />
+  const isStaff = ['Masool', 'Musaid'].includes(session.role)
+  const isHof = session.is_hof
+
+  if (!isStaff && !isHof) redirect('/dashboard')
+
+  return (
+    <BulkFillForm
+      formId={id}
+      role={session.role}
+      itsNo={session.its_no}
+      isHof={isHof}
+      hofSabelNo={isHof ? session.sabeel_no : undefined}
+    />
+  )
 }

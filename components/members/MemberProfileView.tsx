@@ -20,6 +20,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import type { MemberProfile } from '@/lib/members/getMemberProfile'
 import type { SessionUser } from '@/lib/types/app'
+import { EditMemberModal } from '@/components/members/EditMemberModal'
 import {
   Dialog,
   DialogContent,
@@ -344,6 +345,8 @@ export function MemberProfileView({ profile, session, initialResponses = [] }: P
     session.role === 'Musaid'
   const isOwnProfile = session.its_no === profile.its_no
 
+  const canDirectEdit = session.role === 'SuperAdmin' || session.role === 'Admin'
+  const [coreEditOpen, setCoreEditOpen] = useState(false)
   const [contactEditOpen, setContactEditOpen] = useState(false)
   const [contactForm, setContactForm] = useState({
     phone: profile.phone ?? '',
@@ -526,23 +529,35 @@ export function MemberProfileView({ profile, session, initialResponses = [] }: P
                   Sabeel {displayProfile.sabeel_no}
                 </p>
               </div>
-              {canEditContact && (
-                <button
-                  onClick={() => {
-                    setContactForm({
-                      phone: displayProfile.phone ?? '',
-                      alternate_phone: displayProfile.alternate_phone ?? '',
-                      email: displayProfile.email ?? '',
-                      status: displayProfile.status,
-                    })
-                    setContactEditOpen(true)
-                  }}
-                  className="flex-shrink-0 p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
-                  title="Edit contact info"
-                >
-                  <Pencil className="w-4 h-4" />
-                </button>
-              )}
+              <div className="flex items-center gap-1">
+                {canDirectEdit && (
+                  <button
+                    onClick={() => setCoreEditOpen(true)}
+                    className="flex-shrink-0 px-2 py-1 rounded-lg text-xs font-medium text-muted-foreground border border-border hover:text-foreground hover:bg-muted/40 transition-colors flex items-center gap-1"
+                    title="Edit member details"
+                  >
+                    <Pencil className="w-3 h-3" />
+                    Edit
+                  </button>
+                )}
+                {canEditContact && (
+                  <button
+                    onClick={() => {
+                      setContactForm({
+                        phone: displayProfile.phone ?? '',
+                        alternate_phone: displayProfile.alternate_phone ?? '',
+                        email: displayProfile.email ?? '',
+                        status: displayProfile.status,
+                      })
+                      setContactEditOpen(true)
+                    }}
+                    className="flex-shrink-0 p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+                    title="Edit contact info"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-1.5 mt-2">
@@ -568,6 +583,27 @@ export function MemberProfileView({ profile, session, initialResponses = [] }: P
           {isStaff && <InfoField label="Email" value={displayProfile.email ?? '—'} />}
         </div>
       </div>
+
+      {/* Core Edit Modal (SuperAdmin/Admin) */}
+      {canDirectEdit && (
+        <EditMemberModal
+          open={coreEditOpen}
+          onOpenChange={setCoreEditOpen}
+          itsNo={displayProfile.its_no}
+          initial={{
+            name: displayProfile.name,
+            gender: displayProfile.gender,
+            date_of_birth: displayProfile.date_of_birth ?? '',
+            balig_status: displayProfile.balig_status,
+            phone: displayProfile.phone ?? '',
+            alternate_phone: displayProfile.alternate_phone ?? '',
+            email: displayProfile.email ?? '',
+            status: displayProfile.status,
+            notes: (displayProfile as any).notes ?? '',
+          }}
+          onSaved={() => router.refresh()}
+        />
+      )}
 
       {/* Contact Edit Dialog */}
       <Dialog

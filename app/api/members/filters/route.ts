@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSession } from '@/lib/auth/getSession'
+import { withAuth } from '@/lib/auth/withAuth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
-export async function GET(req: NextRequest) {
-  const session = await getSession()
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+export const GET = withAuth(
+  ['SuperAdmin', 'Admin', 'Masool', 'Musaid'],
+  async function handler(req: NextRequest, { session }) {
 
   const sectorId = req.nextUrl.searchParams.get('sector_id')
   const supabase = await createClient()
@@ -122,4 +122,5 @@ export async function GET(req: NextRequest) {
     .sort((a, b) => a.name.localeCompare(b.name))
 
   return NextResponse.json({ sectors: sectors ?? [], subsectors, musaids })
-}
+  }
+)

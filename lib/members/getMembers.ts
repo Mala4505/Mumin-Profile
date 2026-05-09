@@ -83,6 +83,9 @@ export async function getMembers(
   if (musaidSubsectorIds !== null)
     query = query.in("subsector_id", musaidSubsectorIds);
 
+  if (filters.scopedSubsectorIds !== null && filters.scopedSubsectorIds !== undefined)
+    query = query.in("subsector_id", filters.scopedSubsectorIds);
+
   if (filters.search) {
     const s = filters.search.trim();
     const isNum = /^\d+$/.test(s)

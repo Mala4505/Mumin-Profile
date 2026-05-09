@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth/getSession'
+import { resolveScope } from '@/lib/auth/resolveScope'
 import { getMembers } from '@/lib/members/getMembers'
 import { MembersShell } from '@/components/members/MembersShell'
 import { ExportButton } from '@/components/members/ExportButton'
@@ -24,6 +25,7 @@ export default async function MembersPage({ searchParams }: PageProps) {
   if (!session) redirect('/login')
 
   const params = await searchParams
+  const scopedSubsectorIds = await resolveScope(session)
 
   const filters: MemberFilters = {
     sector_id: params.sector_id ? parseInt(params.sector_id) : undefined,
@@ -34,6 +36,7 @@ export default async function MembersPage({ searchParams }: PageProps) {
     status: params.status as MemberFilters['status'],
     search: params.search,
     paci_no: params.paci_no,
+    scopedSubsectorIds,
   }
 
   const showAll = params.show_all === '1'

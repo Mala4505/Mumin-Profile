@@ -27,6 +27,8 @@ export interface AppMetadata {
   sector_ids: number[]
   subsector_ids: number[]
   must_change_password: boolean
+  is_hof: boolean
+  sabeel_no: string
 }
 
 // Extended user session info available in middleware and server components
@@ -37,6 +39,8 @@ export interface SessionUser {
   sector_ids: number[]
   subsector_ids: number[]
   must_change_password: boolean
+  is_hof: boolean
+  sabeel_no: string
 }
 
 // Member list item (joins mumin with subsector/sector/house/building)
@@ -77,4 +81,6 @@ export interface MemberFilters {
   status?: MuminStatus
   search?: string
   paci_no?: string
+  /** null = unrestricted, number[] = restrict to these subsector_ids (role-based scope gate) */
+  scopedSubsectorIds?: number[] | null
 }

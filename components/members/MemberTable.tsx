@@ -4,9 +4,10 @@ import { useState, useMemo, Fragment } from 'react'
 import Link from 'next/link'
 import {
   Users, ChevronUp, ChevronDown, ChevronRight, FilePlus,
-  ChevronsUpDown, LayoutList, Hash, Search,
+  ChevronsUpDown, LayoutList, Hash, Search, Pencil,
 } from 'lucide-react'
 import type { MemberListItem, Role } from '@/lib/types/app'
+import { EditMemberModal } from './EditMemberModal'
 
 
 interface MemberTableProps {
@@ -199,12 +200,14 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const [page, setPage] = useState(1)
   const [expandedPaci, setExpandedPaci] = useState<Set<string>>(new Set())
+  const [editMember, setEditMember] = useState<MemberListItem | null>(null)
 
   const isMumin = role === 'Mumin'
   const isStaff = role !== 'Mumin'
   const showSector = role === 'SuperAdmin' || role === 'Admin'
   const showMasool = isStaff && role !== 'Masool'
   const showMusaid = isStaff && role !== 'Musaid'
+  const canEdit = role === 'SuperAdmin' || role === 'Admin'
 
   function handleSort(col: string) {
     if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
@@ -585,10 +588,21 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
                         {showMusaid && <td className="px-4 py-3"><span className="text-sm text-muted-foreground">{member.musaid_names ?? '—'}</span></td>}
                         <td className="px-4 py-3"><StatusBadge status={member.status} /></td>
                         <td className="px-4 py-3 text-right">
-                          <Link href={`/members/${member.its_no}`}
-                            className="inline-flex items-center gap-1 text-sm font-medium text-orange-600 hover:text-orange-700 transition-colors">
-                            View →
-                          </Link>
+                          <div className="flex items-center justify-end gap-2">
+                            {canEdit && (
+                              <button
+                                onClick={() => setEditMember(member)}
+                                className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+                                title="Edit member"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                            <Link href={`/members/${member.its_no}`}
+                              className="inline-flex items-center gap-1 text-sm font-medium text-orange-600 hover:text-orange-700 transition-colors">
+                              View →
+                            </Link>
+                          </div>
                         </td>
                       </tr>
                     )
@@ -644,6 +658,22 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
       }
 
       <Pagination page={page} total={totalItems} pageSize={PAGE_SIZE} onPage={setPage} />
+
+      {editMember && (
+        <EditMemberModal
+          open={!!editMember}
+          onOpenChange={(open) => { if (!open) setEditMember(null) }}
+          itsNo={editMember.its_no}
+          initial={{
+            name: editMember.name,
+            gender: editMember.gender,
+            balig_status: editMember.balig_status,
+            phone: editMember.phone ?? '',
+            status: editMember.status,
+          }}
+          onSaved={() => { setEditMember(null); window.location.reload() }}
+        />
+      )}
     </div>
   )
 }

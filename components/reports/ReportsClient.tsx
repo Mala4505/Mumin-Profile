@@ -51,7 +51,12 @@ interface MemberRow {
   its_no: number
   name: string
   subsector_id: number
-  subsector: { sector_id: number } | null
+  sector_id: number
+  sabeel_no: string
+  head_its_no: number | null
+  building_name: string | null
+  masool_name: string | null
+  musaid_names: string | null
 }
 
 interface ProfileValueRow {
@@ -72,6 +77,11 @@ interface Subsector {
   subsector_id: number
   subsector_name: string
   sector_id: number
+}
+
+interface StaffOption {
+  its_no: number
+  name: string
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -135,16 +145,57 @@ function FilterSelect({
   )
 }
 
+function FilterInput({
+  label,
+  value,
+  onChange,
+  placeholder,
+  type = 'text',
+}: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  placeholder?: string
+  type?: string
+}) {
+  return (
+    <div className="space-y-1.5">
+      <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide">
+        {label}
+      </label>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors placeholder:text-muted-foreground/50"
+      />
+    </div>
+  )
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function ReportsClient({ sectors, role }: ReportsClientProps) {
-  // ── Filters state ──────────────────────────────────────────────────────────
+  // ── Core filters (server-side) ─────────────────────────────────────────────
   const [categoryId, setCategoryId] = useState('')
   const [fieldId, setFieldId] = useState('')
   const [sectorId, setSectorId] = useState('')
   const [subsectorId, setSubsectorId] = useState('')
   const [subsectors, setSubsectors] = useState<Subsector[]>([])
   const [loadingSubsectors, setLoadingSubsectors] = useState(false)
+
+  // ── Enhanced identity filters (client-side) ────────────────────────────────
+  const [itsNoFilter, setItsNoFilter] = useState('')
+  const [sabelNoFilter, setSabelNoFilter] = useState('')
+  const [hofOnly, setHofOnly] = useState(false)
+  const [buildingFilter, setBuildingFilter] = useState('')
+  const [masoolFilter, setMasoolFilter] = useState('')
+  const [musaidFilter, setMusaidFilter] = useState('')
+
+  // ── Staff options for dropdowns ────────────────────────────────────────────
+  const [masoolOptions, setMasoolOptions] = useState<StaffOption[]>([])
+  const [musaidOptions, setMusaidOptions] = useState<StaffOption[]>([])
 
   // ── Data state ─────────────────────────────────────────────────────────────
   const [data, setData] = useState<ReportData | null>(null)
@@ -163,6 +214,25 @@ export function ReportsClient({ sectors, role }: ReportsClientProps) {
   // ── Chart filter state (SuperAdmin) ────────────────────────────────────────
   const [chartFilterFieldId, setChartFilterFieldId] = useState<number | null>(null)
   const [chartFilterValue, setChartFilterValue] = useState<string | null>(null)
+
+  // ── Load masool + musaid options on mount ──────────────────────────────────
+  useEffect(() => {
+    fetch('/api/members/filters')
+      .then((r) => r.json())
+      .then((d) => {
+        setMusaidOptions(d.musaids ?? [])
+      })
+      .catch(() => {})
+
+    // Masool: fetch from user_sector via filters endpoint (sectors list)
+    // We derive masools from sector assignments — use /api/members/filters?sector_id=ALL
+    // The filters endpoint returns musaids; masools need a separate query.
+    // For now, fetch all masools via a dedicated call we pass sector_ids for.
+    fetch('/api/reports/masools')
+      .then((r) => r.json())
+      .then((d) => setMasoolOptions(d.masools ?? []))
+      .catch(() => {})
+  }, [])
 
   // ── Fetch subsectors when sector changes ───────────────────────────────────
   useEffect(() => {
@@ -197,7 +267,6 @@ export function ReportsClient({ sectors, role }: ReportsClientProps) {
       const json: ReportData = await res.json()
       setData(json)
       setHasFetched(true)
-      // Auto-select all fields on first load
       if (!hasFetched && json.fields.length > 0) {
         setSelectedFieldIds(new Set(json.fields.map((f) => f.id)))
       }
@@ -208,11 +277,40 @@ export function ReportsClient({ sectors, role }: ReportsClientProps) {
     }
   }, [categoryId, fieldId, sectorId, subsectorId, hasFetched])
 
+  // ── Apply client-side identity filters ────────────────────────────────────
+  const filteredMembers = useMemo(() => {
+    if (!data) return []
+    let members = data.members
+
+    if (itsNoFilter) {
+      const n = Number(itsNoFilter)
+      if (!isNaN(n)) members = members.filter((m) => m.its_no === n)
+    }
+    if (sabelNoFilter) {
+      const q = sabelNoFilter.toLowerCase()
+      members = members.filter((m) => m.sabeel_no?.toLowerCase().includes(q))
+    }
+    if (hofOnly) {
+      members = members.filter((m) => m.its_no === m.head_its_no)
+    }
+    if (buildingFilter) {
+      const q = buildingFilter.toLowerCase()
+      members = members.filter((m) => m.building_name?.toLowerCase().includes(q))
+    }
+    if (masoolFilter) {
+      members = members.filter((m) => m.masool_name === masoolFilter)
+    }
+    if (musaidFilter) {
+      members = members.filter((m) => m.musaid_names?.includes(musaidFilter))
+    }
+
+    return members
+  }, [data, itsNoFilter, sabelNoFilter, hofOnly, buildingFilter, masoolFilter, musaidFilter])
+
   // ── Derived data ──────────────────────────────────────────────────────────
   const pivotRows = useMemo(() => {
     if (!data) return []
-    let members = data.members
-    // Apply chart click filter if active
+    let members = filteredMembers
     if (chartFilterFieldId && chartFilterValue) {
       const valueMap = new Map<number, string>()
       for (const v of data.values) {
@@ -221,21 +319,34 @@ export function ReportsClient({ sectors, role }: ReportsClientProps) {
       members = members.filter((m) => valueMap.get(m.its_no) === chartFilterValue)
     }
     return buildPivotRows(members, data.values, data.fields, selectedFieldIds)
-  }, [data, selectedFieldIds, chartFilterFieldId, chartFilterValue])
+  }, [data, filteredMembers, selectedFieldIds, chartFilterFieldId, chartFilterValue])
 
   const visibleColumns = useMemo(() => {
     if (!data) return []
     return data.fields.filter((f) => selectedFieldIds.has(f.id))
   }, [data, selectedFieldIds])
 
-  // Group fields by category for the column selector
   const fieldsByCategory = useMemo(() => {
     if (!data) return []
-    return data.categories.map((cat) => ({
-      category: cat,
-      fields: data.fields.filter((f) => f.category_id === cat.id),
-    })).filter((c) => c.fields.length > 0)
+    return data.categories
+      .map((cat) => ({
+        category: cat,
+        fields: data.fields.filter((f) => f.category_id === cat.id),
+      }))
+      .filter((c) => c.fields.length > 0)
   }, [data])
+
+  const hasIdentityFilters =
+    itsNoFilter || sabelNoFilter || hofOnly || buildingFilter || masoolFilter || musaidFilter
+
+  function clearIdentityFilters() {
+    setItsNoFilter('')
+    setSabelNoFilter('')
+    setHofOnly(false)
+    setBuildingFilter('')
+    setMasoolFilter('')
+    setMusaidFilter('')
+  }
 
   // ── Column selector helpers ────────────────────────────────────────────────
   function toggleField(fid: number) {
@@ -263,7 +374,6 @@ export function ReportsClient({ sectors, role }: ReportsClientProps) {
     setExportSuccess(false)
     try {
       const itsNos = pivotRows.map((r) => r.its_no).join(',')
-      // Columns = its_no + name + selected field captions
       const colList = ['its_no', 'name', ...visibleColumns.map((f) => f.caption)]
       const params = new URLSearchParams({ its_nos: itsNos, columns: colList.join(',') })
       const res = await fetch(`/api/reports/export?${params}`)
@@ -288,7 +398,6 @@ export function ReportsClient({ sectors, role }: ReportsClientProps) {
   // ── Chart data (SuperAdmin) ────────────────────────────────────────────────
   const chartData = useMemo(() => {
     if (!data || role !== 'SuperAdmin') return []
-    // Show value distribution for the first selected field that has data
     const firstField = visibleColumns[0]
     if (!firstField) return []
 
@@ -305,12 +414,15 @@ export function ReportsClient({ sectors, role }: ReportsClientProps) {
 
   const chartField = visibleColumns[0]
 
+  const showMasoolDropdown = role === 'SuperAdmin' || role === 'Admin'
+  const showMusaidDropdown = role === 'SuperAdmin' || role === 'Admin' || role === 'Masool'
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-5">
 
-      {/* ── Filters + Actions bar ─────────────────────────────────────── */}
+      {/* ── Filters + Actions bar ─────────────────────────── */}
       <div className="bg-card rounded-xl border border-border shadow-sm p-5">
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-semibold text-foreground flex items-center gap-2 text-sm">
@@ -319,8 +431,8 @@ export function ReportsClient({ sectors, role }: ReportsClientProps) {
           </h2>
         </div>
 
+        {/* Row 1: Category / Field / Sector / Subsector */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-          {/* Category filter */}
           <FilterSelect label="Umoor Category" value={categoryId} onChange={(v) => { setCategoryId(v); setFieldId('') }}>
             <option value="">All Categories</option>
             {(data?.categories ?? []).map((c) => (
@@ -328,7 +440,6 @@ export function ReportsClient({ sectors, role }: ReportsClientProps) {
             ))}
           </FilterSelect>
 
-          {/* Field filter */}
           <FilterSelect label="Profile Field" value={fieldId} onChange={setFieldId}>
             <option value="">All Fields</option>
             {(data?.fields ?? [])
@@ -338,7 +449,6 @@ export function ReportsClient({ sectors, role }: ReportsClientProps) {
               ))}
           </FilterSelect>
 
-          {/* Sector — SuperAdmin / Admin only */}
           {(role === 'SuperAdmin' || role === 'Admin') && (
             <FilterSelect label="Sector" value={sectorId} onChange={setSectorId}>
               <option value="">All Sectors</option>
@@ -348,7 +458,6 @@ export function ReportsClient({ sectors, role }: ReportsClientProps) {
             </FilterSelect>
           )}
 
-          {/* Subsector */}
           {(role === 'SuperAdmin' || role === 'Admin' || role === 'Masool') && sectorId && (
             <FilterSelect label="Subsector" value={subsectorId} onChange={setSubsectorId}>
               <option value="">{loadingSubsectors ? 'Loading…' : 'All Subsectors'}</option>
@@ -357,6 +466,48 @@ export function ReportsClient({ sectors, role }: ReportsClientProps) {
               ))}
             </FilterSelect>
           )}
+        </div>
+
+        {/* Row 2: Identity filters */}
+        <div className="mt-3 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
+          <FilterInput label="ITS No" value={itsNoFilter} onChange={setItsNoFilter} placeholder="e.g. 30012345" type="number" />
+          <FilterInput label="Sabeel No" value={sabelNoFilter} onChange={setSabelNoFilter} placeholder="e.g. KWT-001" />
+          <FilterInput label="Building" value={buildingFilter} onChange={setBuildingFilter} placeholder="Building name…" />
+
+          {showMasoolDropdown && (
+            <FilterSelect label="Masool" value={masoolFilter} onChange={setMasoolFilter}>
+              <option value="">All Masools</option>
+              {masoolOptions.map((m) => (
+                <option key={m.its_no} value={m.name}>{m.name}</option>
+              ))}
+            </FilterSelect>
+          )}
+
+          {showMusaidDropdown && (
+            <FilterSelect label="Musaid" value={musaidFilter} onChange={setMusaidFilter}>
+              <option value="">All Musaids</option>
+              {musaidOptions.map((m) => (
+                <option key={m.its_no} value={m.name}>{m.name}</option>
+              ))}
+            </FilterSelect>
+          )}
+
+          {/* HOF toggle */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              HOF Only
+            </label>
+            <button
+              onClick={() => setHofOnly((v) => !v)}
+              className={`w-full flex items-center justify-center gap-2 px-3 py-2 text-sm border rounded-lg transition-colors ${
+                hofOnly
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'border-border bg-card text-foreground hover:bg-muted/40'
+              }`}
+            >
+              {hofOnly ? 'HOF Only ✓' : 'All Members'}
+            </button>
+          </div>
         </div>
 
         <div className="flex items-center gap-3 mt-4 pt-4 border-t border-border">
@@ -375,13 +526,24 @@ export function ReportsClient({ sectors, role }: ReportsClientProps) {
 
           {hasFetched && data && (
             <span className="text-xs text-muted-foreground">
-              {data.members.length} member{data.members.length !== 1 ? 's' : ''}
+              {hasIdentityFilters
+                ? <>{filteredMembers.length} of {data.members.length} member{data.members.length !== 1 ? 's' : ''}</>
+                : <>{data.members.length} member{data.members.length !== 1 ? 's' : ''}</>}
               {chartFilterValue && (
                 <> · filtered to <strong className="text-foreground">{pivotRows.length}</strong>
                   {' '}<button onClick={() => { setChartFilterFieldId(null); setChartFilterValue(null) }} className="text-primary underline ml-1">clear</button>
                 </>
               )}
             </span>
+          )}
+
+          {hasIdentityFilters && (
+            <button
+              onClick={clearIdentityFilters}
+              className="text-xs text-muted-foreground hover:text-foreground underline"
+            >
+              Clear identity filters
+            </button>
           )}
         </div>
       </div>
@@ -413,77 +575,27 @@ export function ReportsClient({ sectors, role }: ReportsClientProps) {
           </p>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Bar chart */}
             <ResponsiveContainer width="100%" height={240}>
               <BarChart data={chartData} margin={{ top: 0, right: 0, bottom: 24, left: 0 }}>
-                <XAxis
-                  dataKey="name"
-                  tick={{ fontSize: 11 }}
-                  interval={0}
-                  angle={-30}
-                  textAnchor="end"
-                />
+                <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={-30} textAnchor="end" />
                 <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                <Tooltip
-                  contentStyle={{
-                    background: 'hsl(var(--card))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px',
-                    fontSize: '12px',
-                  }}
-                />
-                <Bar
-                  dataKey="count"
-                  radius={[4, 4, 0, 0]}
-                  cursor="pointer"
-                  onClick={(entry) => {
-                    setChartFilterFieldId(chartField.id)
-                    setChartFilterValue(entry.name ?? null)
-                  }}
-                >
+                <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }} />
+                <Bar dataKey="count" radius={[4, 4, 0, 0]} cursor="pointer" onClick={(entry) => { setChartFilterFieldId(chartField.id); setChartFilterValue(entry.name ?? null) }}>
                   {chartData.map((_, i) => (
-                    <Cell
-                      key={i}
-                      fill={
-                        chartFilterValue === chartData[i].name
-                          ? CHART_COLORS[0]
-                          : CHART_COLORS[i % CHART_COLORS.length]
-                      }
-                      opacity={chartFilterValue && chartFilterValue !== chartData[i].name ? 0.4 : 1}
-                    />
+                    <Cell key={i} fill={chartFilterValue === chartData[i].name ? CHART_COLORS[0] : CHART_COLORS[i % CHART_COLORS.length]} opacity={chartFilterValue && chartFilterValue !== chartData[i].name ? 0.4 : 1} />
                   ))}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
 
-            {/* Pie chart */}
             <ResponsiveContainer width="100%" height={240}>
               <PieChart>
-                <Pie
-                  data={chartData}
-                  dataKey="count"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={90}
-                  cursor="pointer"
-                  onClick={(entry) => {
-                    setChartFilterFieldId(chartField.id)
-                    setChartFilterValue(entry.name ?? null)
-                  }}
-                >
+                <Pie data={chartData} dataKey="count" nameKey="name" cx="50%" cy="50%" outerRadius={90} cursor="pointer" onClick={(entry) => { setChartFilterFieldId(chartField.id); setChartFilterValue(entry.name ?? null) }}>
                   {chartData.map((_, i) => (
                     <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip
-                  contentStyle={{
-                    background: 'hsl(var(--card))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px',
-                    fontSize: '12px',
-                  }}
-                />
+                <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }} />
                 <Legend wrapperStyle={{ fontSize: '11px' }} />
               </PieChart>
             </ResponsiveContainer>
@@ -494,10 +606,8 @@ export function ReportsClient({ sectors, role }: ReportsClientProps) {
       {/* ── Table section ────────────────────────────────────────────────── */}
       {hasFetched && data && (
         <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-          {/* Table toolbar */}
           <div className="flex items-center justify-between px-5 py-3 border-b border-border">
             <div className="flex items-center gap-3">
-              {/* Column selector toggle */}
               <div className="relative">
                 <button
                   onClick={() => setColumnSelectorOpen((v) => !v)}
@@ -511,46 +621,25 @@ export function ReportsClient({ sectors, role }: ReportsClientProps) {
                   <ChevronDown className={`w-3 h-3 transition-transform ${columnSelectorOpen ? 'rotate-180' : ''}`} />
                 </button>
 
-                {/* Column selector dropdown */}
                 {columnSelectorOpen && (
                   <div className="absolute left-0 top-full mt-1 z-20 w-72 max-h-80 overflow-y-auto bg-popover border border-border rounded-xl shadow-lg">
                     <div className="flex items-center gap-2 px-3 py-2 border-b border-border sticky top-0 bg-popover">
-                      <button
-                        onClick={selectAllFields}
-                        className="text-xs text-primary hover:underline"
-                      >
-                        Select All
-                      </button>
+                      <button onClick={selectAllFields} className="text-xs text-primary hover:underline">Select All</button>
                       <span className="text-muted-foreground">·</span>
-                      <button
-                        onClick={deselectAllFields}
-                        className="text-xs text-muted-foreground hover:text-foreground"
-                      >
-                        Deselect All
-                      </button>
+                      <button onClick={deselectAllFields} className="text-xs text-muted-foreground hover:text-foreground">Deselect All</button>
                     </div>
                     {fieldsByCategory.map(({ category, fields }) => (
                       <div key={category.id} className="px-3 py-2">
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
-                          {category.name}
-                        </p>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">{category.name}</p>
                         {fields.map((f) => (
-                          <label
-                            key={f.id}
-                            className="flex items-center gap-2 py-1 cursor-pointer hover:text-primary transition-colors"
-                          >
+                          <label key={f.id} className="flex items-center gap-2 py-1 cursor-pointer hover:text-primary transition-colors">
                             {selectedFieldIds.has(f.id) ? (
                               <CheckSquare className="w-4 h-4 text-primary flex-shrink-0" />
                             ) : (
                               <Square className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                             )}
                             <span className="text-xs text-foreground">{f.caption}</span>
-                            <input
-                              type="checkbox"
-                              className="sr-only"
-                              checked={selectedFieldIds.has(f.id)}
-                              onChange={() => toggleField(f.id)}
-                            />
+                            <input type="checkbox" className="sr-only" checked={selectedFieldIds.has(f.id)} onChange={() => toggleField(f.id)} />
                           </label>
                         ))}
                       </div>
@@ -564,17 +653,12 @@ export function ReportsClient({ sectors, role }: ReportsClientProps) {
               </span>
             </div>
 
-            {/* Export button */}
             <button
               onClick={handleExport}
               disabled={exporting || !pivotRows.length}
               className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {exporting ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <Download className="w-3.5 h-3.5" />
-              )}
+              {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
               {exporting ? 'Exporting…' : 'Export CSV'}
             </button>
           </div>
@@ -585,27 +669,24 @@ export function ReportsClient({ sectors, role }: ReportsClientProps) {
             </div>
           )}
 
-          {/* Pivot table */}
           {pivotRows.length === 0 ? (
             <div className="px-5 py-12 text-center text-sm text-muted-foreground">
-              No data to display. {data.members.length === 0 ? 'No members found for the selected filters.' : 'Select at least one column to display.'}
+              No data to display.{' '}
+              {filteredMembers.length === 0 && data.members.length > 0
+                ? 'No members match the current identity filters.'
+                : data.members.length === 0
+                ? 'No members found for the selected filters.'
+                : 'Select at least one column to display.'}
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border bg-muted/30">
-                    <th className="sticky left-0 z-10 bg-muted/50 px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap w-28">
-                      ITS No.
-                    </th>
-                    <th className="sticky left-28 z-10 bg-muted/50 px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap min-w-[160px]">
-                      Name
-                    </th>
+                    <th className="sticky left-0 z-10 bg-muted/50 px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap w-28">ITS No.</th>
+                    <th className="sticky left-28 z-10 bg-muted/50 px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap min-w-[160px]">Name</th>
                     {visibleColumns.map((f) => (
-                      <th
-                        key={f.id}
-                        className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap"
-                      >
+                      <th key={f.id} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
                         {f.caption}
                       </th>
                     ))}
@@ -614,12 +695,8 @@ export function ReportsClient({ sectors, role }: ReportsClientProps) {
                 <tbody className="divide-y divide-border">
                   {pivotRows.map((row) => (
                     <tr key={row.its_no} className="hover:bg-muted/20 transition-colors">
-                      <td className="sticky left-0 z-10 bg-card px-4 py-2.5 text-xs text-muted-foreground font-mono whitespace-nowrap">
-                        {row.its_no}
-                      </td>
-                      <td className="sticky left-28 z-10 bg-card px-4 py-2.5 text-sm font-medium text-foreground whitespace-nowrap">
-                        {row.name}
-                      </td>
+                      <td className="sticky left-0 z-10 bg-card px-4 py-2.5 text-xs text-muted-foreground font-mono whitespace-nowrap">{row.its_no}</td>
+                      <td className="sticky left-28 z-10 bg-card px-4 py-2.5 text-sm font-medium text-foreground whitespace-nowrap">{row.name}</td>
                       {visibleColumns.map((f) => (
                         <td key={f.id} className="px-4 py-2.5 text-sm text-foreground whitespace-nowrap">
                           {String(row[f.caption] ?? '')}
@@ -634,7 +711,6 @@ export function ReportsClient({ sectors, role }: ReportsClientProps) {
         </div>
       )}
 
-      {/* ── Empty state (before first load) ─────────────────────────── */}
       {!hasFetched && !loading && (
         <div className="bg-card rounded-xl border border-border shadow-sm px-5 py-16 text-center">
           <BarChart3 className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
