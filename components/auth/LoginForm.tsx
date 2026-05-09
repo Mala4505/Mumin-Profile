@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { flushSync } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -46,12 +47,14 @@ export function LoginForm() {
   const loading = step !== null
 
   async function handleSubmit() {
-    setError('')
-    setRestricted(false)
+    flushSync(() => {
+      setError('')
+      setRestricted(false)
+      setStep('verifying')
+    })
 
     try {
       // Step 1 — validate ITS + PACI server-side
-      setStep('verifying')
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
