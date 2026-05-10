@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import {
   ChevronLeft, ChevronUp, ChevronDown, Trash2, Plus,
   Loader2, CheckCircle, XCircle, Save, History, UserCircle,
+  PlusCircle,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Role } from '@/lib/types/app'
@@ -19,6 +20,7 @@ interface FormField {
     caption: string
     field_type: string
     behavior: string
+    options: string[] | null
   }
 }
 
@@ -27,7 +29,9 @@ interface ProfileField {
   caption: string
   field_type: string
   behavior: string
+  options: string[] | null
 }
+
 
 interface Props {
   form: {
@@ -65,14 +69,103 @@ export function FormEditClient({ form, fields: initialFields, role, itsNo }: Pro
   const [showAdd, setShowAdd] = useState(false)
   const [fieldSearch, setFieldSearch] = useState('')
 
+  // Create New Question modal state
+  const [showCreate, setShowCreate] = useState(false)
+  const [createCaption, setCreateCaption] = useState('')
+  const [createType, setCreateType] = useState('text')
+  const [createOptions, setCreateOptions] = useState<string[]>([''])
+  const [createBehavior, setCreateBehavior] = useState<'static' | 'historical'>('static')
+  const [createCategoryId, setCreateCategoryId] = useState<number | ''>('')
+  const [createSaving, setCreateSaving] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
+  const [categories, setCategories] = useState<{ id: number; name: string }[]>([])
+  const [categoriesLoading, setCategoriesLoading] = useState(false)
+
   useEffect(() => {
     const supabase = createClient()
     supabase
       .from('profile_field')
-      .select('id, caption, field_type, behavior')
+      .select('id, caption, field_type, behavior, options')
       .order('caption')
-      .then(({ data }) => setProfileFields(data ?? []))
+      .then(({ data }) => setProfileFields((data ?? []) as ProfileField[]))
   }, [])
+
+  function openCreate() {
+    setCreateCaption('')
+    setCreateType('text')
+    setCreateOptions([''])
+    setCreateBehavior('static')
+    setCreateCategoryId('')
+    setCreateError(null)
+    setShowCreate(true)
+    setCategoriesLoading(true)
+    const supabase = createClient()
+    supabase
+      .from('profile_category')
+      .select('id, name')
+      .order('name')
+      .then(({ data, error: catErr }) => {
+        setCategoriesLoading(false)
+        if (catErr) { setCreateError('Failed to load categories.'); return }
+        setCategories((data ?? []) as { id: number; name: string }[])
+      })
+  }
+
+  function closeCreate() {
+    setShowCreate(false)
+    setCreateCaption('')
+    setCreateType('text')
+    setCreateOptions([''])
+    setCreateBehavior('static')
+    setCreateCategoryId('')
+    setCreateError(null)
+  }
+
+  async function handleCreateSave() {
+    setCreateError(null)
+    if (!createCaption.trim()) { setCreateError('Caption is required.'); return }
+    if (createCategoryId === '') {
+      setCreateError('Please select a category.')
+      return
+    }
+    const nonEmpty = createOptions.filter(o => o.trim())
+    if (createType === 'select' || createType === 'multiselect') {
+      if (nonEmpty.length === 0) { setCreateError('At least one option is required.'); return }
+      const unique = new Set(nonEmpty.map(o => o.trim()))
+      if (unique.size !== nonEmpty.length) {
+        setCreateError('Options must be unique.')
+        return
+      }
+    }
+    setCreateSaving(true)
+    try {
+      const body: Record<string, unknown> = {
+        caption: createCaption.trim(),
+        field_type: createType,
+        behavior: createBehavior,
+        category_id: createCategoryId,
+      }
+      if (createType === 'select' || createType === 'multiselect') {
+        body.options = nonEmpty
+      }
+      const res = await fetch('/api/admin/profile-fields', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error ?? 'Failed to create question')
+      const field = json.field as ProfileField
+      addField(field)
+      setProfileFields(prev => [...prev, field])
+      closeCreate()
+      showToast('success', 'Question created and added to form.')
+    } catch (e) {
+      setCreateError(e instanceof Error ? e.message : 'Failed to create question')
+    } finally {
+      setCreateSaving(false)
+    }
+  }
 
   const fieldIds = new Set(fields.map(f => f.field_id))
 
@@ -90,7 +183,7 @@ export function FormEditClient({ form, fields: initialFields, role, itsNo }: Pro
         field_id: pf.id,
         sort_order: prev.length,
         is_required: false,
-        profile_field: { id: pf.id, caption: pf.caption, field_type: pf.field_type, behavior: pf.behavior },
+        profile_field: { id: pf.id, caption: pf.caption, field_type: pf.field_type, behavior: pf.behavior, options: pf.options },
       },
     ])
     setShowAdd(false)
@@ -255,13 +348,24 @@ export function FormEditClient({ form, fields: initialFields, role, itsNo }: Pro
               {fields.length} field{fields.length !== 1 ? 's' : ''}
             </p>
           </div>
-          <button
-            onClick={() => setShowAdd(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-sm text-foreground hover:bg-muted/40 transition-colors"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Add Field
-          </button>
+          <div className="flex items-center gap-2">
+            {isAdmin && (
+              <button
+                onClick={openCreate}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-primary/40 text-sm text-primary hover:bg-primary/5 transition-colors"
+              >
+                <PlusCircle className="w-3.5 h-3.5" />
+                Create New Question
+              </button>
+            )}
+            <button
+              onClick={() => setShowAdd(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-sm text-foreground hover:bg-muted/40 transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add Field
+            </button>
+          </div>
         </div>
 
         {fields.length === 0 ? (
@@ -363,6 +467,171 @@ export function FormEditClient({ form, fields: initialFields, role, itsNo }: Pro
             {saving && <Loader2 className="w-4 h-4 animate-spin" />}
             Publish Form
           </button>
+        </div>
+      )}
+
+      {/* Create New Question Modal */}
+      {showCreate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-card border border-border rounded-xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-4 border-b border-border flex items-center justify-between shrink-0">
+              <h3 className="text-sm font-semibold text-foreground">Create New Question</h3>
+              <button
+                onClick={closeCreate}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <XCircle className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-4 overflow-y-auto flex-1">
+              {/* Caption */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Caption <span className="text-destructive">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={createCaption}
+                  onChange={e => setCreateCaption(e.target.value)}
+                  placeholder="e.g. Date of Birth"
+                  autoFocus
+                  className="w-full h-9 px-3 text-sm bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+                />
+              </div>
+
+              {/* Type */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Type</label>
+                <select
+                  value={createType}
+                  onChange={e => {
+                    setCreateType(e.target.value)
+                    if (e.target.value !== 'select' && e.target.value !== 'multiselect') {
+                      setCreateOptions([''])
+                    }
+                  }}
+                  className="w-full h-9 px-3 text-sm bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+                >
+                  <option value="text">Text</option>
+                  <option value="number">Number</option>
+                  <option value="date">Date</option>
+                  <option value="select">Select (single choice)</option>
+                  <option value="multiselect">Multiselect (multiple choice)</option>
+                </select>
+              </div>
+
+              {/* Options builder — only for select / multiselect */}
+              {(createType === 'select' || createType === 'multiselect') && (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    Options <span className="text-destructive">*</span>
+                  </label>
+                  <div className="space-y-2">
+                    {createOptions.map((opt, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={opt}
+                          onChange={e => {
+                            const next = [...createOptions]
+                            next[idx] = e.target.value
+                            setCreateOptions(next)
+                          }}
+                          placeholder={`Option ${idx + 1}`}
+                          className="flex-1 h-9 px-3 text-sm bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setCreateOptions(prev => prev.filter((_, i) => i !== idx))}
+                          disabled={createOptions.length === 1}
+                          className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-30"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setCreateOptions(prev => [...prev, ''])}
+                      className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Add option
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Category */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Category <span className="text-destructive">*</span>
+                </label>
+                <select
+                  value={createCategoryId}
+                  onChange={e => setCreateCategoryId(e.target.value === '' ? '' : Number(e.target.value))}
+                  disabled={categoriesLoading}
+                  className="w-full h-9 px-3 text-sm bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors disabled:opacity-60"
+                >
+                  {categoriesLoading ? (
+                    <option value="" disabled>Loading categories…</option>
+                  ) : (
+                    <option value="" disabled>Select a category…</option>
+                  )}
+                  {categories.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Behavior */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Behavior</label>
+                <div className="flex items-center gap-4">
+                  {(['static', 'historical'] as const).map(b => (
+                    <label key={b} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="createBehavior"
+                        value={b}
+                        checked={createBehavior === b}
+                        onChange={() => setCreateBehavior(b)}
+                        className="accent-primary"
+                      />
+                      <span className="text-sm text-foreground capitalize flex items-center gap-1">
+                        {b === 'static' ? <UserCircle className="w-3.5 h-3.5 text-blue-500" /> : <History className="w-3.5 h-3.5 text-amber-500" />}
+                        {b === 'static' ? 'Profile (static)' : 'Event (historical)'}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Error */}
+              {createError && (
+                <p className="text-xs text-destructive bg-destructive/10 px-3 py-2 rounded-lg">{createError}</p>
+              )}
+            </div>
+
+            <div className="p-4 border-t border-border flex items-center justify-end gap-2 shrink-0">
+              <button
+                onClick={closeCreate}
+                disabled={createSaving}
+                className="px-3 py-1.5 rounded-lg border border-border text-sm text-foreground hover:bg-muted/40 transition-colors disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateSave}
+                disabled={createSaving}
+                className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-60"
+              >
+                {createSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlusCircle className="w-4 h-4" />}
+                Create &amp; Add
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

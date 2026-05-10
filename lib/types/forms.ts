@@ -7,6 +7,7 @@ export interface FormQuestion {
   sort_order: number
   behavior?: 'static' | 'historical'
   field_type?: string   // 'text' | 'date' | 'number' | 'select' | 'multiselect'
+  options?: string[] | null
 }
 
 export interface FillerAccess {

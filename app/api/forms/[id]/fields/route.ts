@@ -30,7 +30,8 @@ export async function GET(
           field_type,
           behavior,
           visibility_level,
-          mumin_can_edit
+          mumin_can_edit,
+          options
         )
       `)
       .eq('form_id', formId)

@@ -365,6 +365,7 @@ export type Database = {
           is_data_entry: boolean;
           mumin_can_edit: boolean;
           sort_order: number;
+          options: Json | null;
           created_at: string;
           updated_at: string;
         };
@@ -378,6 +379,7 @@ export type Database = {
           is_data_entry: boolean;
           mumin_can_edit: boolean;
           sort_order: number;
+          options?: Json | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -391,6 +393,7 @@ export type Database = {
           is_data_entry?: boolean;
           mumin_can_edit?: boolean;
           sort_order?: number;
+          options?: Json | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -642,30 +645,36 @@ export type Database = {
           sabeel_no: string;
           requested_by: number;
           remark: string;
-          status: "pending" | "done";
+          status: "pending" | "done" | "rejected";
           reviewed_by: number | null;
           reviewed_at: string | null;
           created_at: string;
+          requested_changes: Json | null;
+          reviewer_note: string | null;
         };
         Insert: {
           id?: number;
           sabeel_no: string;
           requested_by: number;
           remark: string;
-          status?: "pending" | "done";
+          status?: "pending" | "done" | "rejected";
           reviewed_by?: number | null;
           reviewed_at?: string | null;
           created_at?: string;
+          requested_changes?: Json | null;
+          reviewer_note?: string | null;
         };
         Update: {
           id?: number;
           sabeel_no?: string;
           requested_by?: number;
           remark?: string;
-          status?: "pending" | "done";
+          status?: "pending" | "done" | "rejected";
           reviewed_by?: number | null;
           reviewed_at?: string | null;
           created_at?: string;
+          requested_changes?: Json | null;
+          reviewer_note?: string | null;
         };
         Relationships: [];
       };

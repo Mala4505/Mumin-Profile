@@ -13,7 +13,7 @@ export default async function AdminRequestsPage() {
   const { data: rawRequests } = await admin
     .from('change_request')
     .select(`
-      id, sabeel_no, remark, status, created_at, reviewed_at,
+      id, sabeel_no, remark, status, requested_changes, reviewer_note, created_at, reviewed_at,
       requester:requested_by(its_no, name, phone),
       reviewer:reviewed_by(its_no, name)
     `)

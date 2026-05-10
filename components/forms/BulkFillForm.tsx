@@ -27,6 +27,7 @@ interface FormField {
   sort_order: number
   field_type: string
   behavior: 'static' | 'historical'
+  options: string[] | null
 }
 
 interface AudienceMember {
@@ -85,9 +86,15 @@ export function BulkFillForm({ formId, role, itsNo, isHof = false, hofSabelNo }:
           throw new Error(b.error ?? `Failed to load form fields (${fieldsRes.status})`)
         }
         const { fields } = await fieldsRes.json()
-        setQuestions(
-          (fields ?? []).sort((a: FormField, b: FormField) => a.sort_order - b.sort_order)
-        )
+        const mapped: FormField[] = (fields ?? []).map((f: any) => ({
+          profile_field_id: f.field_id,
+          question_text: f.profile_field?.caption ?? '',
+          sort_order: f.sort_order,
+          field_type: f.profile_field?.field_type ?? 'text',
+          behavior: f.profile_field?.behavior ?? 'historical',
+          options: f.profile_field?.options ?? null,
+        }))
+        setQuestions(mapped.sort((a, b) => a.sort_order - b.sort_order))
 
         // 3. Fetch audience from form_audience JOIN mumin
         const { data: audienceData, error: audErr } = await (supabase as any)
@@ -196,7 +203,9 @@ export function BulkFillForm({ formId, role, itsNo, isHof = false, hofSabelNo }:
       m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       m.its_no.toString().includes(searchQuery)
   )
-  const filledCount = Object.keys(progress).length
+  const filledCount = Object.values(progress).filter(fields =>
+    Object.entries(fields).some(([k, v]) => k !== '_remarks' && v !== '')
+  ).length
 
   return (
     <>
@@ -349,6 +358,7 @@ export function BulkFillForm({ formId, role, itsNo, isHof = false, hofSabelNo }:
                               fieldType={q.field_type}
                               value={val}
                               disabled={isExpired}
+                              options={q.options}
                               onChange={(v) =>
                                 handleCellChange(
                                   member.its_no,
@@ -407,11 +417,13 @@ function FieldInput({
   value,
   disabled,
   onChange,
+  options,
 }: {
   fieldType: string
   value: string
   disabled: boolean
   onChange: (v: string) => void
+  options?: string[] | null
 }) {
   const base =
     'w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed'
@@ -441,7 +453,52 @@ function FieldInput({
     )
   }
 
-  // text / select / multiselect — plain text input (select options not yet in schema)
+  if (fieldType === 'select' && options && options.length > 0) {
+    return (
+      <select
+        disabled={disabled}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        className={base}
+      >
+        <option value="">— Select —</option>
+        {options.map(opt => (
+          <option key={opt} value={opt}>{opt}</option>
+        ))}
+      </select>
+    )
+  }
+
+  if (fieldType === 'multiselect' && options && options.length > 0) {
+    // JSON serialize/deserialize for unambiguous multiselect storage
+    const selected: string[] = (() => {
+      if (!value) return []
+      try { return JSON.parse(value) as string[] } catch { return [] }
+    })()
+    return (
+      <div className="flex flex-col gap-1 min-w-[140px]">
+        {options.map(opt => (
+          <label key={opt} className="flex items-center gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              disabled={disabled}
+              checked={selected.includes(opt)}
+              onChange={e => {
+                const next = e.target.checked
+                  ? [...selected, opt]
+                  : selected.filter(s => s !== opt)
+                onChange(JSON.stringify(next))
+              }}
+              className="rounded"
+            />
+            {opt}
+          </label>
+        ))}
+      </div>
+    )
+  }
+
+  // text / select / multiselect with no options — plain text input (backward compat)
   return (
     <input
       type="text"

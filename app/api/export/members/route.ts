@@ -3,6 +3,7 @@ import { getSession } from '@/lib/auth/getSession'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { generateExcel, DEFAULT_COLUMNS } from '@/lib/export/generateExcel'
+import { resolveScope } from '@/lib/auth/resolveScope'
 import type { MemberFilters } from '@/lib/types/app'
 
 export async function GET(req: NextRequest) {
@@ -20,6 +21,8 @@ export async function GET(req: NextRequest) {
     search: searchParams.get('search') || undefined,
   }
 
+  const scopedSubsectorIds = await resolveScope(session)
+
   const supabase = await createClient()
 
   let query = supabase
@@ -27,6 +30,7 @@ export async function GET(req: NextRequest) {
     .select('its_no, name, gender, balig_status, phone, status, sabeel_no, head_its_no, sector_id, sector_name, subsector_id, subsector_name, building_name, floor_no, flat_no, landmark, masool_name, musaid_names')
     .order('name')
 
+  if (scopedSubsectorIds !== null) query = query.in('subsector_id', scopedSubsectorIds)
   if (filters.sector_id) query = query.eq('sector_id', filters.sector_id)
   if (filters.subsector_id) query = query.eq('subsector_id', filters.subsector_id)
   if (filters.gender) query = query.eq('gender', filters.gender)

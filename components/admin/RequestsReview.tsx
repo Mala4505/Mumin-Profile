@@ -1,14 +1,24 @@
 'use client'
 
 import { useState } from 'react'
-import { Loader2, CheckCheck, X } from 'lucide-react'
+import { Loader2, CheckCheck, X, ChevronDown, ChevronUp } from 'lucide-react'
 import { toast } from 'sonner'
+
+interface RequestedChange {
+  its_no: number
+  field: string
+  label: string
+  old_value: string
+  new_value: string
+}
 
 interface ReviewRequest {
   id: number
   sabeel_no: string
   remark: string
-  status: 'pending' | 'done'
+  status: 'pending' | 'done' | 'rejected'
+  requested_changes: RequestedChange[] | null
+  reviewer_note: string | null
   created_at: string
   reviewed_at: string | null
   requester: { its_no: number; name: string; phone: string | null } | null
@@ -19,77 +29,160 @@ interface Props {
   initialRequests: ReviewRequest[]
 }
 
-type FilterTab = 'all' | 'pending' | 'done'
+type FilterTab = 'all' | 'pending' | 'done' | 'rejected'
 
 export function RequestsReview({ initialRequests }: Props) {
   const [requests, setRequests] = useState<ReviewRequest[]>(initialRequests)
   const [tab, setTab] = useState<FilterTab>('all')
-  const [toggling, setToggling] = useState<number | null>(null)
+  const [actioning, setActioning] = useState<number | null>(null)
   const [showMarkAllModal, setShowMarkAllModal] = useState(false)
   const [markingAll, setMarkingAll] = useState(false)
+  // Per-row reject UI state: maps request id → draft note text (undefined = reject UI not open)
+  const [rejectDraft, setRejectDraft] = useState<Record<number, string>>({})
+  // Per-row diff expand state
+  const [diffExpanded, setDiffExpanded] = useState<Record<number, boolean>>({})
 
   const filtered = tab === 'all' ? requests : requests.filter(r => r.status === tab)
   const pendingCount = requests.filter(r => r.status === 'pending').length
-  const pendingFiltered = filtered.filter(r => r.status === 'pending')
 
-  async function toggleStatus(req: ReviewRequest) {
-    const newStatus = req.status === 'pending' ? 'done' : 'pending'
-    setToggling(req.id)
-
+  async function handleApprove(req: ReviewRequest) {
+    setActioning(req.id)
     const res = await fetch(`/api/requests/${req.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: newStatus }),
+      body: JSON.stringify({ action: 'approve' }),
     })
-
     if (res.ok) {
       const updated = await res.json()
       setRequests(prev => prev.map(r =>
         r.id === req.id
-          ? { ...r, status: updated.status, reviewed_at: updated.reviewed_at }
+          ? { ...r, status: updated.status, reviewed_at: updated.reviewed_at, reviewed_by: updated.reviewed_by }
           : r
       ))
+      setDiffExpanded(prev => {
+        const next = { ...prev }
+        delete next[req.id]
+        return next
+      })
+      toast.success('Request approved')
     } else {
-      toast.error('Failed to update request status')
+      toast.error('Failed to approve request')
     }
+    setActioning(null)
+  }
 
-    setToggling(null)
+  async function handleReject(req: ReviewRequest) {
+    const note = rejectDraft[req.id] ?? ''
+    setActioning(req.id)
+    const res = await fetch(`/api/requests/${req.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'reject', reviewer_note: note || undefined }),
+    })
+    if (res.ok) {
+      const updated = await res.json()
+      setRequests(prev => prev.map(r =>
+        r.id === req.id
+          ? { ...r, status: updated.status, reviewed_at: updated.reviewed_at, reviewer_note: updated.reviewer_note !== undefined ? updated.reviewer_note : (note || null) }
+          : r
+      ))
+      setRejectDraft(prev => {
+        const next = { ...prev }
+        delete next[req.id]
+        return next
+      })
+      toast.success('Request rejected')
+    } else {
+      toast.error('Failed to reject request')
+    }
+    setActioning(null)
+  }
+
+  function openRejectUI(id: number) {
+    setRejectDraft(prev => ({ ...prev, [id]: '' }))
+  }
+
+  function closeRejectUI(id: number) {
+    setRejectDraft(prev => {
+      const next = { ...prev }
+      delete next[id]
+      return next
+    })
+  }
+
+  function toggleDiff(id: number) {
+    setDiffExpanded(prev => ({ ...prev, [id]: !prev[id] }))
   }
 
   async function handleMarkAllPending() {
     setMarkingAll(true)
     const pendingIds = requests.filter(r => r.status === 'pending').map(r => r.id)
 
-    let succeeded = 0
-    let failed = 0
-
-    await Promise.all(
+    const results = await Promise.allSettled(
       pendingIds.map(async id => {
         const res = await fetch(`/api/requests/${id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'done' }),
+          body: JSON.stringify({ action: 'approve' }),
         })
-        if (res.ok) {
-          const updated = await res.json()
-          setRequests(prev => prev.map(r =>
-            r.id === id ? { ...r, status: updated.status, reviewed_at: updated.reviewed_at } : r
-          ))
-          succeeded++
-        } else {
-          failed++
-        }
+        if (!res.ok) throw new Error(`failed:${id}`)
+        return res.json() as Promise<{ id: number; status: string; reviewed_at: string; reviewed_by: number | null }>
       })
     )
 
+    const successful = results
+      .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled')
+      .map(r => r.value)
+
+    const succeeded = successful.length
+    const failed = results.length - succeeded
+
+    if (succeeded > 0) {
+      setRequests(prev =>
+        prev.map(r => {
+          const upd = successful.find(u => u.id === r.id)
+          return upd ? { ...r, status: upd.status, reviewed_at: upd.reviewed_at, reviewed_by: upd.reviewed_by } : r
+        })
+      )
+      // clear diffExpanded for all approved rows
+      setDiffExpanded(prev => {
+        const next = { ...prev }
+        successful.forEach(u => delete next[u.id])
+        return next
+      })
+    }
+
     setMarkingAll(false)
-    setShowMarkAllModal(false)
 
     if (failed === 0) {
-      toast.success(`${succeeded} request${succeeded !== 1 ? 's' : ''} marked as done`)
+      setShowMarkAllModal(false)
+      toast.success(`${succeeded} request${succeeded !== 1 ? 's' : ''} approved`)
     } else {
-      toast.warning(`${succeeded} marked as done, ${failed} failed`)
+      // keep modal open so admin can retry
+      toast.warning(`${succeeded} approved, ${failed} failed — retry the pending ones`)
     }
+  }
+
+  function statusBadge(status: ReviewRequest['status']) {
+    if (status === 'done') {
+      return (
+        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+          Done
+        </span>
+      )
+    }
+    if (status === 'rejected') {
+      return (
+        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">
+          Rejected
+        </span>
+      )
+    }
+    return (
+      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+        Pending
+      </span>
+    )
   }
 
   return (
@@ -97,7 +190,7 @@ export function RequestsReview({ initialRequests }: Props) {
       {/* Filter tabs + Mark All button */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-1 bg-muted/40 rounded-lg p-1 w-fit">
-          {(['all', 'pending', 'done'] as FilterTab[]).map(t => (
+          {(['all', 'pending', 'done', 'rejected'] as FilterTab[]).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -143,45 +236,145 @@ export function RequestsReview({ initialRequests }: Props) {
                   <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Timestamp</th>
                   <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">HOF Name</th>
                   <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Sabeel</th>
-                  <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Remark</th>
-                  <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Status</th>
+                  <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Remark / Changes</th>
+                  <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Status / Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {filtered.map(r => (
-                  <tr key={r.id} className="hover:bg-muted/20 transition-colors">
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-foreground">{r.requester?.name ?? '—'}</p>
-                      <p className="text-xs text-muted-foreground font-mono">{r.requester?.its_no}</p>
-                      {r.requester?.phone && (
-                        <p className="text-xs text-muted-foreground">{r.requester.phone}</p>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
-                      {new Date(r.created_at).toLocaleDateString()}<br />
-                      <span className="text-[10px]">{new Date(r.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                    </td>
-                    <td className="px-4 py-3 font-medium text-foreground">
-                      {r.hof?.mumin?.name ?? '—'}
-                    </td>
-                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{r.sabeel_no}</td>
-                    <td className="px-4 py-3 text-foreground max-w-xs">{r.remark}</td>
-                    <td className="px-4 py-3">
-                      <button
-                        onClick={() => toggleStatus(r)}
-                        disabled={toggling === r.id}
-                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                          r.status === 'done'
-                            ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                            : 'bg-amber-100 text-amber-700 hover:bg-amber-200'
-                        } disabled:opacity-60`}
-                      >
-                        {toggling === r.id && <Loader2 className="w-3 h-3 animate-spin" />}
-                        {r.status === 'done' ? 'Done' : 'Pending'}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {filtered.map(r => {
+                  const hasChanges = Array.isArray(r.requested_changes) && r.requested_changes.length > 0
+                  const isRejectOpen = rejectDraft[r.id] !== undefined
+                  const isDiffOpen = !!diffExpanded[r.id]
+                  const isActioning = actioning === r.id
+
+                  return (
+                    <tr key={r.id} className="hover:bg-muted/20 transition-colors align-top">
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-foreground">{r.requester?.name ?? '—'}</p>
+                        <p className="text-xs text-muted-foreground font-mono">{r.requester?.its_no}</p>
+                        {r.requester?.phone && (
+                          <p className="text-xs text-muted-foreground">{r.requester.phone}</p>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
+                        {new Date(r.created_at).toLocaleDateString()}<br />
+                        <span className="text-[10px]">{new Date(r.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      </td>
+                      <td className="px-4 py-3 font-medium text-foreground">
+                        {r.hof?.mumin?.name ?? '—'}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{r.sabeel_no}</td>
+
+                      {/* Remark + diff panel */}
+                      <td className="px-4 py-3 max-w-xs">
+                        {r.remark && (
+                          <p className="text-foreground text-sm">{r.remark}</p>
+                        )}
+                        {hasChanges && (
+                          <div className="mt-1.5">
+                            <button
+                              onClick={() => toggleDiff(r.id)}
+                              className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 hover:text-blue-800 transition-colors"
+                            >
+                              {isDiffOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                              {isDiffOpen ? 'Hide' : 'Show'} {r.requested_changes!.length} change{r.requested_changes!.length !== 1 ? 's' : ''}
+                            </button>
+                            {isDiffOpen && (
+                              <div className="mt-2 ml-1 border border-border rounded-md overflow-hidden text-xs">
+                                <table className="w-full">
+                                  <thead className="bg-muted/60">
+                                    <tr>
+                                      <th className="text-left px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Field</th>
+                                      <th className="text-left px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Before</th>
+                                      <th className="text-left px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">After</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-border bg-card">
+                                    {r.requested_changes!.map((ch, i) => (
+                                      <tr key={i}>
+                                        <td className="px-2 py-1.5 font-medium text-foreground">{ch.label}</td>
+                                        <td className="px-2 py-1.5 text-muted-foreground line-through">{ch.old_value || '—'}</td>
+                                        <td className="px-2 py-1.5 text-green-700 font-semibold">{ch.new_value || '—'}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Status / Action cell */}
+                      <td className="px-4 py-3 min-w-[180px]">
+                        {r.status === 'pending' ? (
+                          <div className="space-y-2">
+                            {!isRejectOpen ? (
+                              <div className="flex items-center gap-2">
+                                {/* Approve */}
+                                <button
+                                  onClick={() => handleApprove(r)}
+                                  disabled={isActioning}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-green-100 text-green-700 hover:bg-green-200 disabled:opacity-60 transition-colors"
+                                >
+                                  {isActioning ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCheck className="w-3 h-3" />}
+                                  Approve
+                                </button>
+                                {/* Open reject UI */}
+                                <button
+                                  onClick={() => openRejectUI(r.id)}
+                                  disabled={isActioning}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-60 transition-colors"
+                                >
+                                  <X className="w-3 h-3" />
+                                  Reject
+                                </button>
+                              </div>
+                            ) : (
+                              /* Inline reject form */
+                              <div className="space-y-1.5">
+                                <textarea
+                                  rows={2}
+                                  placeholder="Reason (optional)"
+                                  value={rejectDraft[r.id]}
+                                  onChange={e => setRejectDraft(prev => ({ ...prev, [r.id]: e.target.value }))}
+                                  className="w-full text-xs px-2 py-1.5 rounded-md border border-border bg-background text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-1 focus:ring-red-400"
+                                />
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    onClick={() => handleReject(r)}
+                                    disabled={isActioning}
+                                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold bg-red-600 text-white hover:bg-red-700 disabled:opacity-60 transition-colors"
+                                  >
+                                    {isActioning ? <Loader2 className="w-3 h-3 animate-spin" /> : <X className="w-3 h-3" />}
+                                    Confirm Reject
+                                  </button>
+                                  <button
+                                    onClick={() => closeRejectUI(r.id)}
+                                    disabled={isActioning}
+                                    className="px-2 py-1.5 rounded-full text-xs text-muted-foreground hover:text-foreground disabled:opacity-60 transition-colors"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          /* Non-pending: read-only badge + optional reviewer note */
+                          <div className="space-y-1.5">
+                            {statusBadge(r.status)}
+                            {r.status === 'rejected' && r.reviewer_note && (
+                              <p className="text-[11px] text-muted-foreground italic">
+                                Note: {r.reviewer_note}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -207,7 +400,7 @@ export function RequestsReview({ initialRequests }: Props) {
 
             <h2 className="text-base font-bold text-foreground mb-1">Mark All Pending as Done?</h2>
             <p className="text-sm text-muted-foreground mb-5">
-              This will mark <span className="font-semibold text-foreground">{pendingCount} pending request{pendingCount !== 1 ? 's' : ''}</span> as done. This action can be reversed individually.
+              This will approve <span className="font-semibold text-foreground">{pendingCount} pending request{pendingCount !== 1 ? 's' : ''}</span> and apply their changes. This action can be reversed individually.
             </p>
 
             <div className="flex gap-2">
@@ -226,7 +419,7 @@ export function RequestsReview({ initialRequests }: Props) {
                 className="flex-1 px-4 py-2.5 rounded-xl bg-green-600 text-white text-sm font-semibold hover:bg-green-700 disabled:opacity-60 transition-colors flex items-center justify-center gap-2"
               >
                 {markingAll ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /> Marking…</>
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Approving…</>
                 ) : (
                   <><CheckCheck className="w-4 h-4" /> Confirm</>
                 )}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { Loader2, Search, X, Users, Trash2Icon } from 'lucide-react'
 import {
@@ -12,7 +12,7 @@ import {
   DialogTitle,
   DialogDescription,
   DialogClose,
-} from '@/components/ui/dialog' // adjust path to where you saved your dialog component
+} from '@/components/ui/dialog'
 
 
 interface Family {
@@ -28,8 +28,21 @@ interface ChangeRequest {
   id: number
   sabeel_no: string
   remark: string
-  status: 'pending' | 'done'
+  status: 'pending' | 'done' | 'rejected'
   created_at: string
+}
+
+interface FamilyMember {
+  its_no: number
+  name: string
+  gender?: string | null
+  date_of_birth?: string | null
+  balig_status?: string | null
+  phone?: string | null
+  alternate_phone?: string | null
+  email?: string | null
+  status?: string | null
+  notes?: string | null
 }
 
 interface Props {
@@ -39,6 +52,18 @@ interface Props {
   currentSearch: string
   showAll: boolean
 }
+
+const FIELD_OPTIONS = [
+  { field: 'name', label: 'Full Name' },
+  { field: 'gender', label: 'Gender' },
+  { field: 'date_of_birth', label: 'Date of Birth' },
+  { field: 'balig_status', label: 'Balig Status' },
+  { field: 'phone', label: 'Phone Number' },
+  { field: 'alternate_phone', label: 'Alternate Phone' },
+  { field: 'email', label: 'Email' },
+  { field: 'status', label: 'Member Status' },
+  { field: 'notes', label: 'Notes' },
+] as const
 
 const PRESET_REMARKS = [
   'Address Changed',
@@ -61,6 +86,18 @@ export function RequestsClient({ families, initialRequests, mode, currentSearch,
   const [submitError, setSubmitError] = useState('')
   const [requests, setRequests] = useState<ChangeRequest[]>(initialRequests)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // ── Request Edit modal state ───────────────────────────────────────────────
+  const [editModalOpen, setEditModalOpen] = useState(false)
+  const [editMembers, setEditMembers] = useState<FamilyMember[]>([])
+  const [editMembersLoading, setEditMembersLoading] = useState(false)
+  const [editMembersError, setEditMembersError] = useState('')
+  const [editMemberSearch, setEditMemberSearch] = useState('')
+  const [editSelectedMember, setEditSelectedMember] = useState<FamilyMember | null>(null)
+  const [editSelectedField, setEditSelectedField] = useState('')
+  const [editNewValue, setEditNewValue] = useState('')
+  const [editSubmitting, setEditSubmitting] = useState(false)
+  const [editSubmitError, setEditSubmitError] = useState('')
 
   const updateParam = useCallback((key: string, value: string) => {
     const params = new URLSearchParams(searchParams.toString())
@@ -115,6 +152,113 @@ export function RequestsClient({ families, initialRequests, mode, currentSearch,
       setRequests(prev => prev.filter(r => r.id !== id))
     } catch (err) {
       console.error(err)
+    }
+  }
+
+  // ── Request Edit modal helpers ─────────────────────────────────────────────
+
+  // Reset all edit state (called by DialogTrigger onClick before modal opens)
+  function openEditModal() {
+    setEditMembers([])
+    setEditMembersError('')
+    setEditMemberSearch('')
+    setEditSelectedMember(null)
+    setEditSelectedField('')
+    setEditNewValue('')
+    setEditSubmitError('')
+  }
+
+  // Fetch members whenever the modal transitions to open
+  useEffect(() => {
+    if (!editModalOpen || !selected) return
+    setEditMembersLoading(true)
+    setEditMembersError('')
+    fetch(`/api/members?sabeel_no=${encodeURIComponent(selected.sabeel_no)}&limit=50`)
+      .then(async res => {
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}))
+          setEditMembersError(d.error ?? 'Failed to load members')
+        } else {
+          const d = await res.json()
+          setEditMembers(d.members ?? [])
+        }
+      })
+      .catch(() => setEditMembersError('Failed to load members'))
+      .finally(() => setEditMembersLoading(false))
+  }, [editModalOpen]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function handleEditMemberSelect(member: FamilyMember) {
+    setEditSelectedMember(member)
+    setEditSelectedField('')
+    setEditNewValue('')
+  }
+
+  function handleEditFieldSelect(field: string) {
+    setEditSelectedField(field)
+    setEditNewValue('')
+  }
+
+  const editFieldLabel = FIELD_OPTIONS.find(f => f.field === editSelectedField)?.label ?? ''
+  const editOldValue = editSelectedMember && editSelectedField
+    ? String((editSelectedMember as unknown as Record<string, unknown>)[editSelectedField] ?? '')
+    : ''
+
+  const filteredEditMembers = editMemberSearch.trim()
+    ? editMembers.filter(m =>
+        m.name.toLowerCase().includes(editMemberSearch.toLowerCase()) ||
+        String(m.its_no).includes(editMemberSearch)
+      )
+    : editMembers
+
+  const editCanSubmit = !!(
+    editSelectedMember &&
+    editSelectedField &&
+    editNewValue.trim() &&
+    editNewValue.trim() !== editOldValue &&
+    !editSubmitting
+  )
+
+  async function handleEditSubmit() {
+    if (!selected || !editSelectedMember || !editSelectedField || !editNewValue.trim()) return
+    setEditSubmitting(true)
+    setEditSubmitError('')
+
+    const remark = `Field change request: ${editFieldLabel} for ${editSelectedMember.name}`
+    const body = {
+      sabeel_no: selected.sabeel_no,
+      remark,
+      requested_changes: [
+        {
+          its_no: editSelectedMember.its_no,
+          field: editSelectedField,
+          label: editFieldLabel,
+          old_value: editOldValue,
+          new_value: editNewValue.trim(),
+        },
+      ],
+    }
+
+    try {
+      const res = await fetch('/api/requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        setEditSubmitError(d.error ?? 'Failed to submit')
+        setEditSubmitting(false)
+        return
+      }
+
+      const newReq = await res.json()
+      setRequests(prev => [newReq, ...prev])
+      setEditModalOpen(false)
+    } catch {
+      setEditSubmitError('Network error. Please try again.')
+    } finally {
+      setEditSubmitting(false)
     }
   }
 
@@ -321,6 +465,169 @@ export function RequestsClient({ families, initialRequests, mode, currentSearch,
               >
                 {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Submitting…</> : 'Submit Request'}
               </button>
+
+              {/* Divider */}
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-border" />
+                </div>
+                <div className="relative flex justify-center text-xs">
+                  <span className="bg-card px-2 text-muted-foreground">or</span>
+                </div>
+              </div>
+
+              {/* Request Edit button — opens the field-level change modal */}
+              <Dialog open={editModalOpen} onOpenChange={open => {
+                if (!open) {
+                  setEditModalOpen(false)
+                  setEditMembers([])
+                  setEditMembersError('')
+                  setEditMemberSearch('')
+                  setEditSelectedMember(null)
+                  setEditSelectedField('')
+                  setEditNewValue('')
+                  setEditSubmitError('')
+                }
+              }}>
+                <DialogTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={openEditModal}
+                    className="w-full py-2.5 rounded-xl border border-border bg-background text-foreground text-sm font-medium hover:bg-muted/40 transition-colors"
+                  >
+                    Request Edit
+                  </button>
+                </DialogTrigger>
+
+                <DialogContent className="max-w-lg">
+                  <DialogHeader>
+                    <DialogTitle>Request Field Edit</DialogTitle>
+                    <DialogDescription>
+                      Select a member, choose the field to change, and enter the new value.
+                      Your request will be reviewed by an admin.
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  <div className="space-y-4 py-2">
+                    {/* Step 1 — Member picker */}
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+                        1. Select Member
+                      </p>
+
+                      {editMembersLoading ? (
+                        <div className="flex items-center justify-center py-6 text-muted-foreground gap-2 text-sm">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Loading members…
+                        </div>
+                      ) : editMembersError ? (
+                        <p className="text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2">
+                          {editMembersError}
+                        </p>
+                      ) : (
+                        <>
+                          <input
+                            type="text"
+                            value={editMemberSearch}
+                            onChange={e => setEditMemberSearch(e.target.value)}
+                            placeholder="Search by name or ITS No…"
+                            className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 mb-2"
+                          />
+                          <div className="max-h-36 overflow-y-auto rounded-lg border border-border divide-y divide-border">
+                            {filteredEditMembers.length === 0 ? (
+                              <p className="px-3 py-3 text-sm text-muted-foreground text-center">No members found</p>
+                            ) : filteredEditMembers.map(m => (
+                              <button
+                                key={m.its_no}
+                                type="button"
+                                onClick={() => handleEditMemberSelect(m)}
+                                className={`w-full text-left px-3 py-2 text-sm transition-colors hover:bg-muted/40 flex items-center justify-between gap-2 ${
+                                  editSelectedMember?.its_no === m.its_no
+                                    ? 'bg-primary/5 border-l-2 border-l-primary'
+                                    : ''
+                                }`}
+                              >
+                                <span className="font-medium text-foreground truncate">{m.name}</span>
+                                <span className="font-mono text-xs text-muted-foreground shrink-0">{m.its_no}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Step 2 — Field selector (shown after member is selected) */}
+                    {editSelectedMember && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+                          2. Select Field to Change
+                        </p>
+                        <select
+                          value={editSelectedField}
+                          onChange={e => handleEditFieldSelect(e.target.value)}
+                          className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        >
+                          <option value="">— Choose a field —</option>
+                          {FIELD_OPTIONS.map(opt => (
+                            <option key={opt.field} value={opt.field}>{opt.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {/* Step 3 — Old value + new value (shown after field is selected) */}
+                    {editSelectedMember && editSelectedField && (
+                      <div className="space-y-3">
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+                            3. Current Value
+                          </p>
+                          <input
+                            type="text"
+                            value={editOldValue || '(empty)'}
+                            readOnly
+                            className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-muted/40 text-muted-foreground cursor-default"
+                          />
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+                            New Value
+                          </p>
+                          <input
+                            type="text"
+                            value={editNewValue}
+                            onChange={e => setEditNewValue(e.target.value)}
+                            placeholder={`Enter new ${editFieldLabel.toLowerCase()}…`}
+                            className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {editSubmitError && (
+                      <p className="text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2">
+                        {editSubmitError}
+                      </p>
+                    )}
+                  </div>
+
+                  <DialogFooter>
+                    <DialogClose asChild>
+                      <button className="px-3 py-1.5 rounded border border-border text-sm hover:bg-muted/40">
+                        Cancel
+                      </button>
+                    </DialogClose>
+                    <button
+                      type="button"
+                      onClick={handleEditSubmit}
+                      disabled={!editCanSubmit}
+                      className="px-4 py-1.5 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center gap-2"
+                    >
+                      {editSubmitting ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Submitting…</> : 'Submit Edit Request'}
+                    </button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center py-12 text-center">
@@ -374,10 +681,12 @@ function RequestsTable({ requests, onDelete }: { requests: ChangeRequest[], onDe
                   className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
                     r.status === 'done'
                       ? 'bg-green-100 text-green-700'
+                      : r.status === 'rejected'
+                      ? 'bg-red-100 text-red-700'
                       : 'bg-amber-100 text-amber-700'
                   }`}
                 >
-                  {r.status === 'done' ? 'Done' : 'Pending'}
+                  {r.status === 'done' ? 'Done' : r.status === 'rejected' ? 'Rejected' : 'Pending'}
                 </span>
               </td>
               <td className="px-4 py-3">

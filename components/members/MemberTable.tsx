@@ -205,8 +205,8 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
   const isMumin = role === 'Mumin'
   const isStaff = role !== 'Mumin'
   const showSector = role === 'SuperAdmin' || role === 'Admin'
-  const showMasool = isStaff && role !== 'Masool'
-  const showMusaid = isStaff && role !== 'Musaid'
+  const showMasool = isStaff
+  const showMusaid = isStaff
   const canEdit = role === 'SuperAdmin' || role === 'Admin'
 
   function handleSort(col: string) {

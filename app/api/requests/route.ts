@@ -90,7 +90,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const body = await request.json() as { sabeel_no: string; remark: string }
+  interface RequestedChange {
+    its_no: number
+    field: string
+    label: string
+    old_value: string
+    new_value: string
+  }
+
+  const body = await request.json() as { sabeel_no: string; remark: string; requested_changes?: RequestedChange[] }
   if (!body.sabeel_no || !body.remark?.trim()) {
     return NextResponse.json({ error: 'sabeel_no and remark are required' }, { status: 400 })
   }
@@ -129,10 +137,29 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  if (body.requested_changes && body.requested_changes.length > 0) {
+    const submittedItsNos = [...new Set(body.requested_changes.map((c: any) => c.its_no as number))]
+    const { data: memberCheck } = await admin
+      .from('mumin')
+      .select('its_no')
+      .eq('sabeel_no', body.sabeel_no)
+      .in('its_no', submittedItsNos)
+    const validItsNos = new Set((memberCheck ?? []).map((m: any) => m.its_no as number))
+    const invalid = submittedItsNos.filter(n => !validItsNos.has(n))
+    if (invalid.length > 0) {
+      return NextResponse.json({ error: `ITS numbers not in this family: ${invalid.join(', ')}` }, { status: 422 })
+    }
+  }
+
   const { data, error } = await admin
     .from('change_request')
-    .insert({ requested_by: meta.its_no!, sabeel_no: body.sabeel_no, remark: body.remark.trim() })
-    .select('id, sabeel_no, remark, status, created_at')
+    .insert({
+      requested_by: meta.its_no!,
+      sabeel_no: body.sabeel_no,
+      remark: body.remark.trim(),
+      requested_changes: body.requested_changes ?? null,
+    })
+    .select('id, sabeel_no, remark, status, requested_changes, created_at')
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
