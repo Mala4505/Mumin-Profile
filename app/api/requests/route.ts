@@ -157,7 +157,7 @@ export async function POST(request: NextRequest) {
       requested_by: meta.its_no!,
       sabeel_no: body.sabeel_no,
       remark: body.remark.trim(),
-      requested_changes: body.requested_changes ?? null,
+      requested_changes: body.requested_changes ? JSON.parse(JSON.stringify(body.requested_changes)) : null,
     })
     .select('id, sabeel_no, remark, status, requested_changes, created_at')
     .single()

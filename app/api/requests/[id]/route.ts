@@ -98,7 +98,7 @@ export async function PATCH(
         action: 'approve_change_request',
         entity_type: 'mumin',
         entity_id: String(itsNo),
-        metadata: { change_request_id: requestId, changes: memberChanges },
+        metadata: JSON.parse(JSON.stringify({ change_request_id: requestId, changes: memberChanges })),
       })
       if (logErr) console.error(`activity_log insert failed for its_no=${itsNo}:`, logErr.message)
     }
