@@ -69,7 +69,7 @@ export async function PATCH(
     }
 
     const changes: RequestedChange[] = Array.isArray(cr.requested_changes)
-      ? (cr.requested_changes as RequestedChange[]).filter(c => ALLOWED_MUMIN_FIELDS.has(c.field))
+      ? (cr.requested_changes as unknown as RequestedChange[]).filter(c => ALLOWED_MUMIN_FIELDS.has(c.field))
       : []
 
     // 2. Group changes by its_no and apply per-member in one UPDATE each
