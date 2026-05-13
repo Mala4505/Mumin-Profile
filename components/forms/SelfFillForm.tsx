@@ -9,7 +9,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 interface Props {
   form: Form
   itsNo: number
-  formFields: FormQuestion[]
+  formFields: (FormQuestion & { field_type?: string; options?: string[] | null })[]
 }
 
 export function SelfFillForm({ form, itsNo, formFields }: Props) {
@@ -136,6 +136,7 @@ export function SelfFillForm({ form, itsNo, formFields }: Props) {
                       fieldType={q.field_type ?? 'text'}
                       value={answers[q.profile_field_id] ?? ''}
                       disabled={isExpired}
+                      options={q.options}
                       onChange={(v) => handleChange(q.profile_field_id, v)}
                     />
                   </div>
@@ -197,11 +198,13 @@ function FieldInput({
   fieldType,
   value,
   disabled,
+  options,
   onChange,
 }: {
   fieldType: string
   value: string
   disabled: boolean
+  options?: string[] | null
   onChange: (v: string) => void
 }) {
   const base =
@@ -232,7 +235,50 @@ function FieldInput({
     )
   }
 
-  // text / select / multiselect — text input (options not yet in schema)
+  if (fieldType === 'select' && options && options.length > 0) {
+    return (
+      <select
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+        className={base}
+      >
+        <option value="">— Select —</option>
+        {options.map((opt) => (
+          <option key={opt} value={opt}>{opt}</option>
+        ))}
+      </select>
+    )
+  }
+
+  if (fieldType === 'multiselect' && options && options.length > 0) {
+    const selected: string[] = (() => {
+      if (!value) return []
+      try { return JSON.parse(value) as string[] } catch { return [] }
+    })()
+    return (
+      <div className="flex flex-col gap-2">
+        {options.map((opt) => (
+          <label key={opt} className="flex items-center gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              disabled={disabled}
+              checked={selected.includes(opt)}
+              onChange={(e) => {
+                const next = e.target.checked
+                  ? [...selected, opt]
+                  : selected.filter((s) => s !== opt)
+                onChange(JSON.stringify(next))
+              }}
+              className="rounded"
+            />
+            {opt}
+          </label>
+        ))}
+      </div>
+    )
+  }
+
   return (
     <input
       type="text"

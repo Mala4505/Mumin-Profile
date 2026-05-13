@@ -5,7 +5,7 @@ export async function materializeAudience(
   formId: string,
   filters: AudienceFilters,
 ): Promise<void> {
-  const supabase = await createClient(); // uses service role in API route context
+  const supabase = await createClient();
 
   let query = supabase.from("mumin").select("its_no");
 
@@ -13,17 +13,29 @@ export async function materializeAudience(
     if (filters.gender) query = query.eq("gender", filters.gender);
     if (filters.balig_status !== undefined)
       query = query.eq("balig_status", filters.balig_status);
+
+    // Sector filter: resolve to subsector IDs first, then filter by subsector_id
     if (filters.sector_ids?.length) {
-      query = query.in("subsector!subsector_id.sector_id", filters.sector_ids);
+      const { data: subs, error: subErr } = await supabase
+        .from("subsector")
+        .select("subsector_id")
+        .in("sector_id", filters.sector_ids.map(Number));
+
+      if (subErr) throw new Error(`Subsector lookup failed: ${subErr.message}`);
+
+      const subsectorIds = (subs ?? []).map((s) => s.subsector_id);
+      if (!subsectorIds.length) return; // no subsectors in these sectors = empty audience
+
+      query = query.in("subsector_id", subsectorIds);
     }
+
     if (filters.subsector_ids?.length) {
-      if (filters.subsector_ids?.length) {
-        query = query.in(
-          "subsector_id",
-          filters.subsector_ids.map((id) => Number(id)),
-        );
-      }
+      query = query.in(
+        "subsector_id",
+        filters.subsector_ids.map((id) => Number(id)),
+      );
     }
+
     if (filters.age_from || filters.age_to) {
       const now = new Date();
       if (filters.age_to) {
@@ -50,7 +62,7 @@ export async function materializeAudience(
 
   const rows = (members ?? []).map((m) => ({
     form_id: formId,
-    its_no: m.its_no as number, // keep number, don’t cast to string
+    its_no: m.its_no as number,
   }));
 
   if (!rows.length) return;

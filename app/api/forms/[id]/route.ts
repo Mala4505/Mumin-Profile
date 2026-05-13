@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/getSession'
 import { createClient } from '@/lib/supabase/server'
 import { materializeAudience } from '@/lib/forms/materializeAudience'
+import { isAuthorizedFiller } from '@/lib/forms/checkFillerAccess'
 import { Database } from '@/lib/types/database'
+import type { FillerAccess } from '@/lib/types/forms'
 
 export async function GET(
   _: NextRequest,
@@ -16,9 +18,28 @@ export async function GET(
   const { data, error } = await supabase.from('forms').select('*').eq('id', id).single()
   if (error) return NextResponse.json({ error: error.message }, { status: 404 })
 
-  const isCreator = Number(session.its_no) === data.created_by // fixed integer
+  const isCreator = Number(session.its_no) === data.created_by
   const isAdmin = ['SuperAdmin', 'Admin'].includes(session.role)
-  if (!isCreator && !isAdmin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const fillerAccess = data.filler_access as FillerAccess | null
+  const isFiller = fillerAccess ? isAuthorizedFiller(fillerAccess, session) : false
+
+  // Mumin can only GET a form for self-fill: must be in audience + form must allow self
+  if (session.role === 'Mumin') {
+    const selfAllowed = fillerAccess?.fillers?.some((f) => f.type === 'self') ?? false
+    if (!selfAllowed) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    const { data: inAudience } = await supabase
+      .from('form_audience')
+      .select('its_no')
+      .eq('form_id', id)
+      .eq('its_no', Number(session.its_no))
+      .maybeSingle()
+    if (!inAudience) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return NextResponse.json({ form: data })
+  }
+
+  if (!isCreator && !isAdmin && !isFiller) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
   return NextResponse.json({ form: data })
 }

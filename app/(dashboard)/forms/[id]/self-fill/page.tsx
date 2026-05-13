@@ -2,7 +2,7 @@ import { redirect, notFound } from 'next/navigation'
 import { getSession } from '@/lib/auth/getSession'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { SelfFillForm } from '@/components/forms/SelfFillForm'
-import type { Form, FormQuestion } from '@/lib/types/forms'
+import type { Form, FormQuestion, FillerAccess } from '@/lib/types/forms'
 
 export default async function SelfFillPage({
   params,
@@ -16,7 +16,6 @@ export default async function SelfFillPage({
 
   const supabase = createAdminClient()
 
-  // Load form metadata
   const { data: formData, error } = await supabase
     .from('forms')
     .select('*')
@@ -26,8 +25,13 @@ export default async function SelfFillPage({
   if (error || !formData) notFound()
   const form = formData as unknown as Form
 
-  if (form.status !== 'published') redirect('/dashboard')
-  if (form.expires_at && new Date(form.expires_at) < new Date()) redirect('/dashboard')
+  if (form.status !== 'published') redirect('/forms')
+  if (form.expires_at && new Date(form.expires_at) < new Date()) redirect('/forms')
+
+  // Verify self-fill is enabled for this form
+  const fillerAccess = form.filler_access as FillerAccess | null
+  const selfAllowed = fillerAccess?.fillers?.some((f) => f.type === 'self') ?? false
+  if (!selfAllowed) redirect('/forms')
 
   // Verify this mumin is in the form audience
   const { data: inAudience } = await (supabase as any)
@@ -37,9 +41,9 @@ export default async function SelfFillPage({
     .eq('its_no', Number(session.its_no))
     .single()
 
-  if (!inAudience) redirect('/dashboard')
+  if (!inAudience) redirect('/forms')
 
-  // Load form fields (questions) from the relational form_fields table
+  // Load form fields with options
   const { data: fieldsData } = await (supabase as any)
     .from('form_fields')
     .select(`
@@ -49,21 +53,23 @@ export default async function SelfFillPage({
       profile_field:field_id (
         caption,
         field_type,
-        behavior
+        behavior,
+        options
       )
     `)
     .eq('form_id', id)
     .order('sort_order')
 
-  const formFields: (FormQuestion & { field_type: string })[] = (fieldsData ?? []).map(
-    (ff: any) => ({
-      profile_field_id: ff.field_id,
-      question_text: ff.profile_field?.caption ?? '',
-      sort_order: ff.sort_order ?? 0,
-      behavior: ff.profile_field?.behavior ?? 'static',
-      field_type: ff.profile_field?.field_type ?? 'text',
-    })
-  )
+  const formFields: (FormQuestion & { field_type: string; options?: string[] | null })[] = (
+    fieldsData ?? []
+  ).map((ff: any) => ({
+    profile_field_id: ff.field_id,
+    question_text: ff.profile_field?.caption ?? '',
+    sort_order: ff.sort_order ?? 0,
+    behavior: ff.profile_field?.behavior ?? 'static',
+    field_type: ff.profile_field?.field_type ?? 'text',
+    options: ff.profile_field?.options ?? null,
+  }))
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6">

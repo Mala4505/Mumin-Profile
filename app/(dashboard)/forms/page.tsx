@@ -6,7 +6,7 @@ import { FormsClient } from '@/components/forms/FormsClient'
 export default async function FormsPage() {
   const session = await getSession()
   if (!session) redirect('/login')
-  if (session.role === 'Mumin') redirect('/dashboard')
+  // Mumin can visit /forms — they see only their self-fill forms (filtered in FormsClient)
 
   return (
     <div className="p-4 md:p-6 lg:p-8">
@@ -16,10 +16,12 @@ export default async function FormsPage() {
           Forms
         </h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          Create, manage and review masool/musaid forms
+          {session.role === 'Mumin'
+            ? 'Forms assigned to you'
+            : 'Create, manage and review masool/musaid forms'}
         </p>
       </div>
-      <FormsClient role={session.role} />
+      <FormsClient role={session.role} itsNo={session.its_no} />
     </div>
   )
 }

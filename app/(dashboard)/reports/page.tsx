@@ -19,7 +19,7 @@ export default async function ReportsPage() {
           Reports &amp; Export
         </h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          Filter members and export to Excel
+          Filter form responses and export to CSV
         </p>
       </div>
       <ReportsClient sectors={sectors} role={session.role} />
