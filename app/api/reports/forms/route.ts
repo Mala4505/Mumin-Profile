@@ -14,20 +14,35 @@ export async function GET(req: NextRequest) {
 
   // ── No form_id → return form list ─────────────────────────────────────────
   if (!formId) {
-    let query = admin
-      .from('forms')
-      .select('id, title, status, created_at, created_by')
-      .order('created_at', { ascending: false })
+    const sel = 'id, title, status, created_at, created_by'
+    let formsData: Array<{ id: string; title: string; status: string; created_at: string; created_by: number | null }> = []
 
     if (session.role === 'Masool' || session.role === 'Musaid') {
-      query = query.eq('created_by', Number(session.its_no))
+      // Show forms the user created OR forms where they are listed as a filler.
+      // Three separate queries are needed because PostgREST JSONB OR filtering is broken.
+      const itsNo = Number(session.its_no)
+      const itsStr = String(session.its_no)
+      const specificType = session.role === 'Masool' ? 'specific_masool' : 'specific_musaid'
+
+      const [myForms, roleForms, specificForms] = await Promise.all([
+        admin.from('forms').select(sel).eq('created_by', itsNo).order('created_at', { ascending: false }),
+        admin.from('forms').select(sel).eq('status', 'published').filter('filler_access', 'cs', JSON.stringify({ fillers: [{ type: 'role', value: session.role }] })),
+        admin.from('forms').select(sel).eq('status', 'published').filter('filler_access', 'cs', JSON.stringify({ fillers: [{ type: specificType, value: [itsStr] }] })),
+      ])
+
+      const seen = new Set<string>()
+      for (const row of [...(myForms.data ?? []), ...(roleForms.data ?? []), ...(specificForms.data ?? [])]) {
+        if (!seen.has(row.id)) { seen.add(row.id); formsData.push(row as typeof formsData[0]) }
+      }
+      formsData.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    } else {
+      // SuperAdmin / Admin: all forms
+      const { data, error } = await admin.from('forms').select(sel).order('created_at', { ascending: false })
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+      formsData = (data ?? []) as typeof formsData
     }
 
-    const { data, error } = await query
-    console.log('[reports/forms] role:', session.role, 'its_no:', session.its_no, 'rows:', data?.length, 'error:', error?.message)
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-    const formIds = (data ?? []).map((f) => f.id)
+    const formIds = formsData.map((f) => f.id)
     const responseCounts: Record<string, number> = {}
 
     if (formIds.length) {
@@ -42,7 +57,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const forms = (data ?? []).map((f) => ({
+    const forms = formsData.map((f) => ({
       id: f.id,
       title: f.title,
       status: f.status,
@@ -63,10 +78,6 @@ export async function GET(req: NextRequest) {
     .single()
 
   if (!form) return NextResponse.json({ error: 'Form not found' }, { status: 404 })
-
-  if (['Masool', 'Musaid'].includes(session.role) && Number(session.its_no) !== form.created_by) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
 
   // Questions from form_fields → profile_field
   const { data: fieldRows, error: fieldsErr } = await admin

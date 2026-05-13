@@ -344,7 +344,6 @@ export function ReportsClient({ sectors, role }: ReportsClientProps) {
   // ── Form list ──────────────────────────────────────────────────────────────
   const [forms, setForms] = useState<FormOption[]>([])
   const [loadingForms, setLoadingForms] = useState(true)
-  const [formsError, setFormsError] = useState<string | null>(null)
   const [formId, setFormId] = useState('')
 
   // ── Location filters ───────────────────────────────────────────────────────
@@ -374,12 +373,9 @@ export function ReportsClient({ sectors, role }: ReportsClientProps) {
   // ── Load form list on mount ────────────────────────────────────────────────
   useEffect(() => {
     fetch('/api/reports/forms')
-      .then(async (r) => {
-        const d = await r.json()
-        if (!r.ok) throw new Error(d.error ?? `HTTP ${r.status}`)
-        setForms(d.forms ?? [])
-      })
-      .catch((e) => setFormsError(e instanceof Error ? e.message : 'Failed to load forms'))
+      .then((r) => r.json())
+      .then((d) => setForms(d.forms ?? []))
+      .catch(() => {})
       .finally(() => setLoadingForms(false))
   }, [])
 
@@ -553,17 +549,6 @@ export function ReportsClient({ sectors, role }: ReportsClientProps) {
               </select>
               <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
             </div>
-            {formsError && (
-              <p className="text-xs text-destructive mt-1">Error: {formsError}</p>
-            )}
-            {!loadingForms && !formsError && forms.length === 0 && (
-              <p className="text-xs text-muted-foreground mt-1">
-                No forms found.{' '}
-                {/* <a href="/forms" className="text-primary underline">
-                  Create one in Forms
-                </a> */}
-              </p>
-            )}
           </div>
 
           {showSectorFilter && (
