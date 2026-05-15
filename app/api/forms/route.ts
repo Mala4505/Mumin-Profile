@@ -76,7 +76,7 @@ export async function GET() {
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
       // Only keep forms where self-fill is enabled in filler_access
-      formData = (data ?? []).filter((f) => {
+      formData = ((data ?? []) as any[]).filter((f) => {
         const fillers = (f.filler_access as any)?.fillers ?? []
         return fillers.some((filler: any) => filler.type === 'self')
       })
