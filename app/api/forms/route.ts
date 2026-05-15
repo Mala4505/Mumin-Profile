@@ -123,9 +123,9 @@ export async function GET() {
     // Merge and deduplicate by form ID
     const seen = new Set<string>()
     for (const form of [
-      ...(myFormsResult.data ?? []),
-      ...(roleFormsResult.data ?? []),
-      ...(specificFormsResult.data ?? []),
+      ...((myFormsResult.data ?? []) as any[]),
+      ...((roleFormsResult.data ?? []) as any[]),
+      ...((specificFormsResult.data ?? []) as any[]),
     ]) {
       if (!seen.has(form.id)) {
         seen.add(form.id)
