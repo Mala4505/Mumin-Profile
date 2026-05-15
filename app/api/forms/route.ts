@@ -20,7 +20,7 @@ export async function GET() {
 
     const audienceFormIds = (audienceRows ?? []).map((a) => a.form_id as string)
 
-    const queries: Promise<any>[] = [
+    const queries: PromiseLike<any>[] = [
       supabase
         .from('forms')
         .select('*, event:event_id(title, event_date, end_date)')
