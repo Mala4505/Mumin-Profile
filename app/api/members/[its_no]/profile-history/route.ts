@@ -48,7 +48,7 @@ export async function GET(
     entries: { answer: string; submitted_at: string; label: string | null }[]
   }>()
 
-  for (const row of data ?? []) {
+  for (const row of (data ?? []) as any[]) {
     const pf = row.profile_field as any
     if (!pf) continue
 
