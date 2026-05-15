@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/getSession'
 import { createAdminClient } from '@/lib/supabase/admin'
-import Papa from 'papaparse'
+import { generateExcel, BASE_COLUMNS, ExportColumn } from '@/lib/export/generateExcel'
+import { fetchMemberBase } from '@/lib/export/fetchMemberBase'
 
 export async function GET(req: NextRequest) {
   const session = await getSession()
@@ -23,18 +24,18 @@ export async function GET(req: NextRequest) {
 
   const admin = createAdminClient()
 
-  const [responsesResult, membersResult, fieldRowsResult] = await Promise.all([
+  const [responsesResult, fieldRowsResult, baseMap] = await Promise.all([
     admin
       .from('form_responses')
       .select('filled_for, profile_field_id, answer')
       .eq('form_id', formId)
       .eq('submitted', true)
       .in('filled_for', itsNos),
-    admin.from('mumin').select('its_no, name').in('its_no', itsNos),
     admin
       .from('form_fields')
       .select('field_id, profile_field!inner(caption)')
       .eq('form_id', formId),
+    fetchMemberBase(itsNos, admin),
   ])
 
   if (responsesResult.error) {
@@ -46,9 +47,6 @@ export async function GET(req: NextRequest) {
     captionMap[(ff as any).field_id] = (ff as any).profile_field.caption
   }
 
-  const memberMap: Record<number, string> = {}
-  for (const m of membersResult.data ?? []) memberMap[m.its_no] = m.name
-
   const answersMap: Record<number, Record<string, string>> = {}
   for (const r of responsesResult.data ?? []) {
     if (!r.filled_for) continue
@@ -59,25 +57,35 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  const baseKeys = new Set(BASE_COLUMNS.map(c => c.key))
+  const extraCols: ExportColumn[] = columns
+    .filter(c => !baseKeys.has(c) && c !== 'its_no' && c !== 'name')
+    .map(c => ({ key: c, header: c, width: 20 }))
+
   const rows = itsNos.map((itsNo) => {
-    const row: Record<string, string> = {
-      its_no: String(itsNo),
-      name: memberMap[itsNo] ?? '',
+    const base = baseMap.get(itsNo)
+    const row: Record<string, unknown> = {
+      its_no: itsNo,
+      name: base?.name ?? '',
+      sabeel_no: base?.sabeel_no ?? '',
+      sector_name: base?.sector_name ?? '',
+      subsector_name: base?.subsector_name ?? '',
+      masool_name: base?.masool_name ?? '',
+      musaid_names: base?.musaid_names ?? '',
     }
-    for (const col of columns) {
-      if (col !== 'its_no' && col !== 'name') {
-        row[col] = answersMap[itsNo]?.[col] ?? ''
-      }
+    for (const col of extraCols) {
+      row[col.key] = answersMap[itsNo]?.[col.key] ?? ''
     }
     return row
   })
 
-  const csv = Papa.unparse(rows, { columns })
-  const filename = `form-report-${new Date().toISOString().split('T')[0]}.csv`
+  const allCols = [...BASE_COLUMNS, ...extraCols]
+  const buffer = await generateExcel(rows, allCols, 'Form Report')
+  const filename = `form-report-${new Date().toISOString().split('T')[0]}.xlsx`
 
-  return new NextResponse(csv, {
+  return new NextResponse(new Uint8Array(buffer), {
     headers: {
-      'Content-Type': 'text/csv',
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'Content-Disposition': `attachment; filename="${filename}"`,
     },
   })

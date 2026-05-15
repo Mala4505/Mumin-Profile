@@ -9,10 +9,6 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  if (session.role === 'Mumin') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
-
   const { id } = await params
   const supabase = await createClient()
   const { data: form, error: formErr } = await supabase.from('forms').select('*').eq('id', id).single()
@@ -20,6 +16,27 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   if (formErr || !form) {
     return NextResponse.json({ error: 'Form not found' }, { status: 404 })
   }
+
+  const isStaffOnly = form.viewable_by_roles === 'staff_only'
+  const isStaff = ['SuperAdmin', 'Admin', 'Masool', 'Musaid'].includes(session.role)
+
+  // Mumin can only see own responses if form allows it
+  if (session.role === 'Mumin') {
+    if (isStaffOnly) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+    const { data: ownResponses, error: respErr } = await supabase
+      .from('form_responses')
+      .select('*, mumin!filled_for(name, its_no)')
+      .eq('form_id', id)
+      .eq('filled_for', Number(session.its_no))
+      .eq('submitted', true)
+      .order('submitted_at', { ascending: false })
+
+    if (respErr) return NextResponse.json({ error: respErr.message }, { status: 500 })
+    return NextResponse.json({ form, responses: ownResponses ?? [], audience: [] })
+  }
+
+  if (!isStaff) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   if (session.role === 'Masool' || session.role === 'Musaid') {
     const isCreator = Number(session.its_no) === form.created_by

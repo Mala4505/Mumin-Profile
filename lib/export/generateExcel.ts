@@ -27,8 +27,18 @@ export interface ExportMember {
   [key: string]: string | number | null | undefined
 }
 
+export const BASE_COLUMNS: ExportColumn[] = [
+  { key: 'its_no',         header: 'ITS No',     width: 12 },
+  { key: 'name',           header: 'Name',        width: 30 },
+  { key: 'sabeel_no',      header: 'Sabeel No',   width: 12 },
+  { key: 'sector_name',    header: 'Sector',      width: 20 },
+  { key: 'subsector_name', header: 'SubSector',   width: 20 },
+  { key: 'masool_name',    header: 'Masool',      width: 20 },
+  { key: 'musaid_names',   header: 'Musaid',      width: 20 },
+]
+
 export async function generateExcel(
-  members: ExportMember[],
+  data: Record<string, unknown>[],
   columns: ExportColumn[],
   sheetName = 'Members'
 ): Promise<Uint8Array> {
@@ -57,10 +67,10 @@ export async function generateExcel(
   headerRow.height = 20
 
   // Data rows
-  members.forEach(member => {
-    const rowData: Record<string, string | number | null | undefined> = {}
+  data.forEach(row => {
+    const rowData: Record<string, unknown> = {}
     columns.forEach(col => {
-      rowData[col.key] = member[col.key] ?? ''
+      rowData[col.key] = row[col.key] ?? ''
     })
     sheet.addRow(rowData)
   })
@@ -75,6 +85,7 @@ export async function generateExcel(
   return new Uint8Array(buffer as ArrayBuffer)
 }
 
+/** @deprecated Use BASE_COLUMNS + role-specific extras instead */
 export const DEFAULT_COLUMNS: ExportColumn[] = [
   { key: 'its_no', header: 'ITS No', width: 12 },
   { key: 'name', header: 'Name', width: 30 },

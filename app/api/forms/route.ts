@@ -9,8 +9,55 @@ export async function GET() {
   const supabase = await createClient()
   let formData: any[] = []
 
-  if (session.role === 'Mumin') {
-    // Mumin sees only published self-fill forms where they're in the audience
+  if (session.role === 'Mumin' && session.is_hof) {
+    // HOF Mumin sees self-fill audience forms + published HOF-access forms
+    const itsNo = Number(session.its_no)
+
+    const { data: audienceRows } = await supabase
+      .from('form_audience')
+      .select('form_id')
+      .eq('its_no', itsNo)
+
+    const audienceFormIds = (audienceRows ?? []).map((a) => a.form_id as string)
+
+    const queries: Promise<any>[] = [
+      supabase
+        .from('forms')
+        .select('*, event:event_id(title, event_date, end_date)')
+        .eq('status', 'published')
+        .filter('filler_access', 'cs', JSON.stringify({ fillers: [{ type: 'hof' }] }))
+        .order('created_at', { ascending: false }),
+    ]
+
+    if (audienceFormIds.length > 0) {
+      queries.push(
+        supabase
+          .from('forms')
+          .select('*, event:event_id(title, event_date, end_date)')
+          .in('id', audienceFormIds)
+          .eq('status', 'published')
+          .order('created_at', { ascending: false }),
+      )
+    }
+
+    const results = await Promise.all(queries)
+    const seen = new Set<string>()
+    for (const result of results) {
+      for (const form of result.data ?? []) {
+        if (!seen.has(form.id)) {
+          seen.add(form.id)
+          // for self-fill forms, check filler_access as before
+          const fillers = (form.filler_access as any)?.fillers ?? []
+          const isHofForm = fillers.some((f: any) => f.type === 'hof')
+          const isSelfForm = fillers.some((f: any) => f.type === 'self')
+          if (isHofForm || isSelfForm) formData.push(form)
+        }
+      }
+    }
+
+    formData.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  } else if (session.role === 'Mumin') {
+    // Non-HOF Mumin sees only published self-fill forms where they're in the audience
     const { data: audienceRows } = await supabase
       .from('form_audience')
       .select('form_id')
@@ -21,7 +68,7 @@ export async function GET() {
     if (formIds.length > 0) {
       const { data, error } = await supabase
         .from('forms')
-        .select('*')
+        .select('*, event:event_id(title, event_date, end_date)')
         .in('id', formIds)
         .eq('status', 'published')
         .order('created_at', { ascending: false })
@@ -44,14 +91,14 @@ export async function GET() {
       // Forms this user created (any status)
       supabase
         .from('forms')
-        .select('*')
+        .select('*, event:event_id(title, event_date, end_date)')
         .eq('created_by', itsNo)
         .order('created_at', { ascending: false }),
 
       // Published forms this user can fill by role (e.g. "All Masools")
       supabase
         .from('forms')
-        .select('*')
+        .select('*, event:event_id(title, event_date, end_date)')
         .eq('status', 'published')
         .filter(
           'filler_access',
@@ -63,7 +110,7 @@ export async function GET() {
       // Published forms where this user is specifically named
       supabase
         .from('forms')
-        .select('*')
+        .select('*, event:event_id(title, event_date, end_date)')
         .eq('status', 'published')
         .filter(
           'filler_access',
@@ -93,7 +140,7 @@ export async function GET() {
     // SuperAdmin / Admin — see all forms
     const { data, error } = await supabase
       .from('forms')
-      .select('*')
+      .select('*, event:event_id(title, event_date, end_date)')
       .order('created_at', { ascending: false })
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -158,6 +205,7 @@ export async function POST(req: NextRequest) {
       form_type: body.form_type ?? 'simple',
       audience_filters: body.audience_filters ?? { all: true },
       filler_access: body.filler_access ?? { fillers: [] },
+      viewable_by_roles: body.viewable_by_roles ?? 'all',
       expires_at: body.expires_at ?? null,
       created_by: Number(session.its_no),
       status: 'draft',

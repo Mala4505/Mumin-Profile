@@ -709,6 +709,7 @@ export type Database = {
           expires_at: string | null;
           audience_filters: AudienceFilters | null;
           filler_access: FillerAccess | null;
+          viewable_by_roles: "all" | "staff_only";
           approved_by: number | null;
           approved_at: string | null;
           published_at: string | null;
@@ -724,6 +725,7 @@ export type Database = {
           event_id?: number | null;
           audience_filters?: AudienceFilters | null;
           filler_access?: FillerAccess | null;
+          viewable_by_roles?: "all" | "staff_only";
           status?: "draft" | "pending_approval" | "published" | "closed";
           approved_by?: number | null;
           approved_at?: string | null;
@@ -741,6 +743,7 @@ export type Database = {
           event_id?: number | null;
           audience_filters?: AudienceFilters | null;
           filler_access?: FillerAccess | null;
+          viewable_by_roles?: "all" | "staff_only";
           status?: "draft" | "pending_approval" | "published" | "closed";
           approved_by?: number | null;
           approved_at?: string | null;
@@ -813,6 +816,7 @@ export type Database = {
           title: string;
           description: string | null;
           event_date: string;
+          end_date: string | null;
           category_id: number | null;
           created_by: number | null;
           created_at: string;
@@ -823,6 +827,7 @@ export type Database = {
           title: string;
           description?: string | null;
           event_date: string;
+          end_date?: string | null;
           category_id?: number | null;
           created_by?: number | null;
           created_at?: string;
@@ -833,6 +838,7 @@ export type Database = {
           title?: string;
           description?: string | null;
           event_date?: string;
+          end_date?: string | null;
           category_id?: number | null;
           created_by?: number | null;
           updated_at?: string;

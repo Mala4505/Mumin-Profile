@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/getSession'
 import { createClient } from '@/lib/supabase/server'
-import Papa from 'papaparse'
+import { generateExcel, BASE_COLUMNS, ExportColumn } from '@/lib/export/generateExcel'
+import { fetchMemberBase } from '@/lib/export/fetchMemberBase'
 
 export async function GET(req: NextRequest) {
   const session = await getSession()
@@ -10,7 +11,7 @@ export async function GET(req: NextRequest) {
   }
 
   const params = req.nextUrl.searchParams
-  const itsNos = params.get('its_nos')?.split(',').filter(Boolean) ?? []
+  const itsNos = params.get('its_nos')?.split(',').filter(Boolean).map(Number) ?? []
   const columns = params.get('columns')?.split(',').filter(Boolean) ?? []
 
   if (!itsNos.length || !columns.length) {
@@ -18,50 +19,54 @@ export async function GET(req: NextRequest) {
   }
 
   const supabase = await createClient()
-  const { data: members } = await supabase
-    .from('mumin')
-    .select('its_no, name')
-    .in('its_no', itsNos.map(Number))
 
-  const { data: values } = await supabase
-    .from('profile_value')
-    .select('its_no, field_id, value')
-    .in('its_no', itsNos.map(Number))
-
-  // Fetch field captions so we can use them as column headers
-  const { data: fields } = await supabase
-    .from('profile_field')
-    .select('id, caption')
+  const [baseMap, valuesResult, fieldsResult] = await Promise.all([
+    fetchMemberBase(itsNos, supabase),
+    supabase
+      .from('profile_value')
+      .select('its_no, field_id, value')
+      .in('its_no', itsNos),
+    supabase
+      .from('profile_field')
+      .select('id, caption'),
+  ])
 
   const fieldCaptionMap: Record<number, string> = {}
-  for (const f of fields ?? []) fieldCaptionMap[f.id] = f.caption
+  for (const f of fieldsResult.data ?? []) fieldCaptionMap[f.id] = f.caption
 
-  // Pivot: one row per member, columns = field captions
-  const pivoted = (members ?? []).map((m) => {
-    const row: Record<string, string> = {
-      its_no: String(m.its_no),
-      name: m.name,
+  const baseKeys = new Set(BASE_COLUMNS.map(c => c.key))
+  const extraCols: ExportColumn[] = columns
+    .filter(c => !baseKeys.has(c) && c !== 'its_no' && c !== 'name')
+    .map(c => ({ key: c, header: c, width: 20 }))
+
+  const rows = itsNos.map((itsNo) => {
+    const base = baseMap.get(itsNo)
+    const row: Record<string, unknown> = {
+      its_no: itsNo,
+      name: base?.name ?? '',
+      sabeel_no: base?.sabeel_no ?? '',
+      sector_name: base?.sector_name ?? '',
+      subsector_name: base?.subsector_name ?? '',
+      masool_name: base?.masool_name ?? '',
+      musaid_names: base?.musaid_names ?? '',
     }
-    const memberVals = (values ?? []).filter((v) => v.its_no === m.its_no)
+    const memberVals = (valuesResult.data ?? []).filter(v => v.its_no === itsNo)
     for (const val of memberVals) {
       const caption = fieldCaptionMap[val.field_id] ?? String(val.field_id)
-      row[caption] = val.value ?? ''
+      if (extraCols.find(c => c.key === caption)) {
+        row[caption] = val.value ?? ''
+      }
     }
     return row
   })
 
-  const filtered = pivoted.map((r) => {
-    const out: Record<string, string> = {}
-    for (const col of columns) out[col] = r[col] ?? ''
-    return out
-  })
+  const allCols = [...BASE_COLUMNS, ...extraCols]
+  const buffer = await generateExcel(rows, allCols, 'Profile Report')
+  const filename = `profile-report-${new Date().toISOString().split('T')[0]}.xlsx`
 
-  const csv = Papa.unparse(filtered, { columns })
-  const filename = `profile-report-${new Date().toISOString().split('T')[0]}.csv`
-
-  return new NextResponse(csv, {
+  return new NextResponse(new Uint8Array(buffer), {
     headers: {
-      'Content-Type': 'text/csv',
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'Content-Disposition': `attachment; filename="${filename}"`,
     },
   })

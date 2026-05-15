@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/getSession'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { generateExcel, DEFAULT_COLUMNS } from '@/lib/export/generateExcel'
+import { generateExcel, BASE_COLUMNS, ExportColumn } from '@/lib/export/generateExcel'
 import { resolveScope } from '@/lib/auth/resolveScope'
 import type { MemberFilters } from '@/lib/types/app'
 
@@ -79,15 +79,22 @@ export async function GET(req: NextRequest) {
     }
   })
 
-  // Determine columns based on role
-  const columns = session.role === 'SuperAdmin' || session.role === 'Masool' || session.role === 'Musaid'
-    ? [
-        ...DEFAULT_COLUMNS,
-        { key: 'alternate_phone', header: 'Alt Phone', width: 16 },
-        { key: 'email', header: 'Email', width: 25 },
-        { key: 'date_of_birth', header: 'Date of Birth', width: 14 },
-      ]
-    : DEFAULT_COLUMNS
+  const isPrivileged = session.role === 'SuperAdmin' || session.role === 'Masool' || session.role === 'Musaid'
+
+  // Column order: BASE + Phone, [Alt Phone*, Email*, DOB*,] Gender, Balig Status, HOF ITS, Status
+  const columns: ExportColumn[] = [
+    ...BASE_COLUMNS,
+    { key: 'phone',         header: 'Phone',         width: 16 },
+    ...(isPrivileged ? [
+      { key: 'alternate_phone', header: 'Alt Phone',    width: 16 },
+      { key: 'email',           header: 'Email',         width: 25 },
+      { key: 'date_of_birth',   header: 'Date of Birth', width: 14 },
+    ] : []),
+    { key: 'gender',        header: 'Gender',        width: 10 },
+    { key: 'balig_status',  header: 'Balig Status',  width: 14 },
+    { key: 'hof_its_no',    header: 'HOF ITS',       width: 12 },
+    { key: 'status',        header: 'Status',        width: 12 },
+  ]
 
   const buffer = await generateExcel(members, columns)
 

@@ -483,7 +483,7 @@ export function ReportsClient({ sectors, role }: ReportsClientProps) {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `form-report-${new Date().toISOString().split('T')[0]}.csv`
+      a.download = `form-report-${new Date().toISOString().split('T')[0]}.xlsx`
       a.click()
       URL.revokeObjectURL(url)
       setExportSuccess(true)

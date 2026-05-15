@@ -17,6 +17,7 @@ interface Event {
   id: number
   title: string
   event_date: string
+  end_date: string | null
 }
 
 interface Props {
@@ -38,6 +39,7 @@ export function Step1BasicInfo({ draft, update, onNext, userRole }: Props) {
   const [showNewEvent, setShowNewEvent] = useState(false)
   const [newEventTitle, setNewEventTitle] = useState('')
   const [newEventDate, setNewEventDate] = useState('')
+  const [newEventEnd, setNewEventEnd] = useState('')
   const [creatingEvent, setCreatingEvent] = useState(false)
   const [newEventError, setNewEventError] = useState<string | null>(null)
 
@@ -78,7 +80,7 @@ export function Step1BasicInfo({ draft, update, onNext, userRole }: Props) {
       const res = await fetch('/api/events', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: newEventTitle.trim(), event_date: newEventDate }),
+        body: JSON.stringify({ title: newEventTitle.trim(), event_date: newEventDate, end_date: newEventEnd || null }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Failed to create event')
@@ -89,6 +91,7 @@ export function Step1BasicInfo({ draft, update, onNext, userRole }: Props) {
       setShowNewEvent(false)
       setNewEventTitle('')
       setNewEventDate('')
+      setNewEventEnd('')
     } catch (err: any) {
       setNewEventError(err.message)
     } finally {
@@ -185,7 +188,7 @@ export function Step1BasicInfo({ draft, update, onNext, userRole }: Props) {
               <option value="">No event</option>
               {events.map((ev) => (
                 <option key={ev.id} value={ev.id}>
-                  {ev.title} ({ev.event_date})
+                  {ev.title} ({ev.event_date}{ev.end_date ? ` – ${ev.end_date}` : ''})
                 </option>
               ))}
             </select>
@@ -207,8 +210,8 @@ export function Step1BasicInfo({ draft, update, onNext, userRole }: Props) {
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
               Create New Event
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-1 sm:col-span-1">
                 <Label htmlFor="new-event-title" className="text-xs">Title</Label>
                 <Input
                   id="new-event-title"
@@ -219,12 +222,22 @@ export function Step1BasicInfo({ draft, update, onNext, userRole }: Props) {
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="new-event-date" className="text-xs">Date</Label>
+                <Label htmlFor="new-event-date" className="text-xs">Start Date</Label>
                 <Input
                   id="new-event-date"
                   type="date"
                   value={newEventDate}
                   onChange={(e) => setNewEventDate(e.target.value)}
+                  className="h-8 text-sm"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="new-event-end" className="text-xs">End Date <span className="text-muted-foreground">(optional)</span></Label>
+                <Input
+                  id="new-event-end"
+                  type="date"
+                  value={newEventEnd}
+                  onChange={(e) => setNewEventEnd(e.target.value)}
                   className="h-8 text-sm"
                 />
               </div>
@@ -250,7 +263,7 @@ export function Step1BasicInfo({ draft, update, onNext, userRole }: Props) {
         {selectedEvent && !showNewEvent && (
           <p className="text-xs text-muted-foreground">
             Linked to: <span className="font-medium text-foreground">{selectedEvent.title}</span>{' '}
-            on {selectedEvent.event_date}
+            {selectedEvent.event_date}{selectedEvent.end_date ? ` – ${selectedEvent.end_date}` : ''}
           </p>
         )}
       </div>

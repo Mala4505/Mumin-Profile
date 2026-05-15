@@ -112,6 +112,7 @@ export async function PUT(
     'questions',
     'audience_filters',
     'filler_access',
+    'viewable_by_roles',
     'expires_at',
     'event_id',
     'umoor_category_id',

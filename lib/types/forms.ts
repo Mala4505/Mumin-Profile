@@ -16,6 +16,7 @@ export interface FillerAccess {
     | { type: 'specific_masool'; value: string[] }
     | { type: 'specific_musaid'; value: string[] }
     | { type: 'self' }
+    | { type: 'hof' }
   >
 }
 

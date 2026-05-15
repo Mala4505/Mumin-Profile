@@ -119,6 +119,7 @@ export function Step4Access({ draft, update, onNext, onBack }: Props) {
   const hasRoleMasool = fillers.some((f) => f.type === 'role' && f.value === 'Masool')
   const hasRoleMusaid = fillers.some((f) => f.type === 'role' && f.value === 'Musaid')
   const hasSelf = fillers.some((f) => f.type === 'self')
+  const hasHof = fillers.some((f) => f.type === 'hof')
   const specificMasool = (fillers.find((f) => f.type === 'specific_masool') as { type: 'specific_masool'; value: number[] } | undefined)?.value ?? []
   const specificMusaid = (fillers.find((f) => f.type === 'specific_musaid') as { type: 'specific_musaid'; value: number[] } | undefined)?.value ?? []
 
@@ -136,18 +137,21 @@ export function Step4Access({ draft, update, onNext, onBack }: Props) {
     roleMasool?: boolean
     roleMusaid?: boolean
     self?: boolean
+    hof?: boolean
     specMasool?: number[]
     specMusaid?: number[]
   }): FillerAccess {
     const rm = patch.roleMasool ?? hasRoleMasool
     const rmu = patch.roleMusaid ?? hasRoleMusaid
     const sf = patch.self ?? hasSelf
+    const hof = patch.hof ?? hasHof
     const sm = patch.specMasool ?? specificMasool
     const smu = patch.specMusaid ?? specificMusaid
 
     const next: FillerAccess['fillers'] = []
     if (rm) next.push({ type: 'role', value: 'Masool' })
     if (rmu) next.push({ type: 'role', value: 'Musaid' })
+    if (hof) next.push({ type: 'hof' })
     if (sm.length > 0) next.push({ type: 'specific_masool', value: sm.map(String) })
     if (smu.length > 0) next.push({ type: 'specific_musaid', value: smu.map(String) })
     if (sf) next.push({ type: 'self' })
@@ -180,6 +184,13 @@ export function Step4Access({ draft, update, onNext, onBack }: Props) {
               sublabel="Every user with the Musaid role can fill this form"
               checked={hasRoleMusaid}
               onChange={(v) => update({ filler_access: buildFillers({ roleMusaid: v }) })}
+            />
+            <CheckItem
+              id="hof-fill"
+              label="Heads of Family (HOF)"
+              sublabel="Family heads can fill this form for their family members"
+              checked={hasHof}
+              onChange={(v) => update({ filler_access: buildFillers({ hof: v }) })}
             />
           </div>
         </div>

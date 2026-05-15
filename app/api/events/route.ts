@@ -10,7 +10,7 @@ export async function GET() {
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('event')
-    .select('id, title, event_date, category_id')
+    .select('id, title, event_date, end_date, category_id')
     .order('event_date', { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { title, event_date, description, category_id } = body
+  const { title, event_date, end_date, description, category_id } = body
 
   if (!title?.trim()) {
     return NextResponse.json({ error: 'title is required' }, { status: 400 })
@@ -40,6 +40,7 @@ export async function POST(req: NextRequest) {
     .insert({
       title: title.trim(),
       event_date,
+      end_date: end_date || null,
       description: description?.trim() || null,
       category_id: category_id ? Number(category_id) : null,
       created_by: Number(session.its_no),

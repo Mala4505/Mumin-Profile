@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Pencil, Check, X, Loader2, FileText, Clock, CheckCircle2, Activity } from 'lucide-react'
+import { Pencil, Check, X, Loader2, FileText, Clock, CheckCircle2, Activity, Calendar } from 'lucide-react'
 import Link from 'next/link'
 import { LumaSpin } from '@/components/ui/luma-spin'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
@@ -26,12 +26,28 @@ interface Form {
   status: string
   expires_at: string | null
   is_expired: boolean
+  event: { title: string; event_date: string; end_date: string | null } | null
 }
 
 interface ActivityItem {
   form_id: string
   form_title: string
   submitted_at: string
+}
+
+interface HistoricalEntry {
+  answer: string
+  submitted_at: string
+  label: string | null
+}
+
+interface HistoricalField {
+  field_id: number
+  caption: string
+  field_type: string
+  category_name: string
+  category_sort_order: number
+  entries: HistoricalEntry[]
 }
 
 interface Props {
@@ -51,6 +67,32 @@ function groupByCategory(values: ProfileValue[]) {
     .map(([name, { fields }]) => ({
       name,
       fields: fields.sort((a, b) => a.sort_order - b.sort_order),
+    }))
+}
+
+function groupAllByCategory(staticFields: ProfileValue[], historicalFields: HistoricalField[]) {
+  const map = new Map<string, { sort_order: number; static: ProfileValue[]; historical: HistoricalField[] }>()
+
+  for (const f of staticFields) {
+    if (!map.has(f.category_name)) {
+      map.set(f.category_name, { sort_order: f.category_sort_order, static: [], historical: [] })
+    }
+    map.get(f.category_name)!.static.push(f)
+  }
+
+  for (const f of historicalFields) {
+    if (!map.has(f.category_name)) {
+      map.set(f.category_name, { sort_order: f.category_sort_order, static: [], historical: [] })
+    }
+    map.get(f.category_name)!.historical.push(f)
+  }
+
+  return Array.from(map.entries())
+    .sort((a, b) => a[1].sort_order - b[1].sort_order)
+    .map(([name, { static: sf, historical: hf }]) => ({
+      name,
+      staticFields: sf.sort((a, b) => a.sort_order - b.sort_order),
+      historicalFields: hf,
     }))
 }
 
@@ -169,6 +211,7 @@ export function MuminPortalTabs({ itsNo }: Props) {
 
   // Profile tab state
   const [profileValues, setProfileValues] = useState<ProfileValue[]>([])
+  const [historyValues, setHistoryValues] = useState<HistoricalField[]>([])
   const [profileLoading, setProfileLoading] = useState(true)
 
   // Forms + Activity tab state (loaded together on first forms/activity tab visit)
@@ -179,9 +222,14 @@ export function MuminPortalTabs({ itsNo }: Props) {
   const [formsLoaded, setFormsLoaded] = useState(false)
 
   useEffect(() => {
-    fetch(`/api/members/${itsNo}/profile-values`)
-      .then((r) => r.json())
-      .then((d) => setProfileValues(d.profile_values ?? []))
+    Promise.all([
+      fetch(`/api/members/${itsNo}/profile-values`).then((r) => r.json()),
+      fetch(`/api/members/${itsNo}/profile-history`).then((r) => r.json()),
+    ])
+      .then(([pvData, phData]) => {
+        setProfileValues(pvData.profile_values ?? [])
+        setHistoryValues(phData.history ?? [])
+      })
       .catch(() => {})
       .finally(() => setProfileLoading(false))
   }, [itsNo])
@@ -217,7 +265,7 @@ export function MuminPortalTabs({ itsNo }: Props) {
     )
   }
 
-  const categories = groupByCategory(profileValues)
+  const mergedCategories = groupAllByCategory(profileValues, historyValues)
 
   const now = new Date()
   const pendingForms = forms.filter(
@@ -260,23 +308,42 @@ export function MuminPortalTabs({ itsNo }: Props) {
             <div className="flex items-center justify-center py-8">
               <LumaSpin size={36} />
             </div>
-          ) : categories.length === 0 ? (
+          ) : mergedCategories.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-6">No profile data available yet.</p>
           ) : (
             <div className="space-y-5">
-              {categories.map((cat) => (
+              {mergedCategories.map((cat) => (
                 <div key={cat.name}>
                   <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
                     {cat.name}
                   </h3>
                   <div>
-                    {cat.fields.map((f) => (
+                    {cat.staticFields.map((f) => (
                       <EditableProfileField
                         key={f.field_id}
                         field={f}
                         itsNo={itsNo}
                         onSaved={handleFieldSaved}
                       />
+                    ))}
+                    {cat.historicalFields.map((f) => (
+                      <div key={f.field_id} className="py-2.5 border-b border-border last:border-0">
+                        <p className="text-xs text-muted-foreground mb-0.5">{f.caption}</p>
+                        {f.entries.length === 0 ? (
+                          <p className="text-sm text-muted-foreground italic">No records</p>
+                        ) : (
+                          <div className="space-y-1">
+                            {f.entries.map((e, i) => (
+                              <div key={`${e.submitted_at}-${i}`} className="flex justify-between items-center">
+                                <span className="text-sm font-medium text-foreground">{e.answer}</span>
+                                <span className="text-xs text-muted-foreground ml-2 shrink-0">
+                                  {e.label ?? new Date(e.submitted_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -326,6 +393,12 @@ export function MuminPortalTabs({ itsNo }: Props) {
                           {form.description && (
                             <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{form.description}</p>
                           )}
+                          {form.event && (
+                            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
+                              <Calendar className="w-3 h-3 shrink-0" />
+                              {form.event.title}
+                            </span>
+                          )}
                           {form.expires_at && (
                             <p className={`text-xs mt-1 ${isExpiringSoon(form.expires_at) ? 'text-red-600 font-medium' : 'text-orange-600'}`}>
                               Due: {new Date(form.expires_at).toLocaleDateString()}
@@ -360,7 +433,15 @@ export function MuminPortalTabs({ itsNo }: Props) {
                         className="border border-green-200 bg-green-50 rounded-lg p-3 flex items-center gap-3"
                       >
                         <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
-                        <p className="text-sm font-medium text-foreground">{form.title}</p>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-foreground">{form.title}</p>
+                          {form.event && (
+                            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
+                              <Calendar className="w-3 h-3 shrink-0" />
+                              {form.event.title}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
