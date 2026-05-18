@@ -947,6 +947,9 @@ export type Database = {
           sort_order: number;
           is_required: boolean;
           created_at: string;
+          question_text: string | null;
+          field_type_override: string | null;
+          options_override: Json | null;
         };
         Insert: {
           id?: number;
@@ -955,6 +958,9 @@ export type Database = {
           sort_order?: number;
           is_required?: boolean;
           created_at?: string;
+          question_text?: string | null;
+          field_type_override?: string | null;
+          options_override?: Json | null;
         };
         Update: {
           id?: number;
@@ -963,6 +969,9 @@ export type Database = {
           sort_order?: number;
           is_required?: boolean;
           created_at?: string;
+          question_text?: string | null;
+          field_type_override?: string | null;
+          options_override?: Json | null;
         };
         Relationships: [];
       };

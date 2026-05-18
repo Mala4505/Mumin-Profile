@@ -273,8 +273,8 @@ export function Step1BasicInfo({ draft, update, onNext, userRole }: Props) {
         <Label>Form Type</Label>
         <div className="grid grid-cols-2 gap-3">
           {[
-            { value: 'simple', label: 'Simple', desc: 'One row per member in a table view' },
-            { value: 'detailed', label: 'Detailed', desc: 'Full form per member with all questions' },
+            { value: 'simple', label: 'Profile Form', desc: 'Answers permanently update each member\'s profile' },
+            { value: 'detailed', label: 'Historical Form', desc: 'Answers are stored per form/event for historical tracking' },
           ].map((opt) => {
             const active = (draft.form_type ?? 'simple') === opt.value
             return (

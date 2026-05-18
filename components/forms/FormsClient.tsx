@@ -76,11 +76,11 @@ const STATUS_CONFIG: Record<Form['status'], { label: string; className: string }
 
 const TYPE_CONFIG: Record<Form['form_type'], { label: string; className: string }> = {
   simple: {
-    label: 'Simple',
+    label: 'Profile',
     className: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
   },
   detailed: {
-    label: 'Detailed',
+    label: 'Historical',
     className: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
   },
 }

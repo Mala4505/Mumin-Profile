@@ -103,6 +103,11 @@ export function Step5Review({ draft, onDraftChange, onBack, onComplete, role }: 
               field_id: q.profile_field_id,
               sort_order: q.sort_order ?? idx,
               is_required: false,
+              question_text: q.question_text?.trim() || null,
+              field_type_override: q.field_type_override ?? null,
+              options_override: (q.options_override ?? []).filter(o => o.trim()).length > 0
+                ? (q.options_override ?? []).filter(o => o.trim())
+                : null,
             })),
           }),
         })
@@ -155,7 +160,9 @@ export function Step5Review({ draft, onDraftChange, onBack, onComplete, role }: 
           <dl className="flex flex-col gap-2 sm:flex-row sm:gap-4">
             <SectionLabel>Form Type</SectionLabel>
             <SectionValue>
-              <span className="capitalize">{draft.form_type ?? 'simple'}</span>
+              <span className="capitalize">
+                {draft.form_type === 'simple' ? 'Profile Form' : 'Historical Form'}
+              </span>
             </SectionValue>
           </dl>
         </div>

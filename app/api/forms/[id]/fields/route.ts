@@ -24,6 +24,9 @@ export async function GET(
         field_id,
         sort_order,
         is_required,
+        question_text,
+        field_type_override,
+        options_override,
         profile_field!inner (
           id,
           caption,
@@ -95,6 +98,9 @@ export async function POST(
         field_id: f.field_id,
         sort_order: f.sort_order ?? idx,
         is_required: f.is_required ?? false,
+        question_text: f.question_text ?? null,
+        field_type_override: f.field_type_override ?? null,
+        options_override: f.options_override ?? null,
       }))
 
       const { error } = await supabase

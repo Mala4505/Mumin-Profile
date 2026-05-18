@@ -10,11 +10,23 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import type { Role } from '@/lib/types/app'
 
+const QUESTION_TYPES = [
+  { value: 'text',         label: 'Short Text'     },
+  { value: 'paragraph',   label: 'Paragraph'       },
+  { value: 'number',      label: 'Number'          },
+  { value: 'date',        label: 'Date'            },
+  { value: 'select',      label: 'Single Choice'   },
+  { value: 'multiselect', label: 'Multiple Choice' },
+] as const
+
 interface FormField {
   id: string
   field_id: number
   sort_order: number
   is_required: boolean
+  question_text?: string | null
+  field_type_override?: string | null
+  options_override?: string[] | null
   profile_field: {
     id: number
     caption: string
@@ -64,6 +76,7 @@ export function FormEditClient({ form, fields: initialFields, role, itsNo }: Pro
   const [fields, setFields] = useState<FormField[]>(initialFields)
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+  const [editingTypeIdx, setEditingTypeIdx] = useState<number | null>(null)
 
   const [profileFields, setProfileFields] = useState<ProfileField[]>([])
   const [showAdd, setShowAdd] = useState(false)
@@ -183,11 +196,33 @@ export function FormEditClient({ form, fields: initialFields, role, itsNo }: Pro
         field_id: pf.id,
         sort_order: prev.length,
         is_required: false,
+        question_text: null,
+        field_type_override: null,
+        options_override: null,
         profile_field: { id: pf.id, caption: pf.caption, field_type: pf.field_type, behavior: pf.behavior, options: pf.options },
       },
     ])
     setShowAdd(false)
     setFieldSearch('')
+  }
+
+  function updateFieldType(index: number, type: string) {
+    setFields(prev => prev.map((f, i) =>
+      i === index
+        ? {
+            ...f,
+            field_type_override: type,
+            options_override:
+              type === 'select' || type === 'multiselect'
+                ? (f.options_override?.length ? f.options_override : [''])
+                : null,
+          }
+        : f
+    ))
+  }
+
+  function updateFieldOptions(index: number, opts: string[]) {
+    setFields(prev => prev.map((f, i) => i === index ? { ...f, options_override: opts } : f))
   }
 
   function removeField(index: number) {
@@ -233,6 +268,11 @@ export function FormEditClient({ form, fields: initialFields, role, itsNo }: Pro
               field_id: f.field_id,
               sort_order: i,
               is_required: f.is_required,
+              question_text: f.question_text ?? null,
+              field_type_override: f.field_type_override ?? null,
+              options_override: f.options_override?.filter(o => o.trim()).length
+                ? f.options_override.filter(o => o.trim())
+                : null,
             })),
           }),
         }),
@@ -326,7 +366,9 @@ export function FormEditClient({ form, fields: initialFields, role, itsNo }: Pro
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <span>
               Type:{' '}
-              <span className="text-foreground font-medium capitalize">{form.form_type}</span>
+              <span className="text-foreground font-medium">
+                {form.form_type === 'simple' ? 'Profile Form' : 'Historical Form'}
+              </span>
             </span>
             <span>·</span>
             <span>
@@ -393,37 +435,88 @@ export function FormEditClient({ form, fields: initialFields, role, itsNo }: Pro
                   </button>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">{f.profile_field.caption}</p>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-xs text-muted-foreground capitalize">{f.profile_field.field_type}</span>
-                    <span
-                      className={`text-[10px] flex items-center gap-0.5 px-1.5 py-0.5 rounded-full font-medium ${
-                        f.profile_field.behavior === 'static'
-                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                          : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
-                      }`}
-                    >
-                      {f.profile_field.behavior === 'static' ? (
-                        <UserCircle className="w-2.5 h-2.5" />
-                      ) : (
-                        <History className="w-2.5 h-2.5" />
-                      )}
-                      {f.profile_field.behavior === 'static' ? 'Profile' : 'Event'}
+                  <p className="text-sm font-medium text-foreground truncate">
+                    {f.question_text || f.profile_field.caption}
+                  </p>
+                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                    <span className="text-xs text-muted-foreground">
+                      {QUESTION_TYPES.find(t => t.value === (f.field_type_override ?? f.profile_field.field_type))?.label
+                        ?? (f.field_type_override ?? f.profile_field.field_type)}
                     </span>
                     <label className="flex items-center gap-1 text-xs text-muted-foreground cursor-pointer">
                       <input
                         type="checkbox"
                         checked={f.is_required}
-                        onChange={e =>
-                          setFields(prev =>
-                            prev.map((ff, idx) => (idx === i ? { ...ff, is_required: e.target.checked } : ff))
-                          )
-                        }
+                        onChange={e => setFields(prev =>
+                          prev.map((ff, idx) => idx === i ? { ...ff, is_required: e.target.checked } : ff)
+                        )}
                         className="rounded"
                       />
                       Required
                     </label>
+                    <button
+                      type="button"
+                      onClick={() => setEditingTypeIdx(editingTypeIdx === i ? null : i)}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      {editingTypeIdx === i ? 'done' : 'edit type'}
+                    </button>
                   </div>
+
+                  {editingTypeIdx === i && (
+                    <div className="mt-2 space-y-2 p-3 bg-muted/30 rounded-lg border border-border">
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-muted-foreground">Question Type</label>
+                        <select
+                          value={f.field_type_override ?? f.profile_field.field_type}
+                          onChange={e => updateFieldType(i, e.target.value)}
+                          className="w-full h-8 px-2 text-xs bg-background border border-border rounded-lg text-foreground focus:outline-none"
+                        >
+                          {QUESTION_TYPES.map(t => (
+                            <option key={t.value} value={t.value}>{t.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      {((f.field_type_override ?? f.profile_field.field_type) === 'select' ||
+                        (f.field_type_override ?? f.profile_field.field_type) === 'multiselect') && (
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-medium text-muted-foreground">Options</label>
+                          {(f.options_override ?? f.profile_field.options ?? ['']).map((opt, oi) => (
+                            <div key={oi} className="flex gap-2 items-center">
+                              <input
+                                type="text"
+                                value={opt}
+                                onChange={e => {
+                                  const next = [...(f.options_override ?? f.profile_field.options ?? [''])]
+                                  next[oi] = e.target.value
+                                  updateFieldOptions(i, next)
+                                }}
+                                placeholder={`Option ${oi + 1}`}
+                                className="flex-1 h-7 px-2 text-xs bg-background border border-border rounded-lg text-foreground focus:outline-none"
+                              />
+                              <button
+                                type="button"
+                                disabled={(f.options_override ?? f.profile_field.options ?? ['']).length <= 1}
+                                onClick={() =>
+                                  updateFieldOptions(i, (f.options_override ?? f.profile_field.options ?? ['']).filter((_, idx) => idx !== oi))
+                                }
+                                className="p-1 text-muted-foreground hover:text-destructive disabled:opacity-30"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() => updateFieldOptions(i, [...(f.options_override ?? f.profile_field.options ?? ['']), ''])}
+                            className="flex items-center gap-1 text-xs text-primary hover:text-primary/80"
+                          >
+                            <Plus className="w-3 h-3" /> Add option
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <button
                   onClick={() => removeField(i)}

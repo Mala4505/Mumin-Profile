@@ -235,6 +235,19 @@ function FieldInput({
     )
   }
 
+  if (fieldType === 'paragraph') {
+    return (
+      <textarea
+        value={value}
+        disabled={disabled}
+        rows={4}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Your answer"
+        className={`${base} resize-none`}
+      />
+    )
+  }
+
   if (fieldType === 'select' && options && options.length > 0) {
     return (
       <select

@@ -102,11 +102,11 @@ export function BulkFillForm({ formId, role, itsNo }: BulkFillFormProps) {
         const { fields } = await fieldsRes.json()
         const mapped: FormField[] = (fields ?? []).map((f: any) => ({
           profile_field_id: f.field_id,
-          question_text: f.profile_field?.caption ?? '',
+          question_text: f.question_text ?? f.profile_field?.caption ?? '',
           sort_order: f.sort_order,
-          field_type: f.profile_field?.field_type ?? 'text',
+          field_type: f.field_type_override ?? f.profile_field?.field_type ?? 'text',
           behavior: f.profile_field?.behavior ?? 'historical',
-          options: f.profile_field?.options ?? null,
+          options: f.options_override ?? f.profile_field?.options ?? null,
         }))
         setQuestions(mapped.sort((a, b) => a.sort_order - b.sort_order))
 
@@ -714,6 +714,18 @@ function FieldInput({
         onChange={(e) => onChange(e.target.value)}
         placeholder="0"
         className={`${base} w-28`}
+      />
+    )
+  }
+
+  if (fieldType === 'paragraph') {
+    return (
+      <textarea
+        value={value}
+        disabled={disabled}
+        rows={3}
+        onChange={(e) => onChange(e.target.value)}
+        className={`${base} resize-none`}
       />
     )
   }

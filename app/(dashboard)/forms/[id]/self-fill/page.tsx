@@ -50,6 +50,9 @@ export default async function SelfFillPage({
       field_id,
       sort_order,
       is_required,
+      question_text,
+      field_type_override,
+      options_override,
       profile_field:field_id (
         caption,
         field_type,
@@ -64,11 +67,11 @@ export default async function SelfFillPage({
     fieldsData ?? []
   ).map((ff: any) => ({
     profile_field_id: ff.field_id,
-    question_text: ff.profile_field?.caption ?? '',
+    question_text: ff.question_text ?? ff.profile_field?.caption ?? '',
     sort_order: ff.sort_order ?? 0,
-    behavior: ff.profile_field?.behavior ?? 'static',
-    field_type: ff.profile_field?.field_type ?? 'text',
-    options: ff.profile_field?.options ?? null,
+    behavior: ff.profile_field?.behavior ?? 'historical',
+    field_type: ff.field_type_override ?? ff.profile_field?.field_type ?? 'text',
+    options: ff.options_override ?? ff.profile_field?.options ?? null,
   }))
 
   return (

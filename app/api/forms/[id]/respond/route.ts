@@ -74,14 +74,26 @@ export async function POST(
     remarks: r.remarks ?? '',
   }));
 
-  const { error: rpcErr } = await supabase.rpc('process_form_submission', {
-    p_form_id: id,
-    p_filled_by: Number(session.its_no),
-    p_responses: normalized,
-  });
-
-  if (rpcErr)
-    return NextResponse.json({ error: rpcErr.message }, { status: 500 });
+  if (form.form_type === 'simple') {
+    const upserts = normalized.map((r) => ({
+      its_no: r.its_no,
+      field_id: r.field_id,
+      value: r.answer,
+    }))
+    const { error: pvErr } = await supabase
+      .from('profile_value')
+      .upsert(upserts, { onConflict: 'its_no,field_id' })
+    if (pvErr)
+      return NextResponse.json({ error: pvErr.message }, { status: 500 })
+  } else {
+    const { error: rpcErr } = await supabase.rpc('process_form_submission', {
+      p_form_id: id,
+      p_filled_by: Number(session.its_no),
+      p_responses: normalized,
+    })
+    if (rpcErr)
+      return NextResponse.json({ error: rpcErr.message }, { status: 500 })
+  }
 
   return NextResponse.json({ success: true });
 }
