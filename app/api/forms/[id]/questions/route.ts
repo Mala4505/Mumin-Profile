@@ -37,7 +37,7 @@ export async function POST(
     return NextResponse.json({ error: `field_type must be one of: ${VALID_TYPES.join(', ')}` }, { status: 400 })
   }
 
-  const fieldType = body.field_type as string
+  const fieldType = body.field_type as typeof VALID_TYPES[number]
   let options: string[] | null = null
 
   if (fieldType === 'select' || fieldType === 'multiselect') {
