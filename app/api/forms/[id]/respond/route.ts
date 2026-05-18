@@ -75,11 +75,13 @@ export async function POST(
   }));
 
   if (form.form_type === 'simple') {
-    const upserts = normalized.map((r) => ({
-      its_no: r.its_no,
-      field_id: r.field_id,
-      value: r.answer,
-    }))
+    const upserts = normalized
+      .filter((r): r is typeof r & { field_id: number } => r.field_id != null)
+      .map((r) => ({
+        its_no: r.its_no,
+        field_id: r.field_id,
+        value: r.answer,
+      }))
     const { error: pvErr } = await supabase
       .from('profile_value')
       .upsert(upserts, { onConflict: 'its_no,field_id' })
