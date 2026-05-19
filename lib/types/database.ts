@@ -1000,7 +1000,17 @@ export type Database = {
         Relationships: [];
       };
     };
-    Views: Record<string, never>;
+    Views: {
+      mumin_auth: {
+        Row: {
+          its_no: number;
+          sabeel_no: string;
+          supabase_auth_id: string | null;
+          is_active: boolean;
+          paci_no: string | null;
+        };
+      };
+    };
     // Functions: Record<string, never>;
     Functions: {
       process_form_submission: {
