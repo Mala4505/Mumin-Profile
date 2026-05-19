@@ -28,14 +28,15 @@ export async function POST(req: NextRequest) {
   try {
     if (action === 'delete') {
       const keys = rows.map((r) => r[onConflictColumn])
-      const { error } = await supabase.from(table).delete().in(onConflictColumn, keys)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await supabase.from(table as any).delete().in(onConflictColumn, keys)
       if (error) throw error
       return NextResponse.json({ inserted: 0, updated: 0, deleted: keys.length, failed: 0, failedRows: [] })
     }
 
     if (action === 'add') {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await supabase.from(table).insert(rows as any)
+      const { error } = await supabase.from(table as any).insert(rows as any)
       if (error) {
         failed = rows.length
         rows.forEach((r) => failedRows.push({ ...r, _error: error.message }))
@@ -44,8 +45,9 @@ export async function POST(req: NextRequest) {
       }
     } else {
       // upsert or update
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error, count } = await supabase
-        .from(table)
+        .from(table as any)
         .upsert(rows as any, { onConflict: onConflictColumn, count: 'exact' })
       if (error) {
         failed = rows.length

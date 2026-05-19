@@ -9,7 +9,7 @@ interface Notification {
   body: string | null
   read: boolean
   created_at: string
-  related_form_id?: string
+  related_form_id?: string | null
 }
 
 interface Props {

@@ -1005,18 +1005,84 @@ export type Database = {
           is_active: boolean;
           paci_no: string | null;
         };
+        Relationships: [];
+      };
+      member_directory: {
+        Row: {
+          its_no: number;
+          name: string;
+          gender: "M" | "F" | null;
+          balig_status: "Balig" | "Ghair Balig" | null;
+          phone: string | null;
+          status: string | null;
+          sabeel_no: string | null;
+          head_its_no: number | null;
+          sector_id: number | null;
+          sector_name: string | null;
+          subsector_id: number | null;
+          subsector_name: string | null;
+          building_name: string | null;
+          floor_no: string | null;
+          flat_no: string | null;
+          landmark: string | null;
+          masool_name: string | null;
+          musaid_names: string | null;
+        };
+        Relationships: [];
+      };
+      v_member_profile: {
+        Row: {
+          its_no: number;
+          name: string;
+          gender: "M" | "F";
+          date_of_birth: string | null;
+          balig_status: "Balig" | "Ghair Balig";
+          phone: string | null;
+          alternate_phone: string | null;
+          email: string | null;
+          status: string;
+          sabeel_no: string;
+          subsector_id: number;
+          subsector_name: string | null;
+          sector_name: string | null;
+          paci_no: string | null;
+          floor_no: string | null;
+          flat_no: string | null;
+          building_name: string | null;
+          landmark: string | null;
+        };
+        Relationships: [];
       };
     };
     // Functions: Record<string, never>;
     Functions: {
       process_form_submission: {
-        // Single entry point for all writes
         Args: {
           p_form_id: string;
           p_filled_by: number;
-          p_responses: Json; // Array of {its_no, field_id, answer, remarks}
+          p_responses: Json;
         };
         Returns: void;
+      };
+      get_superadmin_dashboard_stats: {
+        Args: Record<PropertyKey, never>;
+        Returns: unknown;
+      };
+      get_admin_dashboard_stats: {
+        Args: { p_sector_ids: number[] };
+        Returns: unknown;
+      };
+      get_masool_dashboard_stats: {
+        Args: { p_sector_ids: number[] };
+        Returns: unknown;
+      };
+      get_musaid_dashboard_stats: {
+        Args: { p_subsector_ids: number[] };
+        Returns: unknown;
+      };
+      get_mumin_dashboard_stats: {
+        Args: { p_its_no: number };
+        Returns: unknown;
       };
     };
     Enums: Record<string, never>;
