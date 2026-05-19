@@ -1,7 +1,8 @@
+import { cache } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import type { SessionUser, AppMetadata } from '@/lib/types/app'
 
-export async function getSession(): Promise<SessionUser | null> {
+export const getSession = cache(async function getSession(): Promise<SessionUser | null> {
   const supabase = await createClient()
 
   // getUser() makes a server-side request to validate the token — required for security.
@@ -32,7 +33,7 @@ export async function getSession(): Promise<SessionUser | null> {
     is_hof: meta.is_hof ?? false,
     sabeel_no: meta.sabeel_no ?? '',
   }
-}
+})
 
 
 // import { createClient } from '@/lib/supabase/server'

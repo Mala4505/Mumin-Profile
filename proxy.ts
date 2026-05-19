@@ -95,6 +95,18 @@ export async function proxy(request: NextRequest) {
       url.pathname = '/dashboard'
       return NextResponse.redirect(url)
     }
+
+    // Forward decoded JWT claims as request headers so layout.tsx can read them
+    // without making an additional Supabase auth call.
+    const requestHeaders = new Headers(request.headers)
+    requestHeaders.set('x-user-role', role ?? '')
+    requestHeaders.set('x-user-its', String(appMeta.its_no ?? ''))
+
+    const finalResponse = NextResponse.next({ request: { headers: requestHeaders } })
+    supabaseResponse.cookies.getAll().forEach(({ name, value, ...rest }) => {
+      finalResponse.cookies.set(name, value, rest as Parameters<typeof finalResponse.cookies.set>[2])
+    })
+    return finalResponse
   }
 
   return supabaseResponse

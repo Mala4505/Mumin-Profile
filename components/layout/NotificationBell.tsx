@@ -12,17 +12,14 @@ interface Notification {
   related_form_id?: string
 }
 
-export default function NotificationBell() {
-  const [notifications, setNotifications] = useState<Notification[]>([])
+interface Props {
+  initialNotifications: Notification[]
+}
+
+export default function NotificationBell({ initialNotifications }: Props) {
+  const [notifications, setNotifications] = useState<Notification[]>(initialNotifications)
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    fetch('/api/notifications')
-      .then((r) => r.json())
-      .then((d) => setNotifications(d.notifications ?? []))
-      .catch(() => {})
-  }, [])
 
   // Close dropdown when clicking outside
   useEffect(() => {

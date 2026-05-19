@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { filterRespondents } from '@/components/analytics/RespondentsTable'
-import type { RespondentRow } from '@/app/api/analytics/form-respondents/route'
+import type { RespondentRow } from '@/app/api/analytics/forms/[id]/route'
 
 const rows: RespondentRow[] = [
   { its_no: '1001', name: 'Ahmed Ali', answer: 'Yes', sector_name: 'Sector A', subsector_name: 'Zone 1', submitted_at: '2026-04-12T10:00:00Z' },

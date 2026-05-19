@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 
 export interface MemberProfile {
   its_no: number;
-  name: string; // Changed from 'name' to match component usage
+  name: string;
   gender: "M" | "F";
   date_of_birth: string | null;
   balig_status: "Balig" | "Ghair Balig";
@@ -19,9 +19,8 @@ export interface MemberProfile {
   floor_no: string | null;
   flat_no: string | null;
   paci_no: string;
-  // Changed from 'profile_values' to 'values' to match component usage
   values: Array<{
-    id: number; // Changed from 'field_id' to 'id'
+    id: number;
     caption: string;
     category_name: string;
     value: string | null;
@@ -29,7 +28,7 @@ export interface MemberProfile {
     is_data_entry: boolean;
     mumin_can_edit: boolean;
     field_type: string;
-    behavior: string; // Added to support the Historical Timeline feature
+    behavior: string;
     sort_order: number;
     category_sort_order: number;
   }>;
@@ -40,79 +39,53 @@ export async function getMemberProfile(
 ): Promise<MemberProfile | null> {
   const supabase = await createClient();
 
-  // Query 1: mumin + subsector + sector
-  const { data: mumin, error } = await supabase
-    .from("mumin")
-    .select(
-      `
-      its_no, name, gender, date_of_birth, balig_status,
-      phone, alternate_phone, email, status, sabeel_no,
-      subsector_id,
-      subsector!inner (
-        subsector_name,
-        sector!inner ( sector_name )
+  // Both queries are now independent — run in parallel.
+  // v_member_profile flattens mumin + subsector + sector + family + house + building
+  // into a single row, replacing the previous 2-step sequential fetch.
+  const [{ data: row }, { data: profileValues }] = await Promise.all([
+    supabase
+      .from("v_member_profile")
+      .select(
+        "its_no, name, gender, date_of_birth, balig_status, phone, alternate_phone, email, status, sabeel_no, subsector_id, subsector_name, sector_name, paci_no, floor_no, flat_no, building_name, landmark",
       )
-    `,
-    )
-    .eq("its_no", itsNo)
-    .maybeSingle();
-
-  if (error || !mumin) return null;
-
-  const m = mumin as any;
-
-  // Query 2: family → paci_no → house → building
-  const { data: familyRow } = await supabase
-    .from("family")
-    .select(
-      `
-      paci_no,
-      house!family_paci_no_fkey (
-        floor_no, flat_no,
-        building:building_id ( building_name, landmark )
+      .eq("its_no", itsNo)
+      .maybeSingle(),
+    supabase
+      .from("profile_value")
+      .select(
+        `
+        field_id, value,
+        profile_field!field_id (
+          caption, field_type, visibility_level, is_data_entry,
+          mumin_can_edit, sort_order, behavior,
+          profile_category!inner ( name, sort_order )
+        )`,
       )
-    `,
-    )
-    .eq("sabeel_no", m.sabeel_no)
-    .maybeSingle();
+      .eq("its_no", itsNo),
+  ]);
 
-  const fam = familyRow as any;
-  const house = fam?.house ?? null;
-
-  // Fetch profile values with field info
-  const { data: profileValues } = await supabase
-    .from("profile_value")
-    .select(
-      `
-      field_id, value,
-      profile_field!field_id (
-        caption, field_type, visibility_level, is_data_entry,
-        mumin_can_edit, sort_order, behavior,
-        profile_category!inner ( name, sort_order )
-      )`,
-    )
-    .eq("its_no", itsNo);
+  if (!row) return null;
 
   return {
-    its_no: m.its_no,
-    name: m.name, // Mapping 'name' from DB to 'name' for UI
-    gender: m.gender,
-    date_of_birth: m.date_of_birth,
-    balig_status: m.balig_status,
-    phone: m.phone,
-    alternate_phone: m.alternate_phone,
-    email: m.email,
-    status: m.status,
-    sabeel_no: m.sabeel_no,
-    subsector_id: m.subsector_id,
-    subsector_name: m.subsector?.subsector_name ?? "",
-    sector_name: m.subsector?.sector?.sector_name ?? "",
-    building_name: house?.building?.building_name ?? "",
-    landmark: house?.building?.landmark ?? null,
-    floor_no: house?.floor_no ?? null,
-    flat_no: house?.flat_no ?? null,
-    paci_no: fam?.paci_no ?? "",
-    values: (profileValues ?? []).map((pv: any) => ({
+    its_no: row.its_no,
+    name: row.name,
+    gender: row.gender,
+    date_of_birth: row.date_of_birth,
+    balig_status: row.balig_status,
+    phone: row.phone,
+    alternate_phone: row.alternate_phone,
+    email: row.email,
+    status: row.status,
+    sabeel_no: row.sabeel_no,
+    subsector_id: row.subsector_id,
+    subsector_name: row.subsector_name ?? "",
+    sector_name: row.sector_name ?? "",
+    building_name: row.building_name ?? "",
+    landmark: row.landmark ?? null,
+    floor_no: row.floor_no ?? null,
+    flat_no: row.flat_no ?? null,
+    paci_no: row.paci_no ?? "",
+    values: ((profileValues ?? []) as any[]).map((pv) => ({
       id: pv.field_id,
       caption: pv.profile_field?.caption ?? "",
       category_name: pv.profile_field?.profile_category?.name ?? "",

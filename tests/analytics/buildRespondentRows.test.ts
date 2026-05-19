@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildRespondentRows } from '@/app/api/analytics/form-respondents/route'
+import { buildRespondentRows } from '@/app/api/analytics/forms/[id]/route'
 
 const makeMap = (entries: Array<[number, { name: string; sector_name: string; subsector_name: string }]>) =>
   new Map(entries)

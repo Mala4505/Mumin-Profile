@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
-import type { RespondentRow } from '@/app/api/analytics/form-respondents/route'
+import type { RespondentRow } from '@/app/api/analytics/forms/[id]/route'
 
 export function filterRespondents(
   respondents: RespondentRow[],

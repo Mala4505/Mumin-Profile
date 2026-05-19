@@ -5,7 +5,7 @@ import { ChevronDown, ChevronRight, Download, Map } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import type { AnalyticsForm } from '@/app/api/analytics/forms/route'
-import type { SectorCompletion, SubsectorCompletion } from '@/app/api/analytics/sector-completion/route'
+import type { SectorCompletion, SubsectorCompletion } from '@/app/api/analytics/forms/[id]/route'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -150,7 +150,7 @@ export function SectorPerformanceSection() {
     setDataLoading(true)
     setSectorData([])
 
-    fetch(`/api/analytics/sector-completion?form_id=${selectedFormId}`)
+    fetch(`/api/analytics/forms/${selectedFormId}?section=completion`)
       .then(r => r.json())
       .then((data: SectorCompletion[]) => setSectorData(data))
       .catch(() => {})

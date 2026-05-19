@@ -7,8 +7,8 @@ import {
   LineChart, Line,
 } from 'recharts'
 
-import type { FormRate } from '@/app/api/analytics/form-rates/route'
-import type { ActivityEvent } from '@/app/api/analytics/activity/route'
+import type { FormRate } from '@/app/api/analytics/forms/[id]/route'
+import type { ActivityEvent } from '@/app/api/analytics/dashboard/route'
 import type { Role } from '@/lib/types/app'
 import { Search } from 'lucide-react'
 import { Input } from '@/components/ui/input'
@@ -212,7 +212,7 @@ export function AnalyticsDashboard({ role }: { role: Role }) {
   // â"€â"€ Fetch overview (SuperAdmin only) â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
   React.useEffect(() => {
     if (!isManagement) return
-    fetch('/api/analytics/overview')
+    fetch('/api/analytics/dashboard?type=overview')
       .then(r => r.json())
       .then(setOverview)
       .catch(() => { })
@@ -229,7 +229,7 @@ export function AnalyticsDashboard({ role }: { role: Role }) {
     setDrillGender('__all__')
     setDrillStatus('__all__')
 
-    fetch(`/api/analytics/groups?groupBy=${groupBy}`)
+    fetch(`/api/analytics/dashboard?type=groups&groupBy=${groupBy}`)
       .then(r => r.json())
       .then((d: GroupItem[]) => setGroupData(d))
       .catch(() => setGroupData([]))
@@ -239,12 +239,12 @@ export function AnalyticsDashboard({ role }: { role: Role }) {
   // â"€â"€ Fetch profile completion & submission activity (SuperAdmin only) â"€â"€â"€â"€â"€â"€â"€
   React.useEffect(() => {
     if (!isManagement) return
-    fetch('/api/analytics/profile-completion')
+    fetch('/api/analytics/trends?type=profile')
       .then(r => r.json())
       .then(setProfileCompletion)
       .catch(() => { })
 
-    fetch('/api/analytics/form-activity')
+    fetch('/api/analytics/trends?type=form')
       .then(r => r.json())
       .then(setSubmissionActivity)
       .catch(() => { })
@@ -264,13 +264,13 @@ export function AnalyticsDashboard({ role }: { role: Role }) {
 
   // â"€â"€ Form rates (all roles) + activity (SuperAdmin only) â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
   React.useEffect(() => {
-    fetch('/api/analytics/form-rates')
+    fetch('/api/analytics/forms/all?section=rates')
       .then(r => r.json())
       .then(setFormRates)
       .catch(() => { })
 
     if (isSuperAdmin) {
-      fetch('/api/analytics/activity')
+      fetch('/api/analytics/dashboard?type=activity')
         .then(r => r.json())
         .then(setActivity)
         .catch(() => { })

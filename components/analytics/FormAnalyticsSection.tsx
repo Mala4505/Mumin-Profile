@@ -15,11 +15,10 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import type { AnalyticsForm } from '@/app/api/analytics/forms/route'
 import type {
-  FormFieldMeta, AnswerDist, SectorBreakdown, TextEntry, FormAnswersResponse,
-} from '@/app/api/analytics/form-answers/route'
-import type { EventTrendResponse } from '@/app/api/analytics/event-trend/route'
+  FormFieldMeta, AnswerDist, SectorBreakdown, TextEntry, FormAnswersResponse, RespondentRow,
+} from '@/app/api/analytics/forms/[id]/route'
+import type { EventTrendResponse } from '@/app/api/analytics/trends/route'
 import { RespondentsTable } from './RespondentsTable'
-import type { RespondentRow } from '@/app/api/analytics/form-respondents/route'
 
 // ── Palette ──────────────────────────────────────────────────────────────────
 
@@ -411,7 +410,7 @@ export function FormAnalyticsSection() {
     setShowTrend(false)
     setTrendData(null)
 
-    fetch(`/api/analytics/form-answers?form_id=${selectedFormId}`)
+    fetch(`/api/analytics/forms/${selectedFormId}?section=answers`)
       .then(r => r.json())
       .then((data: FormAnswersResponse) => {
         const list = data.fields ?? []
@@ -428,7 +427,7 @@ export function FormAnalyticsSection() {
     setAnswersData(null)
 
     fetch(
-      `/api/analytics/form-answers?form_id=${selectedFormId}&field_id=${selectedFieldId}&group_by=${groupBy}`
+      `/api/analytics/forms/${selectedFormId}?section=answers&field_id=${selectedFieldId}&group_by=${groupBy}`
     )
       .then(r => r.json())
       .then((data: FormAnswersResponse) => {
@@ -452,7 +451,7 @@ export function FormAnalyticsSection() {
     if (!field || field.field_type === 'text') return
 
     setRespondentsLoading(true)
-    fetch(`/api/analytics/form-respondents?form_id=${selectedFormId}&field_id=${selectedFieldId}`)
+    fetch(`/api/analytics/forms/${selectedFormId}?section=respondents&field_id=${selectedFieldId}`)
       .then(r => r.json())
       .then((data: RespondentRow[]) => setRespondents(Array.isArray(data) ? data : []))
       .catch(() => setRespondents([]))
@@ -467,7 +466,7 @@ export function FormAnalyticsSection() {
 
     setTrendLoading(true)
     setTrendData(null)
-    fetch(`/api/analytics/event-trend?event_id=${form.event_id}&field_id=${selectedFieldId}`)
+    fetch(`/api/analytics/trends?type=event&event_id=${form.event_id}&field_id=${selectedFieldId}`)
       .then(r => r.json())
       .then((data: EventTrendResponse) => setTrendData(data))
       .catch(() => {})
