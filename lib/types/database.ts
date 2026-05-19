@@ -1,7 +1,3 @@
-import type {
-  AudienceFilters,
-  FillerAccess,
-} from "@/lib/types/forms";
 
 export type Json =
   | string
@@ -707,8 +703,8 @@ export type Database = {
           status: "draft" | "pending_approval" | "published" | "closed";
           event_id: number | null;
           expires_at: string | null;
-          audience_filters: AudienceFilters | null;
-          filler_access: FillerAccess | null;
+          audience_filters: Json | null;
+          filler_access: Json | null;
           viewable_by_roles: "all" | "staff_only";
           approved_by: number | null;
           approved_at: string | null;
@@ -723,8 +719,8 @@ export type Database = {
           created_by?: number | null;
           form_type?: "simple" | "detailed" | null;
           event_id?: number | null;
-          audience_filters?: AudienceFilters | null;
-          filler_access?: FillerAccess | null;
+          audience_filters?: Json | null;
+          filler_access?: Json | null;
           viewable_by_roles?: "all" | "staff_only";
           status?: "draft" | "pending_approval" | "published" | "closed";
           approved_by?: number | null;
@@ -741,8 +737,8 @@ export type Database = {
           created_by?: number | null;
           form_type?: "simple" | "detailed" | null;
           event_id?: number | null;
-          audience_filters?: AudienceFilters | null;
-          filler_access?: FillerAccess | null;
+          audience_filters?: Json | null;
+          filler_access?: Json | null;
           viewable_by_roles?: "all" | "staff_only";
           status?: "draft" | "pending_approval" | "published" | "closed";
           approved_by?: number | null;
