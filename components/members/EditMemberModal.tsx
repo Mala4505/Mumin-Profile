@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Loader2 } from 'lucide-react'
 import {
   Dialog,
@@ -26,12 +26,33 @@ interface Tier1Fields {
   notes: string
 }
 
+export interface AddressFields {
+  subsector_id: string
+  building_name: string
+  floor_no: string
+  flat_no: string
+  paci_no: string  // read-only display only — not sent to API
+}
+
 interface EditMemberModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   itsNo: number
   initial: Partial<Tier1Fields>
+  initialAddress?: AddressFields
   onSaved?: () => void
+}
+
+interface SubsectorOption {
+  subsector_id: number
+  subsector_name: string
+}
+
+interface BuildingSuggestion {
+  building_id: string
+  building_name: string
+  subsector_id: number
+  subsector_name: string
 }
 
 export function EditMemberModal({
@@ -39,6 +60,7 @@ export function EditMemberModal({
   onOpenChange,
   itsNo,
   initial,
+  initialAddress,
   onSaved,
 }: EditMemberModalProps) {
   const [form, setForm] = useState<Tier1Fields>({
@@ -52,17 +74,89 @@ export function EditMemberModal({
     status: initial.status ?? 'active',
     notes: initial.notes ?? '',
   })
+
+  const [address, setAddress] = useState<AddressFields>({
+    subsector_id: initialAddress?.subsector_id ?? '',
+    building_name: initialAddress?.building_name ?? '',
+    floor_no: initialAddress?.floor_no ?? '',
+    flat_no: initialAddress?.flat_no ?? '',
+    paci_no: initialAddress?.paci_no ?? '',
+  })
+
+  const [subsectors, setSubsectors] = useState<SubsectorOption[]>([])
+  const [buildingSuggestions, setBuildingSuggestions] = useState<BuildingSuggestion[]>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const suggestionRef = useRef<HTMLDivElement>(null)
+
+  // Fetch subsectors on open (only needed when address section is shown)
+  useEffect(() => {
+    if (!open || !initialAddress) return
+    fetch('/api/members/filters')
+      .then((r) => r.json())
+      .then((d) => {
+        const seen = new Set<number>()
+        const unique: SubsectorOption[] = []
+        for (const s of d.subsectors ?? []) {
+          if (!seen.has(s.subsector_id)) {
+            seen.add(s.subsector_id)
+            unique.push({ subsector_id: s.subsector_id, subsector_name: s.subsector_name })
+          }
+        }
+        setSubsectors(unique)
+      })
+      .catch(() => {})
+  }, [open, initialAddress])
+
+  // Close suggestions on outside click
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (suggestionRef.current && !suggestionRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false)
+      }
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [])
 
   function set<K extends keyof Tier1Fields>(key: K, value: Tier1Fields[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
+  }
+
+  function setAddr<K extends keyof AddressFields>(key: K, value: string) {
+    setAddress((prev) => ({ ...prev, [key]: value }))
+  }
+
+  function onBuildingInput(value: string) {
+    setAddr('building_name', value)
+    setShowSuggestions(true)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    if (!value.trim()) { setBuildingSuggestions([]); return }
+    debounceRef.current = setTimeout(() => {
+      fetch(`/api/buildings?q=${encodeURIComponent(value)}`)
+        .then((r) => r.json())
+        .then((d) => { setBuildingSuggestions(d.buildings ?? []); setShowSuggestions(true) })
+        .catch(() => {})
+    }, 250)
+  }
+
+  function pickBuilding(b: BuildingSuggestion) {
+    setAddress((prev) => ({
+      ...prev,
+      building_name: b.building_name,
+      subsector_id: String(b.subsector_id),
+    }))
+    setBuildingSuggestions([])
+    setShowSuggestions(false)
   }
 
   async function handleSave() {
     setSaving(true)
     setError('')
     try {
+      // Save Tier-1 fields
       const res = await fetch(`/api/members/${itsNo}/core`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -82,6 +176,25 @@ export function EditMemberModal({
         const d = await res.json()
         throw new Error(d.error ?? 'Save failed')
       }
+
+      // Save address if the section is shown and required fields are filled
+      if (initialAddress && address.building_name.trim() && address.subsector_id) {
+        const addrRes = await fetch(`/api/members/${itsNo}/address`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            building_name: address.building_name.trim(),
+            subsector_id: parseInt(address.subsector_id, 10),
+            floor_no: address.floor_no.trim() || undefined,
+            flat_no: address.flat_no.trim() || undefined,
+          }),
+        })
+        if (!addrRes.ok) {
+          const d = await addrRes.json()
+          throw new Error(d.error ?? 'Address save failed')
+        }
+      }
+
       onOpenChange(false)
       onSaved?.()
     } catch (e) {
@@ -188,11 +301,85 @@ export function EditMemberModal({
             />
           </div>
 
-          {/* Tier-2 notice */}
-          <div className="sm:col-span-2 text-xs text-muted-foreground bg-muted/40 rounded-lg px-3 py-2 border border-border/60">
-            Structural fields (Subsector, Sabeel, PACI, Head of Family) require a{' '}
-            <a href="/requests" className="text-primary underline">change request</a>.
-          </div>
+          {/* Address section — only shown when initialAddress is provided (SuperAdmin from profile view) */}
+          {initialAddress && (
+            <>
+              <div className="sm:col-span-2 border-t border-border/60 pt-3 mt-1">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Address</p>
+              </div>
+
+              {/* Subsector */}
+              <div className="sm:col-span-2 space-y-1.5">
+                <Label htmlFor="em-subsector">Subsector</Label>
+                <select
+                  id="em-subsector"
+                  value={address.subsector_id}
+                  onChange={(e) => setAddr('subsector_id', e.target.value)}
+                  className="w-full border border-border rounded-lg h-9 px-3 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                >
+                  <option value="">— select subsector —</option>
+                  {subsectors.map((s) => (
+                    <option key={s.subsector_id} value={String(s.subsector_id)}>
+                      {s.subsector_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Building autocomplete */}
+              <div className="sm:col-span-2 space-y-1.5 relative" ref={suggestionRef}>
+                <Label htmlFor="em-building">Building</Label>
+                <Input
+                  id="em-building"
+                  value={address.building_name}
+                  onChange={(e) => onBuildingInput(e.target.value)}
+                  onFocus={() => address.building_name && setShowSuggestions(true)}
+                  placeholder="Type to search existing buildings…"
+                  autoComplete="off"
+                />
+                {showSuggestions && buildingSuggestions.length > 0 && (
+                  <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-background border border-border rounded-lg shadow-lg overflow-hidden">
+                    {buildingSuggestions.map((b) => (
+                      <button
+                        key={b.building_id}
+                        type="button"
+                        onMouseDown={() => pickBuilding(b)}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-muted/60 transition-colors border-b border-border/40 last:border-0"
+                      >
+                        <span className="font-medium">{b.building_name}</span>
+                        <span className="text-muted-foreground ml-2 text-xs">— {b.subsector_name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {showSuggestions && address.building_name.trim() && buildingSuggestions.length === 0 && (
+                  <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-background border border-border rounded-lg shadow-lg px-3 py-2 text-xs text-muted-foreground">
+                    No existing buildings match — a new building will be created on save.
+                  </div>
+                )}
+              </div>
+
+              {/* Floor & Flat */}
+              <div className="space-y-1.5">
+                <Label htmlFor="em-floor">Floor No</Label>
+                <Input id="em-floor" value={address.floor_no} onChange={(e) => setAddr('floor_no', e.target.value)} placeholder="e.g. 3" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="em-flat">Flat No</Label>
+                <Input id="em-flat" value={address.flat_no} onChange={(e) => setAddr('flat_no', e.target.value)} placeholder="e.g. 12" />
+              </div>
+
+              {/* PACI No — read-only, cannot be changed via this form */}
+              {address.paci_no && (
+                <div className="sm:col-span-2 space-y-1">
+                  <Label className="text-muted-foreground">PACI No</Label>
+                  <p className="text-sm text-muted-foreground bg-muted/40 rounded-lg px-3 py-2 border border-border/60">
+                    {address.paci_no} <span className="text-xs">(cannot be changed here)</span>
+                  </p>
+                </div>
+              )}
+            </>
+          )}
         </div>
 
         {error && (

@@ -54,11 +54,6 @@ export async function GET(req: NextRequest) {
 
   const members = (data ?? []).map((m: any) => {
     const extra = extraMap.get(m.its_no)
-    const addressParts = [
-      m.building_name,
-      m.floor_no ? `Floor ${m.floor_no}` : null,
-      m.flat_no ? `Flat ${m.flat_no}` : null,
-    ].filter(Boolean)
     return {
       its_no: m.its_no,
       name: m.name,
@@ -73,7 +68,9 @@ export async function GET(req: NextRequest) {
       hof_its_no: m.head_its_no ? String(m.head_its_no) : '',
       sector_name: m.sector_name ?? '',
       subsector_name: m.subsector_name ?? '',
-      address: addressParts.join(', '),
+      building_name: m.building_name ?? '',
+      floor_no: m.floor_no ?? '',
+      flat_no: m.flat_no ?? '',
       masool_name: m.masool_name ?? '',
       musaid_names: m.musaid_names ?? '',
     }

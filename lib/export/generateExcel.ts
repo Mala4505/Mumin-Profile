@@ -18,6 +18,9 @@ export interface ExportMember {
   sabeel_no: string
   subsector_name: string
   sector_name: string
+  building_name: string | null
+  floor_no: string | null
+  flat_no: string | null
   date_of_birth: string | null
   hof_its_no?: string | null
   address?: string | null
@@ -28,13 +31,16 @@ export interface ExportMember {
 }
 
 export const BASE_COLUMNS: ExportColumn[] = [
-  { key: 'its_no',         header: 'ITS No',     width: 12 },
-  { key: 'name',           header: 'Name',        width: 30 },
-  { key: 'sabeel_no',      header: 'Sabeel No',   width: 12 },
-  { key: 'sector_name',    header: 'Sector',      width: 20 },
-  { key: 'subsector_name', header: 'SubSector',   width: 20 },
-  { key: 'masool_name',    header: 'Masool',      width: 20 },
-  { key: 'musaid_names',   header: 'Musaid',      width: 20 },
+  { key: 'its_no',         header: 'ITS No',       width: 12 },
+  { key: 'name',           header: 'Name',          width: 30 },
+  { key: 'sabeel_no',      header: 'Sabeel No',     width: 12 },
+  { key: 'sector_name',    header: 'Sector',        width: 20 },
+  { key: 'subsector_name', header: 'SubSector',     width: 20 },
+  { key: 'building_name',  header: 'Building',      width: 25 },
+  { key: 'floor_no',       header: 'Floor No',      width: 10 },
+  { key: 'flat_no',        header: 'Flat No',       width: 10 },
+  { key: 'masool_name',    header: 'Masool',        width: 20 },
+  { key: 'musaid_names',   header: 'Musaid',        width: 20 },
 ]
 
 export async function generateExcel(

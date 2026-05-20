@@ -4,7 +4,7 @@ import { useState, useMemo, Fragment } from 'react'
 import Link from 'next/link'
 import {
   Users, ChevronUp, ChevronDown, ChevronRight, FilePlus,
-  ChevronsUpDown, LayoutList, Hash, Search, Pencil,
+  ChevronsUpDown, LayoutList, Hash, Search,
 } from 'lucide-react'
 import type { MemberListItem, Role } from '@/lib/types/app'
 import { EditMemberModal } from './EditMemberModal'
@@ -432,7 +432,7 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
                                           className="font-medium text-orange-600 hover:text-orange-700 transition-colors"
                                           onClick={e => e.stopPropagation()}
                                         >
-                                          View →
+                                          View
                                         </Link>
                                       </td>
                                     </tr>
@@ -495,7 +495,7 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
                             className="flex-shrink-0 text-xs font-medium text-orange-600 hover:text-orange-700 transition-colors"
                             onClick={e => e.stopPropagation()}
                           >
-                            View →
+                            View
                           </Link>
                         </div>
                       ))}
@@ -532,7 +532,6 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
                     {isStaff && <SortTh col="floor_no" label="Floor" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />}
                     {isStaff && <SortTh col="flat_no" label="Flat" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />}
                     {isStaff && <SortTh col="sabeel_no" label="Sabeel" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />}
-                    {isStaff && <SortTh col="landmark" label="Landmark" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />}
                     {showSector && <SortTh col="sector_name" label="Sector" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />}
                     {isStaff && <SortTh col="subsector_name" label="Subsector" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />}
                     {showMasool && <SortTh col="masool_name" label="Masool" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />}
@@ -547,7 +546,7 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
                   {memberPage.map(member => {
                     const isHead = member.its_no === member.head_its_no
                     return (
-                      <tr key={member.its_no} className="hover:bg-muted/30 transition-colors border-b border-border last:border-0">
+                      <tr key={member.its_no} className="group hover:bg-muted/30 transition-colors border-b border-border last:border-0">
                         <td className="px-4 py-3">
                           <span className="font-mono text-xs text-muted-foreground">{member.its_no}</span>
                         </td>
@@ -581,26 +580,34 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
                         {isStaff && <td className="px-4 py-3"><span className="text-sm">{member.floor_no ?? '—'}</span></td>}
                         {isStaff && <td className="px-4 py-3"><span className="text-sm">{member.flat_no ?? '—'}</span></td>}
                         {isStaff && <td className="px-4 py-3"><span className="font-mono text-xs text-muted-foreground">{member.sabeel_no}</span></td>}
-                        {isStaff && <td className="px-4 py-3"><span className="text-sm text-muted-foreground">{member.landmark ?? '—'}</span></td>}
                         {showSector && <td className="px-4 py-3"><span className="text-sm">{member.sector_name}</span></td>}
                         {isStaff && <td className="px-4 py-3"><span className="text-sm">{member.subsector_name}</span></td>}
                         {showMasool && <td className="px-4 py-3"><span className="text-sm text-muted-foreground">{member.masool_name ?? '—'}</span></td>}
                         {showMusaid && <td className="px-4 py-3"><span className="text-sm text-muted-foreground">{member.musaid_names ?? '—'}</span></td>}
                         <td className="px-4 py-3"><StatusBadge status={member.status} /></td>
                         <td className="px-4 py-3 text-right">
-                          <div className="flex items-center justify-end gap-2">
+                          <div className="flex items-center justify-end gap-1.5">
                             {canEdit && (
                               <button
                                 onClick={() => setEditMember(member)}
-                                className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
-                                title="Edit member"
+                                className="opacity-0 group-hover:opacity-100 transition-opacity px-2.5 py-1 rounded-md border border-border text-xs font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground"
                               >
-                                <Pencil className="w-3.5 h-3.5" />
+                                Edit
                               </button>
                             )}
-                            <Link href={`/members/${member.its_no}`}
-                              className="inline-flex items-center gap-1 text-sm font-medium text-orange-600 hover:text-orange-700 transition-colors">
-                              View →
+                            {isStaff && (
+                              <Link
+                                href={`/requests?search=${member.sabeel_no}`}
+                                className="opacity-0 group-hover:opacity-100 transition-opacity px-2.5 py-1 rounded-md border border-border text-xs font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                              >
+                                Request
+                              </Link>
+                            )}
+                            <Link
+                              href={`/members/${member.its_no}`}
+                              className="px-2.5 py-1 rounded-md bg-orange-500 text-white text-xs font-medium hover:bg-orange-600 transition-colors"
+                            >
+                              View
                             </Link>
                           </div>
                         </td>
@@ -646,7 +653,7 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
                       </div>
                       <Link href={`/members/${member.its_no}`}
                         className="flex-shrink-0 text-sm font-medium text-orange-600 hover:text-orange-700 transition-colors mt-0.5">
-                        View →
+                        View
                       </Link>
                     </div>
                   </div>
@@ -671,6 +678,13 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
             phone: editMember.phone ?? '',
             status: editMember.status,
           }}
+          initialAddress={role === 'SuperAdmin' ? {
+            subsector_id: String(editMember.subsector_id),
+            building_name: editMember.building_name ?? '',
+            floor_no: editMember.floor_no ?? '',
+            flat_no: editMember.flat_no ?? '',
+            paci_no: editMember.paci_no ?? '',
+          } : undefined}
           onSaved={() => { setEditMember(null); window.location.reload() }}
         />
       )}

@@ -601,6 +601,13 @@ export function MemberProfileView({ profile, session, initialResponses = [] }: P
             status: displayProfile.status,
             notes: (displayProfile as any).notes ?? '',
           }}
+          initialAddress={session.role === 'SuperAdmin' ? {
+            subsector_id: String(displayProfile.subsector_id),
+            building_name: displayProfile.building_name ?? '',
+            floor_no: displayProfile.floor_no ?? '',
+            flat_no: displayProfile.flat_no ?? '',
+            paci_no: displayProfile.paci_no ?? '',
+          } : undefined}
           onSaved={() => router.refresh()}
         />
       )}
