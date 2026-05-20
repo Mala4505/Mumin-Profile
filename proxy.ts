@@ -77,20 +77,22 @@ export async function proxy(request: NextRequest) {
 
     // Role-based route protection
     const role = appMeta.role
+    const loginMode = request.cookies.get('login_mode')?.value ?? 'admin'
+    const effectiveRole = loginMode === 'user' ? 'Mumin' : role
     // /admin pages: SuperAdmin only
-    if (pathname.startsWith('/admin') && role !== 'SuperAdmin') {
+    if (pathname.startsWith('/admin') && effectiveRole !== 'SuperAdmin') {
       const url = request.nextUrl.clone()
       url.pathname = '/dashboard'
       return NextResponse.redirect(url)
     }
     // /import pages: all staff except Mumin
-    if (pathname.startsWith('/import') && role === 'Mumin') {
+    if (pathname.startsWith('/import') && effectiveRole === 'Mumin') {
       const url = request.nextUrl.clone()
       url.pathname = '/members'
       return NextResponse.redirect(url)
     }
     // /forms/[id]/responses: staff only — Mumin cannot view form responses
-    if (pathname.includes('/responses') && pathname.startsWith('/forms') && role === 'Mumin') {
+    if (pathname.includes('/responses') && pathname.startsWith('/forms') && effectiveRole === 'Mumin') {
       const url = request.nextUrl.clone()
       url.pathname = '/dashboard'
       return NextResponse.redirect(url)
@@ -101,6 +103,7 @@ export async function proxy(request: NextRequest) {
     const requestHeaders = new Headers(request.headers)
     requestHeaders.set('x-user-role', role ?? '')
     requestHeaders.set('x-user-its', String(appMeta.its_no ?? ''))
+    requestHeaders.set('x-login-mode', request.cookies.get('login_mode')?.value ?? 'admin')
 
     const finalResponse = NextResponse.next({ request: { headers: requestHeaders } })
     supabaseResponse.cookies.getAll().forEach(({ name, value, ...rest }) => {

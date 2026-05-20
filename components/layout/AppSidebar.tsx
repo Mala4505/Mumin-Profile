@@ -2,25 +2,26 @@
 
 import * as React from 'react'
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard,
   Users,
   Upload,
   BarChart3,
   Settings,
-  LogOut,
   ChevronLeft,
   ChevronRight,
   ClipboardList,
   ClipboardCheck,
   FileText,
   LineChart,
+  UserCircle,
+  ArrowLeftRight,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { createClient } from '@/lib/supabase/client'
-import type { Role } from '@/lib/types/app'
+import type { Role, LoginMode } from '@/lib/types/app'
 import { ROUTES } from '@/lib/constants'
+import { switchToUserView, switchToAdminView } from '@/app/actions/mode'
 
 interface NavItem {
   label: string
@@ -29,60 +30,45 @@ interface NavItem {
   roles: Role[]
 }
 
-const NAV_ITEMS: NavItem[] = [
+interface NavGroup {
+  label: string | null
+  items: NavItem[]
+}
+
+const NAV_GROUPS: NavGroup[] = [
   {
-    label: 'Dashboard',
-    href: '/dashboard',
-    icon: LayoutDashboard,
-    roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid', 'Mumin'],
+    label: null,
+    items: [
+      { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid', 'Mumin'] },
+    ],
   },
   {
-    label: 'Members',
-    href: ROUTES.MEMBERS,
-    icon: Users,
-    roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid'],
+    label: 'MANAGE',
+    items: [
+      { label: 'Members', href: ROUTES.MEMBERS, icon: Users, roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid'] },
+      { label: 'Import', href: ROUTES.IMPORT, icon: Upload, roles: ['SuperAdmin', 'Admin', 'Masool'] },
+    ],
   },
   {
-    label: 'Import',
-    href: ROUTES.IMPORT,
-    icon: Upload,
-    roles: ['SuperAdmin', 'Admin', 'Masool'],
+    label: 'ACTIVITY',
+    items: [
+      { label: 'Forms', href: ROUTES.FORMS, icon: FileText, roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid'] },
+      { label: 'Requests', href: ROUTES.REQUESTS, icon: ClipboardList, roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid'] },
+      { label: 'Reports', href: ROUTES.REPORTS, icon: BarChart3, roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid'] },
+    ],
   },
   {
-    label: 'Reports',
-    href: ROUTES.REPORTS,
-    icon: BarChart3,
-    roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid'],
+    label: 'INSIGHTS',
+    items: [
+      { label: 'Analytics', href: '/analytics', icon: LineChart, roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid'] },
+    ],
   },
   {
-    label: 'Forms',
-    href: ROUTES.FORMS,
-    icon: FileText,
-    roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid'],
-  },
-  {
-    label: 'Requests',
-    href: ROUTES.REQUESTS,
-    icon: ClipboardList,
-    roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid'],
-  },
-  {
-    label: 'Analytics',
-    href: '/analytics',
-    icon: LineChart,
-    roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid'],
-  },
-  {
-    label: 'Admin',
-    href: ROUTES.ADMIN_USERS,
-    icon: Settings,
-    roles: ['SuperAdmin'],
-  },
-  {
-    label: 'Request Review',
-    href: ROUTES.ADMIN_REQUESTS,
-    icon: ClipboardCheck,
-    roles: ['SuperAdmin'],
+    label: 'SYSTEM',
+    items: [
+      { label: 'Admin', href: ROUTES.ADMIN_USERS, icon: Settings, roles: ['SuperAdmin'] },
+      { label: 'Request Review', href: ROUTES.ADMIN_REQUESTS, icon: ClipboardCheck, roles: ['SuperAdmin'] },
+    ],
   },
 ]
 
@@ -96,31 +82,12 @@ const ROLE_LABELS: Record<Role, string> = {
 
 interface AppSidebarProps {
   role: Role
-  itsNo?: number
-  userName?: string
+  loginMode: LoginMode
 }
 
-export function AppSidebar({ role, itsNo, userName }: AppSidebarProps) {
+export function AppSidebar({ role, loginMode }: AppSidebarProps) {
   const pathname = usePathname()
-  const router = useRouter()
   const [collapsed, setCollapsed] = React.useState(false)
-
-  const visibleItems = NAV_ITEMS.filter((item) => item.roles.includes(role))
-
-  async function handleLogout() {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    router.push(ROUTES.LOGIN)
-  }
-
-  const initials = userName
-    ? userName
-        .split(' ')
-        .map((n) => n[0])
-        .join('')
-        .toUpperCase()
-        .slice(0, 2)
-    : 'U'
 
   return (
     <aside
@@ -156,16 +123,13 @@ export function AppSidebar({ role, itsNo, userName }: AppSidebarProps) {
           {!collapsed && (
             <div>
               <p className="text-sidebar-fg font-bold text-base leading-tight">Masool/Musaid System</p>
-              <p className="text-[11px] leading-tight opacity-50 text-sidebar-fg">
-                Masool/Musaid
-              </p>
             </div>
           )}
         </div>
 
         {/* Role badge */}
         {!collapsed && (
-          <div className="mt-3">
+          <div className="mt-2">
             <span className="inline-flex items-center rounded-full bg-sidebar-primary px-2.5 py-0.5 text-xs font-semibold text-sidebar-primary-fg">
               {ROLE_LABELS[role]}
             </span>
@@ -175,73 +139,111 @@ export function AppSidebar({ role, itsNo, userName }: AppSidebarProps) {
 
       {/* Nav items */}
       <nav className={cn('flex-1 overflow-y-auto py-4', collapsed ? 'px-2' : 'px-3')}>
-        <ul className="space-y-1">
-          {visibleItems.map((item) => {
-            const Icon = item.icon
-            const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-
+        <div className="space-y-4">
+          {NAV_GROUPS.map((group) => {
+            const visibleGroupItems = group.items.filter((item) => item.roles.includes(role))
+            if (visibleGroupItems.length === 0) return null
             return (
-              <li key={item.href}>
-                <Link
-                  href={item.href}
-                  title={collapsed ? item.label : undefined}
-                  className={cn(
-                    'flex items-center rounded-lg transition-colors',
-                    collapsed ? 'justify-center h-10 w-10 mx-auto' : 'px-3 py-2.5 gap-3',
-                    isActive
-                      ? 'bg-sidebar-primary text-sidebar-primary-fg'
-                      : 'text-sidebar-fg hover:bg-sidebar-accent'
-                  )}
-                >
-                  <Icon className="h-5 w-5 shrink-0" />
-                  {!collapsed && (
-                    <span className="text-sm font-medium">{item.label}</span>
-                  )}
-                </Link>
-              </li>
+              <div key={group.label ?? 'root'}>
+                {!collapsed && group.label && (
+                  <p className="mb-1 px-3 text-[9px] font-semibold tracking-widest uppercase opacity-30 text-sidebar-fg">
+                    {group.label}
+                  </p>
+                )}
+                <ul className="space-y-0.5">
+                  {visibleGroupItems.map((item) => {
+                    const Icon = item.icon
+                    const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+                    return (
+                      <li key={item.href}>
+                        <Link
+                          href={item.href}
+                          title={collapsed ? item.label : undefined}
+                          className={cn(
+                            'relative overflow-hidden flex items-center rounded-lg transition-colors',
+                            collapsed ? 'justify-center h-10 w-10 mx-auto' : 'px-3 py-2.5 gap-3',
+                            isActive
+                              ? 'bg-sidebar-primary/15 text-sidebar-primary'
+                              : 'text-sidebar-fg hover:bg-sidebar-accent'
+                          )}
+                        >
+                          {isActive && !collapsed && (
+                            <span className="absolute left-0 top-1 bottom-1 w-0.5 bg-amber-400 rounded-full" />
+                          )}
+                          <Icon className="h-5 w-5 shrink-0" />
+                          {!collapsed && (
+                            <span className="text-sm font-medium">{item.label}</span>
+                          )}
+                        </Link>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
             )
           })}
-        </ul>
+        </div>
       </nav>
 
-      {/* Bottom user area */}
-      <div className={cn('border-t border-sidebar-border', collapsed ? 'px-2 py-3' : 'px-3 py-4')}>
-        {collapsed ? (
-          <button
-            onClick={handleLogout}
-            title="Logout"
-            className="flex h-10 w-10 mx-auto items-center justify-center rounded-lg text-sidebar-fg hover:bg-sidebar-accent transition-colors"
-          >
-            <LogOut className="h-5 w-5" />
-          </button>
+      {/* Mode toggle */}
+      <div className={cn('px-3 py-2 border-t border-sidebar-border/50', collapsed ? 'px-2' : '')}>
+        {!collapsed ? (
+          loginMode === 'user' ? (
+            <div className="rounded-lg bg-amber-400/10 border border-amber-400/20 px-3 py-2">
+              <p className="text-[9px] font-semibold tracking-widest uppercase text-amber-500 mb-1.5">
+                User View Active
+              </p>
+              <form action={switchToAdminView}>
+                <button
+                  type="submit"
+                  className="flex items-center gap-2 text-sm font-medium text-amber-700 hover:text-amber-800 transition-colors"
+                >
+                  <ArrowLeftRight className="h-4 w-4" />
+                  Back to Admin
+                </button>
+              </form>
+            </div>
+          ) : (
+            <form action={switchToUserView}>
+              <button
+                type="submit"
+                className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sidebar-fg opacity-60 hover:opacity-100 hover:bg-sidebar-accent transition-all"
+              >
+                <UserCircle className="h-5 w-5 shrink-0" />
+                <span className="text-sm font-medium">Switch to User View</span>
+                <ArrowLeftRight className="h-4 w-4 ml-auto" />
+              </button>
+            </form>
+          )
         ) : (
-          <div className="flex items-center gap-3">
-            {/* Avatar */}
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sidebar-accent text-sidebar-fg text-xs font-semibold select-none">
-              {initials}
+          loginMode === 'user' ? (
+            <div className="flex justify-center">
+              <form action={switchToAdminView}>
+                <button
+                  type="submit"
+                  title="Back to Admin"
+                  className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-400/15 text-amber-600 hover:bg-amber-400/25 transition-colors"
+                >
+                  <UserCircle className="h-5 w-5" />
+                </button>
+              </form>
             </div>
-            <div className="flex-1 min-w-0">
-              {userName && (
-                <p className="text-sidebar-fg text-sm font-medium truncate leading-tight">
-                  {userName}
-                </p>
-              )}
-              {itsNo && (
-                <p className="text-[11px] truncate leading-tight opacity-50 text-sidebar-fg">
-                  ITS: {itsNo}
-                </p>
-              )}
+          ) : (
+            <div className="flex justify-center">
+              <form action={switchToUserView}>
+                <button
+                  type="submit"
+                  title="Switch to User View"
+                  className="flex h-10 w-10 items-center justify-center rounded-lg text-sidebar-fg opacity-60 hover:opacity-100 hover:bg-sidebar-accent transition-all"
+                >
+                  <UserCircle className="h-5 w-5" />
+                </button>
+              </form>
             </div>
-            <button
-              onClick={handleLogout}
-              title="Logout"
-              className="shrink-0 flex h-8 w-8 items-center justify-center rounded-lg text-sidebar-fg hover:bg-sidebar-accent transition-colors"
-            >
-              <LogOut className="h-4 w-4" />
-            </button>
-          </div>
+          )
         )}
       </div>
+
     </aside>
   )
 }

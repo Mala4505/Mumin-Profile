@@ -1,6 +1,7 @@
 import type { Database } from './database'
 
 export type Role = 'SuperAdmin' | 'Admin' | 'Masool' | 'Musaid' | 'Mumin'
+export type LoginMode = 'admin' | 'user'
 
 export type MuminStatus = 'active' | 'deceased' | 'relocated' | 'left_community' | 'inactive'
 

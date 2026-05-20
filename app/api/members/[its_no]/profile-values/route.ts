@@ -74,6 +74,8 @@ export async function PATCH(
   const meta = getJwtMeta(session.access_token)
   const callerRole = meta.role
   const callerItsNo = meta.its_no
+  const loginMode = request.cookies.get('login_mode')?.value ?? 'admin'
+  const effectiveRole = loginMode === 'user' ? 'Mumin' : callerRole
 
   const { its_no } = await params
   const targetItsNo = parseInt(its_no)
@@ -93,15 +95,15 @@ export async function PATCH(
 
   if (!field) return NextResponse.json({ error: 'Field not found' }, { status: 404 })
 
-  if (callerRole === 'Mumin') {
-    // Mumin can only edit their own profile, only mumin_can_edit fields
+  if (effectiveRole === 'Mumin') {
+    // Mumin (and user view mode) can only edit their own profile, only mumin_can_edit fields
     if (callerItsNo !== targetItsNo) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
     if (!field.mumin_can_edit) {
       return NextResponse.json({ error: 'This field is not editable' }, { status: 403 })
     }
-  } else if (callerRole === 'Masool' || callerRole === 'Musaid') {
+  } else if (effectiveRole === 'Masool' || effectiveRole === 'Musaid') {
     // Verify scope
     const { data: member } = await admin
       .from('mumin')
@@ -120,7 +122,7 @@ export async function PATCH(
     if (callerRole === 'Musaid' && !meta.subsector_ids?.includes(memberSubsectorId)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
-  } else if (callerRole !== 'SuperAdmin') {
+  } else if (effectiveRole !== 'SuperAdmin') {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 

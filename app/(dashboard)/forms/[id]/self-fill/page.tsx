@@ -1,8 +1,10 @@
 import { redirect, notFound } from 'next/navigation'
+import { headers } from 'next/headers'
 import { getSession } from '@/lib/auth/getSession'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { SelfFillForm } from '@/components/forms/SelfFillForm'
 import type { Form, FormQuestion, FillerAccess } from '@/lib/types/forms'
+import type { LoginMode } from '@/lib/types/app'
 
 export default async function SelfFillPage({
   params,
@@ -12,7 +14,12 @@ export default async function SelfFillPage({
   const { id } = await params
   const session = await getSession()
   if (!session) redirect('/login')
-  if (session.role !== 'Mumin') redirect('/dashboard')
+
+  const headersList = await headers()
+  const loginMode = (headersList.get('x-login-mode') ?? 'admin') as LoginMode
+  const effectiveRole = loginMode === 'user' ? 'Mumin' : session.role
+
+  if (effectiveRole !== 'Mumin') redirect('/dashboard')
 
   const supabase = createAdminClient()
 
@@ -53,7 +60,7 @@ export default async function SelfFillPage({
       question_text,
       field_type_override,
       options_override,
-      profile_field:field_id (
+      profile_field!field_id (
         caption,
         field_type,
         behavior,

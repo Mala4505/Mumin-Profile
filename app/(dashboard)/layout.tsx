@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
-import type { Role } from '@/lib/types/app'
+import type { Role, LoginMode } from '@/lib/types/app'
 import { AppSidebar } from '@/components/layout/AppSidebar'
 import { MobileHeader } from '@/components/layout/MobileHeader'
 import { TopBar } from '@/components/layout/TopBar'
@@ -14,12 +14,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (!rawRole) redirect('/login')
 
   const role = rawRole as Role
+  const loginMode = (headersList.get('x-login-mode') ?? 'admin') as LoginMode
+  const isUserViewMode = role !== 'Mumin' && loginMode === 'user'
 
-  if (role === 'Mumin') {
+  if (role === 'Mumin' || isUserViewMode) {
     return (
       <div className="min-h-screen bg-background">
-        <MobileHeader role={role} />
-        <TopBar role={role} its_no={its_no} />
+        <MobileHeader role={role} loginMode={loginMode} />
+        <TopBar role={role} its_no={its_no} loginMode={loginMode} />
         <main className="max-w-2xl mx-auto px-4 pt-20 pb-6">
           {children}
         </main>
@@ -31,16 +33,16 @@ export default async function DashboardLayout({ children }: { children: React.Re
     <div className="flex h-screen bg-background overflow-hidden">
       {/* Desktop sidebar — hidden on mobile */}
       <div className="hidden md:flex">
-        <AppSidebar role={role} itsNo={its_no} />
+        <AppSidebar role={role} loginMode={loginMode} />
       </div>
       {/* Main content area */}
       <div className="flex flex-col flex-1 min-w-0">
         {/* Mobile header — shown only on mobile */}
         <div className="md:hidden">
-          <MobileHeader role={role} />
+          <MobileHeader role={role} loginMode={loginMode} />
         </div>
         {/* Desktop top bar now uses TopBar */}
-        <TopBar role={role} its_no={its_no} />
+        <TopBar role={role} its_no={its_no} loginMode={loginMode} />
         <main className="flex-1 overflow-y-auto">
           {children}
         </main>

@@ -14,11 +14,15 @@ import {
   ClipboardList,
   ClipboardCheck,
   LineChart,
+  ArrowLeftRight,
+  UserCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import type { Role } from '@/lib/types/app'
 import { ROUTES } from '@/lib/constants'
+import type { LoginMode } from '@/lib/types/app'
+import { switchToUserView, switchToAdminView } from '@/app/actions/mode'
 import {
   Sheet,
   SheetContent,
@@ -95,14 +99,16 @@ const NAV_ITEMS: NavItem[] = [
 interface MobileHeaderProps {
   role: Role
   userName?: string
+  loginMode: LoginMode
 }
 
-export function MobileHeader({ role, userName }: MobileHeaderProps) {
+export function MobileHeader({ role, userName, loginMode }: MobileHeaderProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [sheetOpen, setSheetOpen] = React.useState(false)
 
-  const visibleItems = NAV_ITEMS.filter((item) => item.roles.includes(role))
+  const effectiveRole = loginMode === 'user' ? 'Mumin' : role
+  const visibleItems = NAV_ITEMS.filter((item) => item.roles.includes(effectiveRole))
 
   async function handleLogout() {
     const supabase = createClient()
@@ -131,7 +137,12 @@ export function MobileHeader({ role, userName }: MobileHeaderProps) {
       </button>
 
       {/* Center: App name */}
-      <span className="text-foreground font-bold text-base tracking-tight">Masool/Musaid System</span>
+      <div className="flex flex-col items-center">
+        <span className="text-foreground font-bold text-base tracking-tight">Masool/Musaid System</span>
+        {role !== 'Mumin' && loginMode === 'user' && (
+          <span className="text-[9px] font-semibold text-amber-500 tracking-wide uppercase">User View</span>
+        )}
+      </div>
 
       {/* Right: User avatar dropdown */}
       <DropdownMenu>
@@ -200,6 +211,38 @@ export function MobileHeader({ role, userName }: MobileHeaderProps) {
               })}
             </ul>
           </nav>
+
+          {role !== 'Mumin' && (
+            <div className="border-t border-border px-3 py-3">
+              {loginMode === 'user' ? (
+                <div className="rounded-lg bg-amber-400/10 border border-amber-400/20 px-3 py-2">
+                  <p className="text-[9px] font-semibold tracking-widest uppercase text-amber-500 mb-1.5">
+                    User View Active
+                  </p>
+                  <form action={switchToAdminView} onSubmit={() => setSheetOpen(false)}>
+                    <button
+                      type="submit"
+                      className="flex items-center gap-2 text-sm font-medium text-amber-700 hover:text-amber-800 transition-colors"
+                    >
+                      <ArrowLeftRight className="h-4 w-4" />
+                      Back to Admin
+                    </button>
+                  </form>
+                </div>
+              ) : (
+                <form action={switchToUserView} onSubmit={() => setSheetOpen(false)}>
+                  <button
+                    type="submit"
+                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted transition-colors"
+                  >
+                    <UserCircle className="h-5 w-5 shrink-0" />
+                    Switch to User View
+                    <ArrowLeftRight className="h-4 w-4 ml-auto" />
+                  </button>
+                </form>
+              )}
+            </div>
+          )}
 
           <div className="border-t border-border px-3 py-4">
             <button

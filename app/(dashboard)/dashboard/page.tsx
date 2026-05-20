@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import { Suspense } from 'react'
 import { getSession } from '@/lib/auth/getSession'
 import {
@@ -111,6 +112,17 @@ async function MuminContent({ itsNo }: { itsNo: number }) {
 export default async function DashboardPage() {
   const session = await getSession()
   if (!session) redirect('/login')
+
+  const headersList = await headers()
+  const loginMode = headersList.get('x-login-mode') ?? 'admin'
+
+  if (loginMode === 'user') {
+    return (
+      <Suspense fallback={<DashboardSkeleton />}>
+        <MuminContent itsNo={session.its_no} />
+      </Suspense>
+    )
+  }
 
   if (session.role === 'SuperAdmin') {
     return (

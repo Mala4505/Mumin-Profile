@@ -19,7 +19,7 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { MemberProfile } from '@/lib/members/getMemberProfile'
-import type { SessionUser } from '@/lib/types/app'
+import type { SessionUser, LoginMode } from '@/lib/types/app'
 import { EditMemberModal } from '@/components/members/EditMemberModal'
 import {
   Dialog,
@@ -43,6 +43,7 @@ interface Props {
   profile: MemberProfile
   session: SessionUser
   initialResponses?: InitialResponse[]
+  loginMode?: LoginMode
 }
 
 interface HistoryEntry {
@@ -336,16 +337,17 @@ function UmoorSection({
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export function MemberProfileView({ profile, session, initialResponses = [] }: Props) {
+export function MemberProfileView({ profile, session, initialResponses = [], loginMode = 'admin' }: Props) {
   const router = useRouter()
+  const effectiveRole = loginMode === 'user' ? 'Mumin' : session.role
   const isStaff =
-    session.role === 'SuperAdmin' ||
-    session.role === 'Admin' ||
-    session.role === 'Masool' ||
-    session.role === 'Musaid'
+    effectiveRole === 'SuperAdmin' ||
+    effectiveRole === 'Admin' ||
+    effectiveRole === 'Masool' ||
+    effectiveRole === 'Musaid'
   const isOwnProfile = session.its_no === profile.its_no
 
-  const canDirectEdit = session.role === 'SuperAdmin' || session.role === 'Admin'
+  const canDirectEdit = effectiveRole === 'SuperAdmin' || effectiveRole === 'Admin'
   const [coreEditOpen, setCoreEditOpen] = useState(false)
   const [contactEditOpen, setContactEditOpen] = useState(false)
   const [contactForm, setContactForm] = useState({
@@ -459,7 +461,7 @@ export function MemberProfileView({ profile, session, initialResponses = [] }: P
   }
 
   function canEditField(field: MemberProfile['values'][number]) {
-    if (session.role === 'SuperAdmin') return true
+    if (effectiveRole === 'SuperAdmin') return true
     if (isStaff) return true
     if (isOwnProfile && field.mumin_can_edit) return true
     return false
@@ -468,7 +470,7 @@ export function MemberProfileView({ profile, session, initialResponses = [] }: P
   // Filter and group profile values
   const visibleValues = displayProfile.values
     .filter((pv) => {
-      if (session.role === 'SuperAdmin') return true
+      if (effectiveRole === 'SuperAdmin') return true
       if (isStaff) return pv.visibility_level <= 2
       return pv.visibility_level === 1
     })
@@ -601,7 +603,7 @@ export function MemberProfileView({ profile, session, initialResponses = [] }: P
             status: displayProfile.status,
             notes: (displayProfile as any).notes ?? '',
           }}
-          initialAddress={session.role === 'SuperAdmin' ? {
+          initialAddress={effectiveRole === 'SuperAdmin' ? {
             subsector_id: String(displayProfile.subsector_id),
             building_name: displayProfile.building_name ?? '',
             floor_no: displayProfile.floor_no ?? '',

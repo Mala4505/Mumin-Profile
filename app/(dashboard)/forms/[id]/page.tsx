@@ -35,11 +35,15 @@ export default async function FormEditPage({
       field_id,
       sort_order,
       is_required,
+      question_text,
+      field_type_override,
+      options_override,
       profile_field!inner (
         id,
         caption,
         field_type,
-        behavior
+        behavior,
+        options
       )
     `)
     .eq('form_id', id)

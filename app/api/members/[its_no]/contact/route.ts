@@ -25,6 +25,8 @@ export async function PATCH(
   const meta = getJwtMeta(session.access_token)
   const callerRole = meta.role
   const callerItsNo = meta.its_no
+  const loginMode = request.cookies.get('login_mode')?.value ?? 'admin'
+  const effectiveRole = loginMode === 'user' ? 'Mumin' : callerRole
 
   const { its_no } = await params
   const targetItsNo = parseInt(its_no)
@@ -39,8 +41,8 @@ export async function PATCH(
 
   const admin = createAdminClient()
 
-  // Mumin can only edit their own phone/email
-  if (callerRole === 'Mumin') {
+  // Mumin (and user view mode) can only edit their own phone/email
+  if (effectiveRole === 'Mumin') {
     if (callerItsNo !== targetItsNo) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
@@ -56,7 +58,7 @@ export async function PATCH(
   }
 
   // Masool/Musaid scope check
-  if (callerRole === 'Masool' || callerRole === 'Musaid') {
+  if (effectiveRole === 'Masool' || effectiveRole === 'Musaid') {
     const { data: member } = await admin
       .from('mumin')
       .select('subsector_id, subsector!subsector_id(sector_id)')
@@ -81,7 +83,7 @@ export async function PATCH(
   if (body.phone !== undefined) update.phone = body.phone
   if (body.alternate_phone !== undefined) update.alternate_phone = body.alternate_phone
   if (body.email !== undefined) update.email = body.email
-  if (body.status !== undefined && callerRole !== 'Mumin') {
+  if (body.status !== undefined && effectiveRole !== 'Mumin') {
     const validStatuses: Database['public']['Tables']['mumin']['Row']['status'][] =
       ["active", "deceased", "relocated", "left_community", "inactive"]
     if (validStatuses.includes(body.status as any)) {
