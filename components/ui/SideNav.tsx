@@ -18,7 +18,6 @@ export function SideNav({ role }: SideNavProps) {
   const navItems = [
     { href: ROUTES.MEMBERS, label: 'Members', show: true },
     { href: ROUTES.IMPORT, label: 'CSV Import', show: role !== 'Mumin' },
-    { href: ROUTES.REPORTS, label: 'Reports & Export', show: true },
     { href: ROUTES.ADMIN_USERS, label: 'User Management', show: role === 'SuperAdmin' },
   ].filter(item => item.show)
 

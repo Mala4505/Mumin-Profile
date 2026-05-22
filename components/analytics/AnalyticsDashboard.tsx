@@ -2,13 +2,11 @@
 
 import * as React from 'react'
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
-  PieChart, Pie, Cell,
-  LineChart, Line,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  Cell,
 } from 'recharts'
 
 import type { FormRate } from '@/app/api/analytics/forms/[id]/route'
-import type { ActivityEvent } from '@/app/api/analytics/dashboard/route'
 import type { Role } from '@/lib/types/app'
 import { Search } from 'lucide-react'
 import { Input } from '@/components/ui/input'
@@ -117,48 +115,6 @@ function FormResponseRates({ rates }: { rates: FormRate[] }) {
 }
 
 // â"€â"€â"€ Activity Feed â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
-function timeAgoFromEvent(dateStr: string): string {
-  const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000)
-  if (diff < 60) return `${diff}s ago`
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
-  return `${Math.floor(diff / 86400)}d ago`
-}
-
-const ACTIVITY_COLORS: Record<string, string> = {
-  submission: '#10B981',
-  import: '#3B82F6',
-  profile: '#F59E0B',
-}
-
-function ActivityFeed({ events }: { events: ActivityEvent[] }) {
-  return (
-    <div className="bg-card border border-border rounded-lg p-5">
-      <h2 className="text-base font-semibold text-foreground mb-4">Recent Activity</h2>
-      {events.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No recent activity.</p>
-      ) : (
-        <ul className="space-y-2.5">
-          {events.map((e, i) => (
-            <li key={i} className="flex items-start gap-2.5">
-              <span
-                className="mt-1.5 w-2 h-2 rounded-full shrink-0"
-                style={{ backgroundColor: ACTIVITY_COLORS[e.type] ?? '#94a3b8' }}
-              />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm text-foreground leading-snug">{e.label}</p>
-              </div>
-              <span className="text-[10px] text-muted-foreground whitespace-nowrap mt-0.5">
-                {timeAgoFromEvent(e.timestamp)}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  )
-}
-
 
 
 // â"€â"€â"€ Main Component â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
@@ -172,9 +128,6 @@ export function AnalyticsDashboard({ role }: { role: Role }) {
   const [groupData, setGroupData] = React.useState<GroupItem[]>([])
   const [groupLoading, setGroupLoading] = React.useState(true)
 
-  const [profileCompletion, setProfileCompletion] = React.useState<Array<{ name: string; value: number }>>([])
-  const [submissionActivity, setSubmissionActivity] = React.useState<Array<{ date: string; submissions: number }>>([])
-
   const [selectedGroup, setSelectedGroup] = React.useState<string | null>(null)
   const [drillMembers, setDrillMembers] = React.useState<MemberRow[]>([])
   const [drillLoading, setDrillLoading] = React.useState(false)
@@ -183,7 +136,6 @@ export function AnalyticsDashboard({ role }: { role: Role }) {
   const [drillStatus, setDrillStatus] = React.useState<string>('__all__')
 
   const [formRates, setFormRates] = React.useState<FormRate[]>([])
-  const [activity, setActivity] = React.useState<ActivityEvent[]>([])
 
   const isManagement = ['SuperAdmin', 'Admin', 'Masool', 'Musaid'].includes(role)
   const isSuperAdmin = role === 'SuperAdmin'
@@ -236,20 +188,6 @@ export function AnalyticsDashboard({ role }: { role: Role }) {
       .finally(() => setGroupLoading(false))
   }, [groupBy, isSuperAdmin])
 
-  // â"€â"€ Fetch profile completion & submission activity (SuperAdmin only) â"€â"€â"€â"€â"€â"€â"€
-  React.useEffect(() => {
-    if (!isManagement) return
-    fetch('/api/analytics/trends?type=profile')
-      .then(r => r.json())
-      .then(setProfileCompletion)
-      .catch(() => { })
-
-    fetch('/api/analytics/trends?type=form')
-      .then(r => r.json())
-      .then(setSubmissionActivity)
-      .catch(() => { })
-  }, [isSuperAdmin])
-
   // â"€â"€ Drill-down (SuperAdmin only) â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
   React.useEffect(() => {
     if (!isManagement) return
@@ -269,12 +207,6 @@ export function AnalyticsDashboard({ role }: { role: Role }) {
       .then(setFormRates)
       .catch(() => { })
 
-    if (isSuperAdmin) {
-      fetch('/api/analytics/dashboard?type=activity')
-        .then(r => r.json())
-        .then(setActivity)
-        .catch(() => { })
-    }
   }, [isSuperAdmin])
 
 
@@ -284,11 +216,6 @@ export function AnalyticsDashboard({ role }: { role: Role }) {
   function handleBarClick(data: any) {
     const name = data?.activePayload?.[0]?.payload?.name
     if (name) setSelectedGroup((prev: string | null) => prev === name ? null : name)
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  function handlePieClick(data: any) {
-    if (data?.name) setSelectedGroup((prev: string | null) => prev === data.name ? null : data.name)
   }
 
   // â"€â"€ Non-management: degraded view (page.tsx redirects Mumin, so this shouldn't fire) â"€
@@ -415,7 +342,7 @@ export function AnalyticsDashboard({ role }: { role: Role }) {
             Members by {groupBy.charAt(0).toUpperCase() + groupBy.slice(1)}
           </h2>
           {groupLoading ? (
-            <div className="h-[260px] flex items-center justify-center text-muted-foreground text-sm">Loadingâ€¦</div>
+            <div className="h-[260px] flex items-center justify-center text-muted-foreground text-sm">Loading...</div>
           ) : groupData.length === 0 ? (
             <div className="h-[260px] flex items-center justify-center text-muted-foreground text-sm">No data available</div>
           ) : (
@@ -463,71 +390,6 @@ export function AnalyticsDashboard({ role }: { role: Role }) {
           )}
         </div>
 
-        {/* Bottom two charts */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-          {/* Pie â€" profile completion by Umoor category */}
-          <div className="bg-card border border-border rounded-lg p-5">
-            <h2 className="text-base font-semibold text-foreground mb-4">Profile Completion by Category</h2>
-            {profileCompletion.length === 0 ? (
-              <div className="h-[220px] flex items-center justify-center text-muted-foreground text-sm">No data available</div>
-            ) : (
-              <ResponsiveContainer width="100%" height={220}>
-                <PieChart>
-                  <Pie
-                    data={profileCompletion}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={55}
-                    outerRadius={80}
-                    paddingAngle={3}
-                    dataKey="value"
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    onClick={handlePieClick as any}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    {profileCompletion.map((_, i) => (
-                      <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0', boxShadow: 'none' }}
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    formatter={((v: number | string) => [`${v}%`, 'Completion']) as any}
-                  />
-                  <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
-                </PieChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-
-          {/* Line â€" form submission activity over time */}
-          <div className="bg-card border border-border rounded-lg p-5">
-            <h2 className="text-base font-semibold text-foreground mb-4">Form Submission Activity</h2>
-            {submissionActivity.length === 0 ? (
-              <div className="h-[220px] flex items-center justify-center text-muted-foreground text-sm">No submissions yet</div>
-            ) : (
-              <ResponsiveContainer width="100%" height={220}>
-                <LineChart data={submissionActivity} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                  <XAxis dataKey="date" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
-                  <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={32} allowDecimals={false} />
-                  <Tooltip
-                    contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0', boxShadow: 'none' }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="submissions"
-                    stroke="#F59E0B"
-                    strokeWidth={2}
-                    dot={{ r: 3, fill: '#F59E0B' }}
-                    activeDot={{ r: 5 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-        </div>
       </div>
 
 
@@ -543,7 +405,7 @@ export function AnalyticsDashboard({ role }: { role: Role }) {
           </div>
         ) : drillLoading ? (
           <div className="bg-card border border-border rounded-lg p-8 text-center text-muted-foreground text-sm animate-pulse">
-            Loading membersâ€¦
+            Loading members...
           </div>
         ) : drillMembers.length === 0 ? (
           <div className="bg-card border border-border rounded-lg p-8 text-center text-muted-foreground text-sm">
@@ -632,8 +494,6 @@ export function AnalyticsDashboard({ role }: { role: Role }) {
       </div>
 
       <FormResponseRates rates={formRates} />
-      <ActivityFeed events={activity} />
-
       {/* Divider */}
       <div className="border-t border-border pt-8 space-y-12">
 

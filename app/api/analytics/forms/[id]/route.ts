@@ -284,16 +284,6 @@ export const GET = withAuth(
           mData?.forEach((m: any) => memberMap.set(m.its_no, m))
         }
 
-        if (field.field_type === 'text') {
-          const textEntries = responses
-            .filter((r: any) => r.answer && r.filled_for !== null)
-            .map((r: any) => {
-              const m = memberMap.get(r.filled_for!)
-              return { its_no: r.filled_for!, name: m?.name ?? 'Unknown', value: r.answer!, submitted_at: r.submitted_at }
-            })
-          return NextResponse.json({ fields, field, distribution: [], bySector: [], textEntries })
-        }
-
         const distMap = new Map<string, number>()
         const sectorMap = new Map<string, Record<string, number>>()
 
@@ -316,9 +306,12 @@ export const GET = withAuth(
           }
         }
 
-        const distribution = Array.from(distMap.entries())
+        const allDist = Array.from(distMap.entries())
           .map(([answer, count]) => ({ answer, count }))
           .sort((a, b) => b.count - a.count)
+
+        // Limit text fields to top 20 unique values so the chart stays readable
+        const distribution = field.field_type === 'text' ? allDist.slice(0, 20) : allDist
 
         const bySector = Array.from(sectorMap.entries())
           .map(([name, answers]) => ({
@@ -328,7 +321,17 @@ export const GET = withAuth(
           }))
           .sort((a, b) => (b.total as number) - (a.total as number))
 
-        return NextResponse.json({ fields, field, distribution, bySector, textEntries: [] })
+        // Include raw text entries for text fields alongside the chart data
+        const textEntries = field.field_type === 'text'
+          ? responses
+              .filter((r: any) => r.answer && r.filled_for !== null)
+              .map((r: any) => {
+                const m = memberMap.get(r.filled_for!)
+                return { its_no: r.filled_for!, name: m?.name ?? 'Unknown', value: r.answer!, submitted_at: r.submitted_at }
+              })
+          : []
+
+        return NextResponse.json({ fields, field, distribution, bySector, textEntries })
       } catch (err: any) {
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
       }

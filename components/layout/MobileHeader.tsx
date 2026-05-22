@@ -8,7 +8,6 @@ import {
   LayoutDashboard,
   Users,
   Upload,
-  BarChart3,
   Settings,
   LogOut,
   ClipboardList,
@@ -63,12 +62,6 @@ const NAV_ITEMS: NavItem[] = [
     href: ROUTES.IMPORT,
     icon: Upload,
     roles: ['SuperAdmin', 'Admin', 'Masool'],
-  },
-  {
-    label: 'Reports',
-    href: ROUTES.REPORTS,
-    icon: BarChart3,
-    roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid'],
   },
   {
     label: 'Requests',

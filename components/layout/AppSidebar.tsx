@@ -7,7 +7,6 @@ import {
   LayoutDashboard,
   Users,
   Upload,
-  BarChart3,
   Settings,
   ChevronLeft,
   ChevronRight,
@@ -54,12 +53,6 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: 'Forms', href: ROUTES.FORMS, icon: FileText, roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid'] },
       { label: 'Requests', href: ROUTES.REQUESTS, icon: ClipboardList, roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid'] },
-      { label: 'Reports', href: ROUTES.REPORTS, icon: BarChart3, roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid'] },
-    ],
-  },
-  {
-    label: 'INSIGHTS',
-    items: [
       { label: 'Analytics', href: '/analytics', icon: LineChart, roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid'] },
     ],
   },
