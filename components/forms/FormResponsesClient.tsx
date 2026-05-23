@@ -313,7 +313,7 @@ export function FormResponsesClient({ form, formFields, responses, audience, rol
 
       {/* Detail Dialog for multi-answer responses */}
       <Dialog open={!!detailResponse} onOpenChange={(open) => { if (!open) setDetailResponse(null) }}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>{detailResponse?.mumin?.name ?? 'Response'}</DialogTitle>
           </DialogHeader>

@@ -2,17 +2,19 @@ import { createClient } from '@/lib/supabase/server'
 import type { SessionUser } from '@/lib/types/app'
 
 /**
- * Check if a user can view responses for a specific member's form submission
- * Rules:
- * 1. Member can view their own responses (unless form is staff_only)
- * 2. Member's assigned Masool/Musaid can always view
- * 3. Admin/SuperAdmin can always view
- * 4. Other users cannot view
+ * Check if a user can view responses for a specific member's form submission.
+ *
+ * Two-layer gate:
+ * 1. If responseViewerRoles is non-null, use granular role list (new mode).
+ * 2. If responseViewerRoles is null, fall back to legacy viewableByRoles logic.
+ *
+ * Admin/SuperAdmin always return true regardless of settings.
  */
 export async function canViewResponses(
   viewerSession: SessionUser,
   respondentItsNo: number,
   viewableByRoles: string | null,
+  responseViewerRoles: string[] | null,
   respondentSubsectorId?: number,
   respondentSectorId?: number
 ): Promise<boolean> {
@@ -21,17 +23,20 @@ export async function canViewResponses(
     return true
   }
 
-  // Member cannot view if form is staff_only
+  // Granular mode: use responseViewerRoles list
+  if (responseViewerRoles !== null) {
+    return responseViewerRoles.includes(viewerSession.role)
+  }
+
+  // Legacy mode: use viewableByRoles
   if (viewableByRoles === 'staff_only' && viewerSession.its_no === respondentItsNo) {
     return false
   }
 
-  // Member can view their own responses if form allows it
   if (viewerSession.its_no === respondentItsNo && viewableByRoles !== 'staff_only') {
     return true
   }
 
-  // Check if viewer is assigned as Musaid to respondent's subsector
   if (viewerSession.role === 'Musaid' && respondentSubsectorId) {
     const supabase = await createClient()
     const { data } = await supabase
@@ -44,7 +49,6 @@ export async function canViewResponses(
     if (data) return true
   }
 
-  // Check if viewer is assigned as Masool to respondent's sector
   if (viewerSession.role === 'Masool' && respondentSectorId) {
     const supabase = await createClient()
     const { data } = await supabase
@@ -57,6 +61,5 @@ export async function canViewResponses(
     if (data) return true
   }
 
-  // Default: cannot view
   return false
 }

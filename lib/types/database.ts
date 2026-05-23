@@ -706,6 +706,7 @@ export type Database = {
           audience_filters: Json | null;
           filler_access: Json | null;
           viewable_by_roles: "all" | "staff_only";
+          response_viewer_roles: Json | null;
           approved_by: number | null;
           approved_at: string | null;
           published_at: string | null;
@@ -722,6 +723,7 @@ export type Database = {
           audience_filters?: Json | null;
           filler_access?: Json | null;
           viewable_by_roles?: "all" | "staff_only";
+          response_viewer_roles?: Json | null;
           status?: "draft" | "pending_approval" | "published" | "closed";
           approved_by?: number | null;
           approved_at?: string | null;
@@ -740,6 +742,7 @@ export type Database = {
           audience_filters?: Json | null;
           filler_access?: Json | null;
           viewable_by_roles?: "all" | "staff_only";
+          response_viewer_roles?: Json | null;
           status?: "draft" | "pending_approval" | "published" | "closed";
           approved_by?: number | null;
           approved_at?: string | null;
@@ -946,6 +949,7 @@ export type Database = {
           question_text: string | null;
           field_type_override: string | null;
           options_override: Json | null;
+          hidden_from_roles: Json;
         };
         Insert: {
           id?: number;
@@ -957,6 +961,7 @@ export type Database = {
           question_text?: string | null;
           field_type_override?: string | null;
           options_override?: Json | null;
+          hidden_from_roles?: Json;
         };
         Update: {
           id?: number;
@@ -968,6 +973,7 @@ export type Database = {
           question_text?: string | null;
           field_type_override?: string | null;
           options_override?: Json | null;
+          hidden_from_roles?: Json;
         };
         Relationships: [];
       };

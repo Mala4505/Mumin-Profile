@@ -78,6 +78,7 @@ export function Step5Review({ draft, onDraftChange, onBack, onComplete, role }: 
           audience_filters: draft.audience_filters ?? { all: true },
           filler_access: draft.filler_access ?? { fillers: [] },
           expires_at: draft.expires_at || null,
+          response_viewer_roles: draft.response_viewer_roles ?? null,
         }),
       })
 
@@ -108,6 +109,7 @@ export function Step5Review({ draft, onDraftChange, onBack, onComplete, role }: 
               options_override: (q.options_override ?? []).filter(o => o.trim()).length > 0
                 ? (q.options_override ?? []).filter(o => o.trim())
                 : null,
+              hidden_from_roles: q.hidden_from_roles ?? [],
             })),
           }),
         })

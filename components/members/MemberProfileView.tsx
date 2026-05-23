@@ -622,7 +622,7 @@ export function MemberProfileView({ profile, session, initialResponses = [], log
           setContactEditOpen(open)
         }}
       >
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>Edit Contact Info</DialogTitle>
           </DialogHeader>

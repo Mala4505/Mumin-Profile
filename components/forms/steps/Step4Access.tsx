@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase/client'
 import type { FillerAccess } from '@/lib/types/forms'
+import type { Role } from '@/lib/types/app'
 import type { FormDraft } from '../FormBuilder'
 
 interface MuminOption { its_no: number; name: string }
@@ -109,9 +110,24 @@ function PersonPicker({ label, people, selected, onChange }: {
   )
 }
 
+const VIEWER_ROLES: { role: Role; label: string; desc: string; color: string }[] = [
+  { role: 'Mumin',  label: 'Mumin',  desc: 'Community members',   color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
+  { role: 'Masool', label: 'Masool', desc: 'Sector leaders',       color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400' },
+  { role: 'Musaid', label: 'Musaid', desc: 'Assistant leaders',    color: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400' },
+]
+
+const ALL_VIEWER_ROLES: Role[] = ['Mumin', 'Masool', 'Musaid']
+
 export function Step4Access({ draft, update, onNext, onBack }: Props) {
   const [masools, setMasools] = useState<MuminOption[]>([])
   const [musaids, setMusaids] = useState<MuminOption[]>([])
+
+  // null in draft = all can view (default open); otherwise it's an explicit list
+  const [responseViewerRoles, setResponseViewerRoles] = useState<Role[]>(
+    draft.response_viewer_roles === null || draft.response_viewer_roles === undefined
+      ? [...ALL_VIEWER_ROLES]
+      : (draft.response_viewer_roles as Role[])
+  )
 
   const access = draft.filler_access ?? { fillers: [] }
   const fillers = access.fillers
@@ -236,10 +252,72 @@ export function Step4Access({ draft, update, onNext, onBack }: Props) {
         </p>
       )}
 
+      {/* Response Visibility */}
+      <div className="space-y-2">
+        <div>
+          <Label className="text-xs uppercase tracking-wider text-muted-foreground">Who can view responses</Label>
+          <p className="text-xs text-muted-foreground mt-0.5">Admin and SuperAdmin always have access.</p>
+        </div>
+        <div className="space-y-2 p-3.5 border border-border rounded-lg bg-background">
+          {VIEWER_ROLES.map(({ role, label, desc, color }) => {
+            const isOn = responseViewerRoles.includes(role)
+            return (
+              <div key={role} className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <span className={`text-[11px] font-bold w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${color}`}>
+                    {label.slice(0, 2)}
+                  </span>
+                  <div>
+                    <p className="text-sm text-foreground">{label}</p>
+                    <p className="text-xs text-muted-foreground">{desc}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = isOn
+                      ? responseViewerRoles.filter(r => r !== role)
+                      : [...responseViewerRoles, role]
+                    setResponseViewerRoles(next)
+                  }}
+                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary shrink-0 ${
+                    isOn ? 'bg-primary' : 'bg-muted'
+                  }`}
+                  style={{ transition: 'background cubic-bezier(0.23,1,0.32,1) 200ms' }}
+                  role="switch"
+                  aria-checked={isOn}
+                >
+                  <span
+                    className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform ${
+                      isOn ? 'translate-x-4' : 'translate-x-0.5'
+                    }`}
+                    style={{ transition: 'transform cubic-bezier(0.23,1,0.32,1) 200ms' }}
+                  />
+                </button>
+              </div>
+            )
+          })}
+        </div>
+        {/* Live summary */}
+        <p className="text-xs text-muted-foreground px-1">
+          {responseViewerRoles.length === 0
+            ? 'No roles can view responses (staff only).'
+            : responseViewerRoles.length === ALL_VIEWER_ROLES.length
+            ? 'Responses visible to all roles.'
+            : `Responses visible to: ${responseViewerRoles.join(', ')}.`}
+        </p>
+      </div>
+
       {/* Footer */}
       <div className="flex justify-between pt-2 border-t border-border">
         <Button variant="outline" onClick={onBack}>Back</Button>
-        <Button onClick={onNext}>Next: Review</Button>
+        <Button onClick={() => {
+          // Save null if all roles selected (open/default), else save explicit array
+          const toSave: Role[] | null =
+            responseViewerRoles.length === ALL_VIEWER_ROLES.length ? null : responseViewerRoles
+          update({ response_viewer_roles: toSave })
+          onNext()
+        }}>Next: Review</Button>
       </div>
     </div>
   )

@@ -21,6 +21,7 @@ export interface FormDraft {
   audience_filters: AudienceFilters
   filler_access: FillerAccess
   viewable_by_roles?: string     // 'all' or 'staff_only'
+  response_viewer_roles?: Role[] | null
 }
 
 const STEPS = ['Basic Info', 'Audience', 'Form Fields', 'Access', 'Review']

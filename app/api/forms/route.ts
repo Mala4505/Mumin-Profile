@@ -206,6 +206,7 @@ export async function POST(req: NextRequest) {
       audience_filters: body.audience_filters ?? { all: true },
       filler_access: body.filler_access ?? { fillers: [] },
       viewable_by_roles: body.viewable_by_roles ?? 'all',
+      response_viewer_roles: body.response_viewer_roles ?? null,
       expires_at: body.expires_at ?? null,
       created_by: Number(session.its_no),
       status: 'draft',

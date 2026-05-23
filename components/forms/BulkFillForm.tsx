@@ -33,6 +33,7 @@ interface FormField {
   field_type: string
   behavior: 'static' | 'historical'
   options: string[] | null
+  hidden_from_roles: string[]
 }
 
 interface AudienceMember {
@@ -107,6 +108,7 @@ export function BulkFillForm({ formId, role, itsNo }: BulkFillFormProps) {
           field_type: f.field_type_override ?? f.profile_field?.field_type ?? 'text',
           behavior: f.profile_field?.behavior ?? 'historical',
           options: f.options_override ?? f.profile_field?.options ?? null,
+          hidden_from_roles: f.hidden_from_roles ?? [],
         }))
         setQuestions(mapped.sort((a, b) => a.sort_order - b.sort_order))
 
@@ -199,11 +201,14 @@ export function BulkFillForm({ formId, role, itsNo }: BulkFillFormProps) {
     setCurrentPage(1)
   }, [searchQuery, showUnfilledOnly])
 
+  // Filter out questions hidden from Mumin (bulk-fill respondents are Mumins)
+  const visibleQuestions = questions.filter(q => !q.hidden_from_roles.includes('Mumin'))
+
   const isMemberFilled = (m: AudienceMember): boolean => {
-    if (questions.length === 0) return false
+    if (visibleQuestions.length === 0) return false
     const fields = progress[m.its_no]
     if (!fields) return false
-    return questions.every(q => {
+    return visibleQuestions.every(q => {
       const v = fields[q.profile_field_id]
       return v !== undefined && v !== ''
     })
@@ -496,7 +501,7 @@ export function BulkFillForm({ formId, role, itsNo }: BulkFillFormProps) {
                     <th className="p-4 font-semibold text-foreground sticky left-0 bg-muted/40 z-10 backdrop-blur-sm whitespace-nowrap">
                       Member Details
                     </th>
-                    {questions.map((q) => (
+                    {visibleQuestions.map((q) => (
                       <th
                         key={q.profile_field_id}
                         className="p-4 font-semibold text-foreground min-w-[200px]"
@@ -584,7 +589,7 @@ export function BulkFillForm({ formId, role, itsNo }: BulkFillFormProps) {
                             </div>
                           </div>
                         </td>
-                        {questions.map((q) => {
+                        {visibleQuestions.map((q) => {
                           const val = progress[member.its_no]?.[q.profile_field_id] ?? ''
                           return (
                             <td key={q.profile_field_id} className="p-3">
@@ -622,7 +627,7 @@ export function BulkFillForm({ formId, role, itsNo }: BulkFillFormProps) {
                   {pagedMembers.length === 0 && (
                     <tr>
                       <td
-                        colSpan={questions.length + 2}
+                        colSpan={visibleQuestions.length + 2}
                         className="p-12 text-center text-muted-foreground"
                       >
                         <AlertTriangle className="w-6 h-6 mx-auto mb-2 opacity-20" />

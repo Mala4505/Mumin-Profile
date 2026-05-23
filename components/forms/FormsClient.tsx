@@ -578,7 +578,7 @@ export function FormsClient({ role, itsNo }: FormsClientProps) {
               else setShowBuilder(true)
             }}
           >
-            <DialogContent className="max-w-2xl overflow-y-auto max-h-[90vh]">
+            <DialogContent className="max-w-2xl overflow-y-auto max-h-[90vh]" aria-describedby={undefined}>
               <DialogTitle className="sr-only">Form Builder</DialogTitle>
               <FormBuilder
                 onComplete={() => {

@@ -1,5 +1,10 @@
+import type { Role } from './app'
+
 export type FormStatus = 'draft' | 'pending_approval' | 'published' | 'closed' | 'expired'
 export type FormType = 'simple' | 'detailed'
+
+export type HiddenFromRoles = Role[]
+export type ResponseViewerRoles = Role[] | null
 
 export interface FormQuestion {
   profile_field_id: number
@@ -8,6 +13,7 @@ export interface FormQuestion {
   behavior?: 'static' | 'historical'
   field_type_override?: string | null
   options_override?: string[] | null
+  hidden_from_roles?: HiddenFromRoles
 }
 
 export interface FillerAccess {
@@ -50,4 +56,6 @@ export interface Form {
   published_at?: string
   created_at: string
   is_expired?: boolean
+  viewable_by_roles?: 'all' | 'staff_only'
+  response_viewer_roles?: ResponseViewerRoles
 }

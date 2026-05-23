@@ -17,12 +17,48 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Form not found' }, { status: 404 })
   }
 
-  const isStaffOnly = form.viewable_by_roles === 'staff_only'
+  const isAdmin = ['SuperAdmin', 'Admin'].includes(session.role)
   const isStaff = ['SuperAdmin', 'Admin', 'Masool', 'Musaid'].includes(session.role)
+  const responseViewerRoles = form.response_viewer_roles as string[] | null
 
-  // Mumin can only see own responses if form allows it
+  // Determine if this role can view responses under the new granular gate.
+  // null = open to all (fall through to legacy logic).
+  // non-null = must be in the list (Admin/SuperAdmin always pass).
+  function roleCanViewResponses(): boolean {
+    if (isAdmin) return true
+    if (responseViewerRoles !== null) {
+      return responseViewerRoles.includes(session!.role)
+    }
+    // Legacy: staff_only check
+    if (form!.viewable_by_roles === 'staff_only') return isStaff
+    return true
+  }
+
+  // Fetch form_fields so we can strip hidden question answers
+  const { data: formFields } = await supabase
+    .from('form_fields')
+    .select('field_id, hidden_from_roles')
+    .eq('form_id', id)
+
+  // Build set of field_ids hidden from the viewer's role (Admin sees all)
+  const hiddenFieldIds = new Set<number>()
+  if (!isAdmin && formFields) {
+    for (const ff of formFields) {
+      const hidden = (ff.hidden_from_roles as string[]) ?? []
+      if (hidden.includes(session.role)) hiddenFieldIds.add(ff.field_id as number)
+    }
+  }
+
+  function stripHiddenAnswers(responses: any[]): any[] {
+    if (isAdmin || hiddenFieldIds.size === 0) return responses
+    return responses.filter(r => !hiddenFieldIds.has(r.profile_field_id as number))
+  }
+
+  // Mumin: can only see own responses if allowed by visibility gate
   if (session.role === 'Mumin') {
-    if (isStaffOnly) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (!roleCanViewResponses()) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
 
     const { data: ownResponses, error: respErr } = await supabase
       .from('form_responses')
@@ -33,12 +69,18 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       .order('submitted_at', { ascending: false })
 
     if (respErr) return NextResponse.json({ error: respErr.message }, { status: 500 })
-    return NextResponse.json({ form, responses: ownResponses ?? [], audience: [] })
+    return NextResponse.json({ form, responses: stripHiddenAnswers(ownResponses ?? []), audience: [] })
   }
 
   if (!isStaff) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
+  // Masool/Musaid: check they're authorized to view this form's responses
   if (session.role === 'Masool' || session.role === 'Musaid') {
+    // Must be able to view responses (new gate)
+    if (!roleCanViewResponses()) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     const isCreator = Number(session.its_no) === form.created_by
     const fillerAccess = form.filler_access as FillerAccess | null
     if (!isCreator && (!fillerAccess || !isAuthorizedFiller(fillerAccess, session))) {
@@ -46,7 +88,6 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     }
   }
 
-  // ✅ pluralized table name and type-safe join
   const { data: responses, error: respErr } = await supabase
     .from('form_responses')
     .select('*, mumin!filled_for(name, its_no)')
@@ -63,5 +104,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
   if (audErr) return NextResponse.json({ error: audErr.message }, { status: 500 })
 
-  return NextResponse.json({ form, responses: responses ?? [], audience: audience ?? [] })
+  return NextResponse.json({
+    form,
+    responses: stripHiddenAnswers(responses ?? []),
+    audience: audience ?? [],
+  })
 }

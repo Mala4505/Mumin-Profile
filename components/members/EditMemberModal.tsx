@@ -206,7 +206,7 @@ export function EditMemberModal({
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!saving) onOpenChange(v) }}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>Edit Member — ITS {itsNo}</DialogTitle>
         </DialogHeader>

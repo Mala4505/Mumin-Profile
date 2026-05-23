@@ -499,7 +499,7 @@ export function RequestsClient({ families, initialRequests, mode, currentSearch,
                   </button>
                 </DialogTrigger>
 
-                <DialogContent className="max-w-lg">
+                <DialogContent className="max-w-lg" aria-describedby={undefined}>
                   <DialogHeader>
                     <DialogTitle>Request Field Edit</DialogTitle>
                     <DialogDescription>
@@ -699,7 +699,7 @@ function RequestsTable({ requests, onDelete }: { requests: ChangeRequest[], onDe
                       <Trash2Icon className="w-4 h-4 text-red-600" />
                     </button>
                   </DialogTrigger>
-                  <DialogContent>
+                  <DialogContent aria-describedby={undefined}>
                     <DialogHeader>
                       <DialogTitle>Confirm Deletion</DialogTitle>
                       <DialogDescription>

@@ -27,6 +27,7 @@ export async function GET(
         question_text,
         field_type_override,
         options_override,
+        hidden_from_roles,
         profile_field!inner (
           id,
           caption,
@@ -48,7 +49,16 @@ export async function GET(
       )
     }
 
-    return NextResponse.json({ fields: fields || [] })
+    // Filter out questions the viewer's role is excluded from (Admin/SuperAdmin see all)
+    const isAdmin = session.role === 'SuperAdmin' || session.role === 'Admin'
+    const visibleFields = isAdmin
+      ? (fields ?? [])
+      : (fields ?? []).filter(f => {
+          const hidden = (f.hidden_from_roles as string[]) ?? []
+          return !hidden.includes(session.role)
+        })
+
+    return NextResponse.json({ fields: visibleFields })
   } catch (error: any) {
     console.error('GET /api/forms/[id]/fields error:', error)
     return NextResponse.json(
@@ -101,6 +111,7 @@ export async function POST(
         question_text: f.question_text ?? null,
         field_type_override: f.field_type_override ?? null,
         options_override: f.options_override ?? null,
+        hidden_from_roles: f.hidden_from_roles ?? [],
       }))
 
       const { error } = await supabase

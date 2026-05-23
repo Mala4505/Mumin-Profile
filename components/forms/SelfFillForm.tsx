@@ -9,10 +9,14 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 interface Props {
   form: Form
   itsNo: number
+  userRole?: string
   formFields: (FormQuestion & { field_type?: string; options?: string[] | null })[]
 }
 
-export function SelfFillForm({ form, itsNo, formFields }: Props) {
+export function SelfFillForm({ form, itsNo, userRole, formFields }: Props) {
+  const visibleFields = userRole
+    ? formFields.filter(q => !(q.hidden_from_roles ?? []).includes(userRole as any))
+    : formFields
   const router = useRouter()
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [remarks, setRemarks] = useState('')
@@ -29,7 +33,7 @@ export function SelfFillForm({ form, itsNo, formFields }: Props) {
     setSubmitting(true)
     setError(null)
 
-    const responses = formFields
+    const responses = visibleFields
       .filter((q) => answers[q.profile_field_id] != null && answers[q.profile_field_id] !== '')
       .map((q) => ({
         profile_field_id: q.profile_field_id,
@@ -118,13 +122,13 @@ export function SelfFillForm({ form, itsNo, formFields }: Props) {
 
         {/* Questions */}
         <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
-          {formFields.length === 0 ? (
+          {visibleFields.length === 0 ? (
             <p className="p-6 text-sm text-muted-foreground text-center">
               This form has no questions.
             </p>
           ) : (
             <div className="divide-y divide-border">
-              {formFields
+              {visibleFields
                 .slice()
                 .sort((a, b) => a.sort_order - b.sort_order)
                 .map((q) => (
@@ -180,7 +184,7 @@ export function SelfFillForm({ form, itsNo, formFields }: Props) {
           {!isExpired && (
             <button
               onClick={() => setConfirmOpen(true)}
-              disabled={formFields.length === 0}
+              disabled={visibleFields.length === 0}
               className="flex items-center gap-2 bg-primary text-primary-foreground px-6 py-2.5 rounded-lg font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 shadow-sm"
             >
               <Send className="w-4 h-4" />
