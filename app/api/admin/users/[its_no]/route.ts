@@ -105,7 +105,7 @@ export async function PATCH(
         role: body.role ?? muminRow?.role ?? 'Mumin',
         sector_ids: body.sector_ids ?? [],
         subsector_ids: body.subsector_ids ?? [],
-        must_change_password: true,
+        must_change_password: false,
       },
     })
 
@@ -113,7 +113,7 @@ export async function PATCH(
       newAuthId = authUser.user.id
       await admin.from('mumin').update({
         supabase_auth_id: newAuthId,
-        must_change_password: true,
+        must_change_password: false,
       }).eq('its_no', itsNo)
     } else if (authErr) {
       // If already registered (e.g. concurrent save), look up existing account

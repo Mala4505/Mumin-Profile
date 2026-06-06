@@ -68,13 +68,6 @@ export async function proxy(request: NextRequest) {
       ? decodeJwtAppMetadata(session.access_token)
       : {}
 
-    // Force password change if flagged in JWT
-    if (appMeta.must_change_password && !isChangePasswordRoute) {
-      const url = request.nextUrl.clone()
-      url.pathname = '/change-password'
-      return NextResponse.redirect(url)
-    }
-
     // Role-based route protection
     const role = appMeta.role
     const loginMode = request.cookies.get('login_mode')?.value ?? 'admin'

@@ -24,7 +24,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface FillerEntry {
-  type: 'role' | 'specific_masool' | 'specific_musaid' | 'self'
+  type: 'role' | 'specific_masool' | 'specific_musaid' | 'self' | 'hof'
   value?: string | string[]
 }
 
@@ -45,6 +45,7 @@ interface Form {
 interface FormsClientProps {
   role: Role
   itsNo: number
+  isHof: boolean
 }
 
 type TabId = 'my-forms' | 'pending-approval' | 'all-forms'
@@ -98,6 +99,7 @@ function canUserFill(
   fillerAccess: { fillers: FillerEntry[] } | undefined,
   role: Role,
   itsNo: number,
+  isHof: boolean,
 ): boolean {
   if (!fillerAccess?.fillers) return false
   const itsStr = String(itsNo)
@@ -106,6 +108,7 @@ function canUserFill(
     if (f.type === 'specific_masool' && Array.isArray(f.value) && f.value.includes(itsStr)) return true
     if (f.type === 'specific_musaid' && Array.isArray(f.value) && f.value.includes(itsStr)) return true
     if (f.type === 'self' && role === 'Mumin') return true
+    if (f.type === 'hof' && isHof) return true
   }
   return false
 }
@@ -140,6 +143,7 @@ function FormCard({
   form,
   role,
   itsNo,
+  isHof,
   onApprove,
   onReject,
   approving,
@@ -148,6 +152,7 @@ function FormCard({
   form: Form
   role: Role
   itsNo: number
+  isHof: boolean
   onApprove?: (id: string) => void
   onReject?: (id: string) => void
   approving?: boolean
@@ -160,7 +165,7 @@ function FormCard({
   const isExpired = form.is_expired
 
   const isPublishedAndActive = form.status === 'published' && !isExpired
-  const isFiller = canUserFill(form.filler_access, role, itsNo)
+  const isFiller = canUserFill(form.filler_access, role, itsNo, isHof)
   const canBulkFill = isPublishedAndActive && isFiller && role !== 'Mumin'
   const canSelfFill = isPublishedAndActive && role === 'Mumin' && isFiller
 
@@ -305,7 +310,7 @@ function FormCard({
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export function FormsClient({ role, itsNo }: FormsClientProps) {
+export function FormsClient({ role, itsNo, isHof }: FormsClientProps) {
   const [tab, setTab] = useState<TabId>('my-forms')
   const [forms, setForms] = useState<Form[]>([])
   const [loading, setLoading] = useState(true)
@@ -559,6 +564,7 @@ export function FormsClient({ role, itsNo }: FormsClientProps) {
               form={form}
               role={role}
               itsNo={itsNo}
+              isHof={isHof}
               onApprove={tab === 'pending-approval' ? handleApprove : undefined}
               onReject={tab === 'pending-approval' ? handleReject : undefined}
               approving={approvingIds.has(form.id)}

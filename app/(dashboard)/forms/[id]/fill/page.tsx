@@ -14,7 +14,7 @@ export default async function FillFormPage({
   const session = await getSession()
   if (!session) redirect('/login')
 
-  const isStaff = ['Masool', 'Musaid'].includes(session.role)
+  const isStaff = ['Masool', 'Musaid', 'Admin', 'SuperAdmin'].includes(session.role)
   const isHof = session.is_hof
 
   if (!isStaff && !isHof) redirect('/dashboard')
@@ -32,6 +32,7 @@ export default async function FillFormPage({
   if (form.expires_at && new Date(form.expires_at) < new Date()) redirect('/forms')
 
   // HOF fills for their family — bypass filler_access check
+  // Admin/SuperAdmin must still be explicitly granted filler access
   if (!isHof) {
     const fillerAccess = form.filler_access as FillerAccess | null
     if (!fillerAccess || !isAuthorizedFiller(fillerAccess, session)) {

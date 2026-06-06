@@ -26,7 +26,7 @@ function CheckItem({ id, label, checked, onChange, sublabel }: {
         className={`w-4 h-4 mt-0.5 rounded border-2 flex items-center justify-center transition-colors shrink-0 ${
           checked ? 'bg-primary border-primary' : 'border-border group-hover:border-primary/60'
         }`}
-        onClick={() => onChange(!checked)}
+        onClick={(e) => { e.stopPropagation(); onChange(!checked) }}
       >
         {checked && (
           <svg className="w-2.5 h-2.5 text-primary-foreground" fill="none" viewBox="0 0 12 12">
@@ -111,9 +111,9 @@ function PersonPicker({ label, people, selected, onChange }: {
 }
 
 const VIEWER_ROLES: { role: Role; label: string; desc: string; color: string }[] = [
-  { role: 'Mumin',  label: 'Mumin',  desc: 'Community members',   color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
-  { role: 'Masool', label: 'Masool', desc: 'Sector leaders',       color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400' },
-  { role: 'Musaid', label: 'Musaid', desc: 'Assistant leaders',    color: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400' },
+  { role: 'Mumin',  label: 'Mumin',  desc: 'Members',   color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
+  { role: 'Masool', label: 'Masool', desc: 'Sector',       color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400' },
+  { role: 'Musaid', label: 'Musaid', desc: 'Sub-sector',    color: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400' },
 ]
 
 const ALL_VIEWER_ROLES: Role[] = ['Mumin', 'Masool', 'Musaid']
@@ -134,6 +134,8 @@ export function Step4Access({ draft, update, onNext, onBack }: Props) {
 
   const hasRoleMasool = fillers.some((f) => f.type === 'role' && f.value === 'Masool')
   const hasRoleMusaid = fillers.some((f) => f.type === 'role' && f.value === 'Musaid')
+  const hasRoleSuperAdmin = fillers.some((f) => f.type === 'role' && f.value === 'SuperAdmin')
+  const hasRoleAdmin = fillers.some((f) => f.type === 'role' && f.value === 'Admin')
   const hasSelf = fillers.some((f) => f.type === 'self')
   const hasHof = fillers.some((f) => f.type === 'hof')
   const specificMasool = (fillers.find((f) => f.type === 'specific_masool') as { type: 'specific_masool'; value: number[] } | undefined)?.value ?? []
@@ -152,6 +154,8 @@ export function Step4Access({ draft, update, onNext, onBack }: Props) {
   function buildFillers(patch: {
     roleMasool?: boolean
     roleMusaid?: boolean
+    roleSuperAdmin?: boolean
+    roleAdmin?: boolean
     self?: boolean
     hof?: boolean
     specMasool?: number[]
@@ -159,12 +163,16 @@ export function Step4Access({ draft, update, onNext, onBack }: Props) {
   }): FillerAccess {
     const rm = patch.roleMasool ?? hasRoleMasool
     const rmu = patch.roleMusaid ?? hasRoleMusaid
+    const rsa = patch.roleSuperAdmin ?? hasRoleSuperAdmin
+    const ra = patch.roleAdmin ?? hasRoleAdmin
     const sf = patch.self ?? hasSelf
     const hof = patch.hof ?? hasHof
     const sm = patch.specMasool ?? specificMasool
     const smu = patch.specMusaid ?? specificMusaid
 
     const next: FillerAccess['fillers'] = []
+    if (rsa) next.push({ type: 'role', value: 'SuperAdmin' })
+    if (ra) next.push({ type: 'role', value: 'Admin' })
     if (rm) next.push({ type: 'role', value: 'Masool' })
     if (rmu) next.push({ type: 'role', value: 'Musaid' })
     if (hof) next.push({ type: 'hof' })
@@ -187,6 +195,20 @@ export function Step4Access({ draft, update, onNext, onBack }: Props) {
         <div className="space-y-2">
           <Label className="text-xs uppercase tracking-wider text-muted-foreground">By Role</Label>
           <div className="space-y-2.5 p-3.5 border border-border rounded-lg bg-background">
+            <CheckItem
+              id="role-superadmin"
+              label="SuperAdmin"
+              sublabel="SuperAdmin can fill this form (bulk fill for others, or self via user mode)"
+              checked={hasRoleSuperAdmin}
+              onChange={(v) => update({ filler_access: buildFillers({ roleSuperAdmin: v }) })}
+            />
+            <CheckItem
+              id="role-admin"
+              label="Admin"
+              sublabel="Admin users can fill this form"
+              checked={hasRoleAdmin}
+              onChange={(v) => update({ filler_access: buildFillers({ roleAdmin: v }) })}
+            />
             <CheckItem
               id="role-masool"
               label="All Masools"
