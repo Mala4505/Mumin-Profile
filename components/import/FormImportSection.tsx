@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import Papa from 'papaparse'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
@@ -78,7 +77,7 @@ export function FormImportSection() {
     }
   }, [forms])
 
-  const handleDownloadTemplate = useCallback(() => {
+  const handleDownloadTemplate = useCallback(async () => {
     const headers = ['its_no', ...formFields.map((f) => f.caption), 'remarks']
     const csv = headers.join(',') + '\n'
     const blob = new Blob([csv], { type: 'text/csv' })
@@ -90,7 +89,7 @@ export function FormImportSection() {
     URL.revokeObjectURL(url)
   }, [formFields])
 
-  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0] ?? null
     setFile(f)
     setRowCount(null)
@@ -99,6 +98,7 @@ export function FormImportSection() {
     setImportError(null)
     if (!f) return
 
+    const Papa = (await import('papaparse')).default
     Papa.parse(f, {
       skipEmptyLines: true,
       complete: (parsed) => {

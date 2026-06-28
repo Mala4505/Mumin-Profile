@@ -1,7 +1,12 @@
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import type { AdminStats } from '@/lib/dashboard/getStats'
 import StatCard from './StatCard'
-import SectorMuminChart from './charts/SectorMuminChart'
+
+const SectorMuminChart = dynamic(() => import('./charts/SectorMuminChart'), {
+  ssr: false,
+  loading: () => <div className="h-[260px] bg-muted animate-pulse rounded-lg" />,
+})
 
 const UsersIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -94,7 +99,7 @@ export default function AdminDashboard({ stats }: Props) {
       </div>
 
       {/* Stat Cards — row 2 */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard
           title="Buildings"
           value={stats.totalBuildings}

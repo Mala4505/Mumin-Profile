@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import Papa from 'papaparse'
 import { IMPORT_TABLES, ImportTableKey, ImportAction } from '@/lib/import/importConfig'
 import { validateImportRows, RowError } from '@/lib/import/validateImportRows'
 import { Button } from '@/components/ui/button'
@@ -32,6 +31,7 @@ export function ImportForm() {
     if (!table) return
     const file = e.target.files?.[0]
     if (!file) return
+    const Papa = (await import('papaparse')).default
     const text = await file.text()
     const parsed = Papa.parse<Record<string, string>>(text, {
       header: true,
@@ -89,8 +89,9 @@ export function ImportForm() {
     setDone(true)
   }
 
-  const downloadErrorReport = () => {
+  const downloadErrorReport = async () => {
     if (!failedRows.length) return
+    const Papa = (await import('papaparse')).default
     const csv = Papa.unparse(failedRows)
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)

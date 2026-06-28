@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/getSession'
 import { IMPORT_TABLES, ImportTableKey } from '@/lib/import/importConfig'
-import Papa from 'papaparse'
 
 const CORE_HEADERS = [
   'ITS_NO', 'Name', 'Gender', 'DOB', 'Balig', 'Sabeel_No',
@@ -35,6 +34,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
+  const Papa = (await import('papaparse')).default
   const table = req.nextUrl.searchParams.get('table')
 
   if (table === 'core') {

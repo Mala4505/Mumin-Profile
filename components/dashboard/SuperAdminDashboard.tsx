@@ -1,7 +1,12 @@
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import type { SuperAdminStats } from '@/lib/dashboard/getStats'
 import StatCard from './StatCard'
-import SectorMuminChart from './charts/SectorMuminChart'
+
+const SectorMuminChart = dynamic(() => import('./charts/SectorMuminChart'), {
+  ssr: false,
+  loading: () => <div className="h-[260px] bg-muted animate-pulse rounded-lg" />,
+})
 
 function timeAgo(date: string): string {
   const now = Date.now()
@@ -200,7 +205,7 @@ export default function SuperAdminDashboard({ stats }: Props) {
       </div>
 
       {/* ── 2b. Building, Flat & Family Stat Cards ──────────────────────── */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard
           title="Buildings"
           value={stats.totalBuildings}

@@ -15,6 +15,7 @@ import {
   LineChart,
   ArrowLeftRight,
   UserCircle,
+  FileText,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -62,6 +63,12 @@ const NAV_ITEMS: NavItem[] = [
     href: ROUTES.IMPORT,
     icon: Upload,
     roles: ['SuperAdmin', 'Admin', 'Masool'],
+  },
+  {
+    label: 'Forms',
+    href: ROUTES.FORMS,
+    icon: FileText,
+    roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid'],
   },
   {
     label: 'Requests',

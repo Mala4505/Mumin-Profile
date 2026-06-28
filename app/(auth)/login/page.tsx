@@ -1,5 +1,7 @@
 import { LoginForm } from '@/components/auth/LoginForm'
 
+export const revalidate = 3600 // revalidate at most once per hour
+
 export default function LoginPage() {
   const umoor = [
     'Deeniyah', 'Talimiyah', 'Kharejiyah', 'Dakheliyah',

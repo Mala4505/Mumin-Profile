@@ -1,8 +1,16 @@
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import type { MusaidStats } from '@/lib/dashboard/getStats'
 import StatCard from './StatCard'
-import DemographicsCharts from './charts/DemographicsCharts'
-import BuildingFlatsChart from './charts/BuildingFlatsChart'
+
+const DemographicsCharts = dynamic(() => import('./charts/DemographicsCharts'), {
+  ssr: false,
+  loading: () => <div className="h-[210px] bg-muted animate-pulse rounded-lg" />,
+})
+const BuildingFlatsChart = dynamic(() => import('./charts/BuildingFlatsChart'), {
+  ssr: false,
+  loading: () => <div className="h-[200px] bg-muted animate-pulse rounded-lg" />,
+})
 
 const UsersIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

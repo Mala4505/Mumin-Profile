@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import dynamic from 'next/dynamic'
 import {
   SlidersHorizontal,
   Columns3,
@@ -16,18 +17,22 @@ import {
   Filter,
 } from 'lucide-react'
 import type { Role } from '@/lib/types/app'
-import {
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-} from 'recharts'
+
+const ReportsDistributionCharts = dynamic(
+  () => import('./ReportsDistributionCharts').then(m => ({ default: m.ReportsDistributionCharts })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="bg-card rounded-xl border border-border shadow-sm p-5">
+        <div className="h-4 bg-muted rounded w-48 mb-4 animate-pulse" />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="h-60 bg-muted rounded animate-pulse" />
+          <div className="h-60 bg-muted rounded animate-pulse" />
+        </div>
+      </div>
+    ),
+  }
+)
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -78,8 +83,6 @@ interface FilterRule {
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-
-const CHART_COLORS = ['#6366f1', '#8b5cf6', '#a78bfa', '#c4b5fd', '#ddd6fe', '#ede9fe']
 
 const ALL_OPERATORS: Array<{ value: FilterOperator; label: string }> = [
   { value: 'eq', label: 'equals' },
@@ -634,63 +637,10 @@ export function ReportsClient({ sectors, role }: ReportsClientProps) {
 
       {/* ── SuperAdmin Charts ──────────────────────────────────────────────── */}
       {role === 'SuperAdmin' && hasFetched && data && chartData.length > 0 && visibleColumns[0] && (
-        <div className="bg-card rounded-xl border border-border shadow-sm p-5">
-          <h2 className="font-semibold text-foreground flex items-center gap-2 text-sm mb-1">
-            <BarChart3 className="w-4 h-4 text-primary" />
-            Distribution — {visibleColumns[0].caption}
-          </h2>
-          <p className="text-xs text-muted-foreground mb-5">
-            Answer distribution across all respondents for the first visible column.
-          </p>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={chartData} margin={{ top: 0, right: 0, bottom: 24, left: 0 }}>
-                <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={-30} textAnchor="end" />
-                <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                <Tooltip
-                  contentStyle={{
-                    background: 'hsl(var(--card))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px',
-                    fontSize: '12px',
-                  }}
-                />
-                <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-                  {chartData.map((_, i) => (
-                    <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-
-            <ResponsiveContainer width="100%" height={240}>
-              <PieChart>
-                <Pie
-                  data={chartData}
-                  dataKey="count"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={90}
-                >
-                  {chartData.map((_, i) => (
-                    <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{
-                    background: 'hsl(var(--card))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px',
-                    fontSize: '12px',
-                  }}
-                />
-                <Legend wrapperStyle={{ fontSize: '11px' }} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+        <ReportsDistributionCharts
+          chartData={chartData}
+          columnCaption={visibleColumns[0].caption}
+        />
       )}
 
       {/* ── Table section ─────────────────────────────────────────────────── */}

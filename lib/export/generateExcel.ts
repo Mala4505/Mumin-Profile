@@ -1,5 +1,3 @@
-import ExcelJS from 'exceljs'
-
 export interface ExportColumn {
   key: string
   header: string
@@ -48,6 +46,7 @@ export async function generateExcel(
   columns: ExportColumn[],
   sheetName = 'Members'
 ): Promise<Uint8Array> {
+  const ExcelJS = (await import('exceljs')).default
   const workbook = new ExcelJS.Workbook()
   workbook.creator = 'Masool/Musaid System'
   workbook.created = new Date()

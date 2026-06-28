@@ -1,8 +1,16 @@
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import type { MasoolStats } from '@/lib/dashboard/getStats'
 import StatCard from './StatCard'
-import SubsectorMuminChart from './charts/SubsectorMuminChart'
-import BuildingFlatsChart from './charts/BuildingFlatsChart'
+
+const SubsectorMuminChart = dynamic(() => import('./charts/SubsectorMuminChart'), {
+  ssr: false,
+  loading: () => <div className="h-[240px] bg-muted animate-pulse rounded-lg" />,
+})
+const BuildingFlatsChart = dynamic(() => import('./charts/BuildingFlatsChart'), {
+  ssr: false,
+  loading: () => <div className="h-[200px] bg-muted animate-pulse rounded-lg" />,
+})
 import {
   Card,
   CardHeader,

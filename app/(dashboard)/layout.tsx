@@ -43,7 +43,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         </div>
         {/* Desktop top bar now uses TopBar */}
         <TopBar role={role} its_no={its_no} loginMode={loginMode} />
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto pt-14 md:pt-0">
           {children}
         </main>
       </div>

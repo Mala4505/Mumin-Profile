@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createHmac } from "crypto";
+import { createHmac, createHash } from "crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const admin = createAdminClient();
@@ -64,8 +64,30 @@ async function provisionAuthUser(
   return null;
 }
 
+// Generic credential failure message — same for all 401 cases to prevent user enumeration
+const INVALID_CREDENTIALS_RESPONSE = { error: "Invalid ITS number or PACI number" } as const;
+
 export async function POST(request: Request) {
   try {
+    // --- Rate limiting: max 5 failed attempts per IP per 15 minutes ---
+    const forwarded = request.headers.get("x-forwarded-for");
+    const ip = forwarded ? forwarded.split(",")[0].trim() : "127.0.0.1";
+    const ipHash = createHash("sha256").update(ip).digest("hex");
+
+    const windowStart = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+    const { count } = await admin
+      .from("login_attempts")
+      .select("*", { count: "exact", head: true })
+      .eq("ip_hash", ipHash)
+      .gte("attempted_at", windowStart);
+
+    if ((count ?? 0) >= 5) {
+      return NextResponse.json(
+        { error: "Too many login attempts. Please try again later." },
+        { status: 429, headers: { "Retry-After": "900" } },
+      );
+    }
+
     const body = await request.json();
     const its_no_raw: string = String(body.its_no ?? "").trim();
     const paci_no: string = String(body.paci_no ?? "").trim();
@@ -96,8 +118,25 @@ export async function POST(request: Request) {
         { status: 500 },
       );
     }
+
+    // Record failed attempt helper (fire-and-forget)
+    const recordFailedAttempt = () => {
+      admin
+        .from("login_attempts")
+        .insert({ ip_hash: ipHash })
+        .then(() => {
+          // Fire-and-forget cleanup of records older than 24 hours
+          admin
+            .from("login_attempts")
+            .delete()
+            .lt("attempted_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+        });
+    };
+
+    // User not found — return generic message (prevents ITS enumeration)
     if (!row) {
-      return NextResponse.json({ error: "ITS No not found" }, { status: 401 });
+      recordFailedAttempt();
+      return NextResponse.json(INVALID_CREDENTIALS_RESPONSE, { status: 401 });
     }
 
     if (!row.is_active) {
@@ -107,17 +146,10 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!row.paci_no) {
-      return NextResponse.json(
-        { error: "No house record found for this family" },
-        { status: 401 },
-      );
-    }
-    if (row.paci_no !== paci_no) {
-      return NextResponse.json(
-        { error: "Invalid PACI number" },
-        { status: 401 },
-      );
+    // Wrong PACI number (including missing paci_no) — same generic message
+    if (!row.paci_no || row.paci_no !== paci_no) {
+      recordFailedAttempt();
+      return NextResponse.json(INVALID_CREDENTIALS_RESPONSE, { status: 401 });
     }
 
     const email = `${its_no_raw}@mumin.local`;
