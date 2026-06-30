@@ -1,3 +1,4 @@
+'use client'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import type { MusaidStats } from '@/lib/dashboard/getStats'
