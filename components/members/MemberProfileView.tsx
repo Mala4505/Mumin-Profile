@@ -345,6 +345,9 @@ export function MemberProfileView({ profile, session, initialResponses = [], log
     effectiveRole === 'Admin' ||
     effectiveRole === 'Masool' ||
     effectiveRole === 'Musaid'
+  // UmoorCoordinator: sees all members but only their assigned umoors' data;
+  // no core/address/contact edit affordances.
+  const isCoordinator = effectiveRole === 'UmoorCoordinator'
   const isOwnProfile = session.its_no === profile.its_no
 
   const canDirectEdit = effectiveRole === 'SuperAdmin' || effectiveRole === 'Admin'
@@ -463,6 +466,9 @@ export function MemberProfileView({ profile, session, initialResponses = [], log
   function canEditField(field: MemberProfile['values'][number]) {
     if (effectiveRole === 'SuperAdmin') return true
     if (isStaff) return true
+    // Coordinator: the values reaching the client are already RLS/app-filtered
+    // to their assigned umoors, so anything visible here is editable by them.
+    if (isCoordinator) return true
     if (isOwnProfile && field.mumin_can_edit) return true
     return false
   }
@@ -471,7 +477,7 @@ export function MemberProfileView({ profile, session, initialResponses = [], log
   const visibleValues = displayProfile.values
     .filter((pv) => {
       if (effectiveRole === 'SuperAdmin') return true
-      if (isStaff) return pv.visibility_level <= 2
+      if (isStaff || isCoordinator) return pv.visibility_level <= 2
       return pv.visibility_level === 1
     })
     .sort(
@@ -488,10 +494,26 @@ export function MemberProfileView({ profile, session, initialResponses = [], log
     {}
   )
 
-  const orderedCategories = [
-    ...UMOOR_CATEGORIES.filter(() => true),
-    ...Object.keys(categoriesMap).filter((cat) => !UMOOR_CATEGORIES.includes(cat)),
-  ]
+  // Categories actually present in the data (already sorted by category_sort_order)
+  const dataCategories = Object.keys(categoriesMap)
+
+  // Coordinators only get tabs for the umoors present in their (already scoped)
+  // data; other roles keep the full hardcoded taxonomy plus any extra categories.
+  const orderedCategories = isCoordinator
+    ? dataCategories
+    : [
+        ...UMOOR_CATEGORIES,
+        ...dataCategories.filter((cat) => !UMOOR_CATEGORIES.includes(cat)),
+      ]
+
+  // Keep the active tab valid when the derived category list doesn't include it
+  // (e.g. coordinator whose first umoor isn't the first hardcoded category)
+  useEffect(() => {
+    if (orderedCategories.length > 0 && !orderedCategories.includes(activeTab)) {
+      setActiveTab(orderedCategories[0])
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderedCategories.join('|')])
 
   const initials = displayProfile.name
     .split(' ')

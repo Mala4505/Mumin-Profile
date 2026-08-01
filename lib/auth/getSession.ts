@@ -29,6 +29,7 @@ export const getSession = cache(async function getSession(): Promise<SessionUser
     role: meta.role,
     sector_ids: meta.sector_ids ?? [],
     subsector_ids: meta.subsector_ids ?? [],
+    umoor_ids: meta.umoor_ids ?? [],
     must_change_password: meta.must_change_password ?? false,
     is_hof: meta.is_hof ?? false,
     sabeel_no: meta.sabeel_no ?? '',

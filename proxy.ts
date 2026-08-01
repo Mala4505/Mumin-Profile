@@ -72,14 +72,22 @@ export async function proxy(request: NextRequest) {
     const role = appMeta.role
     const loginMode = request.cookies.get('login_mode')?.value ?? 'admin'
     const effectiveRole = loginMode === 'user' ? 'Mumin' : role
-    // /admin pages: SuperAdmin only
-    if (pathname.startsWith('/admin') && effectiveRole !== 'SuperAdmin') {
+    // /admin/profile-fields: SuperAdmin, Admin + UmoorCoordinator (own umoors, enforced app-level)
+    if (pathname.startsWith('/admin/profile-fields')) {
+      if (!['SuperAdmin', 'Admin', 'UmoorCoordinator'].includes(effectiveRole ?? '')) {
+        const url = request.nextUrl.clone()
+        url.pathname = '/dashboard'
+        return NextResponse.redirect(url)
+      }
+    }
+    // Other /admin pages: SuperAdmin only
+    else if (pathname.startsWith('/admin') && effectiveRole !== 'SuperAdmin') {
       const url = request.nextUrl.clone()
       url.pathname = '/dashboard'
       return NextResponse.redirect(url)
     }
-    // /import pages: all staff except Mumin
-    if (pathname.startsWith('/import') && effectiveRole === 'Mumin') {
+    // /import pages: all staff except Mumin and UmoorCoordinator
+    if (pathname.startsWith('/import') && (effectiveRole === 'Mumin' || effectiveRole === 'UmoorCoordinator')) {
       const url = request.nextUrl.clone()
       url.pathname = '/members'
       return NextResponse.redirect(url)

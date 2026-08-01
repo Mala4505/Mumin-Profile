@@ -1,10 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/getSession'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { resolveUmoorScope } from '@/lib/auth/resolveScope'
+import { ageToDobRange } from '@/lib/members/ageToDobRange'
+
+function computeAge(dob: string | null): number | null {
+  if (!dob) return null
+  const birth = new Date(dob)
+  if (isNaN(birth.getTime())) return null
+  const now = new Date()
+  let age = now.getFullYear() - birth.getFullYear()
+  const monthDiff = now.getMonth() - birth.getMonth()
+  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < birth.getDate())) age--
+  return age
+}
 
 export async function GET(req: NextRequest) {
   const session = await getSession()
-  if (!session || !['SuperAdmin', 'Admin', 'Masool', 'Musaid'].includes(session.role)) {
+  if (!session || !['SuperAdmin', 'Admin', 'Masool', 'Musaid', 'UmoorCoordinator'].includes(session.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
@@ -12,10 +25,23 @@ export async function GET(req: NextRequest) {
   const formId = url.searchParams.get('form_id')
   const admin = createAdminClient()
 
+  // null for SA/Admin/Masool/Musaid; category_ids (or [-1] deny-all) for UmoorCoordinator.
+  // Reports routes use the service-role client (bypasses RLS) → this guard is app-level.
+  const umoorScope = resolveUmoorScope(session)
+
   // ── No form_id → return form list ─────────────────────────────────────────
   if (!formId) {
-    const sel = 'id, title, status, created_at, created_by'
-    let formsData: Array<{ id: string; title: string; status: string; created_at: string; created_by: number | null }> = []
+    const umoorCategoryParam = url.searchParams.get('umoor_category_id')
+    const sel = 'id, title, status, created_at, created_by, umoor_category_id'
+    type FormRow = {
+      id: string
+      title: string
+      status: string
+      created_at: string
+      created_by: number | null
+      umoor_category_id: number | null
+    }
+    let formsData: FormRow[] = []
 
     if (session.role === 'Masool' || session.role === 'Musaid') {
       // Show forms the user created OR forms where they are listed as a filler.
@@ -32,14 +58,28 @@ export async function GET(req: NextRequest) {
 
       const seen = new Set<string>()
       for (const row of [...(myForms.data ?? []), ...(roleForms.data ?? []), ...(specificForms.data ?? [])]) {
-        if (!seen.has(row.id)) { seen.add(row.id); formsData.push(row as typeof formsData[0]) }
+        if (!seen.has(row.id)) { seen.add(row.id); formsData.push(row as FormRow) }
       }
       formsData.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    } else if (session.role === 'UmoorCoordinator') {
+      // Coordinators: only forms belonging to their assigned umoors
+      const { data, error } = await admin
+        .from('forms')
+        .select(sel)
+        .in('umoor_category_id', umoorScope ?? [-1])
+        .order('created_at', { ascending: false })
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+      formsData = (data ?? []) as FormRow[]
     } else {
       // SuperAdmin / Admin: all forms
       const { data, error } = await admin.from('forms').select(sel).order('created_at', { ascending: false })
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-      formsData = (data ?? []) as typeof formsData
+      formsData = (data ?? []) as FormRow[]
+    }
+
+    if (umoorCategoryParam) {
+      const catId = Number(umoorCategoryParam)
+      formsData = formsData.filter((f) => f.umoor_category_id === catId)
     }
 
     const formIds = formsData.map((f) => f.id)
@@ -61,6 +101,7 @@ export async function GET(req: NextRequest) {
       id: f.id,
       title: f.title,
       status: f.status,
+      umoor_category_id: f.umoor_category_id,
       response_count: responseCounts[f.id] ?? 0,
     }))
 
@@ -70,14 +111,22 @@ export async function GET(req: NextRequest) {
   // ── With form_id → return report data ─────────────────────────────────────
   const sectorId = url.searchParams.get('sector_id')
   const subsectorId = url.searchParams.get('subsector_id')
+  const gender = url.searchParams.get('gender')
+  const ageFromParam = url.searchParams.get('age_from')
+  const ageToParam = url.searchParams.get('age_to')
 
   const { data: form } = await admin
     .from('forms')
-    .select('id, created_by')
+    .select('id, created_by, umoor_category_id')
     .eq('id', formId)
     .single()
 
   if (!form) return NextResponse.json({ error: 'Form not found' }, { status: 404 })
+
+  // Coordinators may only open forms belonging to their assigned umoors
+  if (umoorScope && (form.umoor_category_id === null || !umoorScope.includes(form.umoor_category_id))) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
   // Questions from form_fields → profile_field
   const { data: fieldRows, error: fieldsErr } = await admin
@@ -115,9 +164,10 @@ export async function GET(req: NextRequest) {
   // Member info with scope filtering
   let memberQuery = admin
     .from('member_directory')
-    .select('its_no, name, sector_id, subsector_id')
+    .select('its_no, name, sector_id, subsector_id, sector_name, subsector_name, gender, date_of_birth')
     .in('its_no', respondentItsNos)
 
+  // Geo narrowing applies to Masool/Musaid only — coordinators are geo-unrestricted
   if (session.role === 'Masool' && session.sector_ids?.length) {
     memberQuery = memberQuery.in('sector_id', session.sector_ids)
   }
@@ -127,7 +177,27 @@ export async function GET(req: NextRequest) {
   if (sectorId) memberQuery = memberQuery.eq('sector_id', Number(sectorId))
   if (subsectorId) memberQuery = memberQuery.eq('subsector_id', Number(subsectorId))
 
-  type MemberRow = { its_no: number; name: string; sector_id: number; subsector_id: number }
+  // Demographic filters
+  if (gender === 'M' || gender === 'F') memberQuery = memberQuery.eq('gender', gender)
+  const ageFrom = ageFromParam ? Number(ageFromParam) : null
+  const ageTo = ageToParam ? Number(ageToParam) : null
+  const { minDob, maxDob } = ageToDobRange(
+    Number.isFinite(ageFrom as number) ? ageFrom : null,
+    Number.isFinite(ageTo as number) ? ageTo : null,
+  )
+  if (minDob) memberQuery = memberQuery.gte('date_of_birth', minDob)
+  if (maxDob) memberQuery = memberQuery.lte('date_of_birth', maxDob)
+
+  type MemberRow = {
+    its_no: number
+    name: string
+    sector_id: number
+    subsector_id: number
+    sector_name: string | null
+    subsector_name: string | null
+    gender: 'M' | 'F' | null
+    date_of_birth: string | null
+  }
   const { data: membersRaw, error: memberErr } = await memberQuery
   if (memberErr) return NextResponse.json({ error: memberErr.message }, { status: 500 })
   const members = (membersRaw ?? []) as MemberRow[]
@@ -152,6 +222,10 @@ export async function GET(req: NextRequest) {
   const respondents = members.map((m) => ({
     its_no: m.its_no,
     name: m.name,
+    gender: m.gender,
+    age: computeAge(m.date_of_birth),
+    sector_name: m.sector_name,
+    subsector_name: m.subsector_name,
     submitted_at: submittedAtMap[m.its_no] ?? '',
   }))
 

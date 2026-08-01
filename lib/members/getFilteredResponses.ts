@@ -68,6 +68,10 @@ export async function getFilteredResponses(
 
   if (!allResponses) return []
 
+  // UmoorCoordinator: the RLS-scoped client above only returns responses for
+  // forms within their assigned umoor categories, so anything fetched is theirs to see.
+  const isUmoorCoordinator = viewerSession.role === 'UmoorCoordinator'
+
   // Filter based on access rules
   const filtered = (allResponses as any[]).filter((r) => {
     const viewableByRoles = r.form?.viewable_by_roles || 'all'
@@ -77,13 +81,13 @@ export async function getFilteredResponses(
     // Admin always sees
     if (isAdmin) return true
 
-    // If staff_only, only admin/assigned staff see
+    // If staff_only, only admin/assigned staff/umoor coordinator see
     if (viewableByRoles === 'staff_only') {
-      return isAssignedMusaid || isAssignedMasool
+      return isAssignedMusaid || isAssignedMasool || isUmoorCoordinator
     }
 
-    // If 'all' (default), member + assigned staff see
-    return isOwnProfile || isAssignedMusaid || isAssignedMasool
+    // If 'all' (default), member + assigned staff + umoor coordinator see
+    return isOwnProfile || isAssignedMusaid || isAssignedMasool || isUmoorCoordinator
   })
 
   return filtered.map((r) => ({

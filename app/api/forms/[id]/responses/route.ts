@@ -18,7 +18,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   const isAdmin = ['SuperAdmin', 'Admin'].includes(session.role)
-  const isStaff = ['SuperAdmin', 'Admin', 'Masool', 'Musaid'].includes(session.role)
+  const isStaff = ['SuperAdmin', 'Admin', 'Masool', 'Musaid', 'UmoorCoordinator'].includes(session.role)
   const responseViewerRoles = form.response_viewer_roles as string[] | null
 
   // Determine if this role can view responses under the new granular gate.
@@ -84,6 +84,21 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     const isCreator = Number(session.its_no) === form.created_by
     const fillerAccess = form.filler_access as FillerAccess | null
     if (!isCreator && (!fillerAccess || !isAuthorizedFiller(fillerAccess, session))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+  }
+
+  // UmoorCoordinator: may view responses for own forms or forms in their assigned umoors
+  if (session.role === 'UmoorCoordinator') {
+    if (!roleCanViewResponses()) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    const isCreator = Number(session.its_no) === form.created_by
+    const isUmoorScoped =
+      form.umoor_category_id !== null &&
+      (session.umoor_ids ?? []).includes(form.umoor_category_id)
+    if (!isCreator && !isUmoorScoped) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
   }

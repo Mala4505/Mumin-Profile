@@ -132,8 +132,9 @@ export function Step3Questions({ draft, update, onNext, onBack }: Props) {
     supabase
       .from('profile_field')
       .select('id, caption, field_type, behavior')
+      .eq('is_active', true)
       .order('caption')
-      .then(({ data }) => setFields(data ?? []))
+      .then(({ data }) => setFields((data ?? []) as ProfileField[]))
   }, [])
 
   function sync(updated: FormQuestion[]) {

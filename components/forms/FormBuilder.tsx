@@ -26,7 +26,7 @@ export interface FormDraft {
 
 const STEPS = ['Basic Info', 'Audience', 'Form Fields', 'Access', 'Review']
 
-export function FormBuilder({ onComplete, role }: { onComplete: () => void; role: Role }) {
+export function FormBuilder({ onComplete, role, umoorIds }: { onComplete: () => void; role: Role; umoorIds?: number[] }) {
   const [step, setStep] = useState(0)
   // ✅ Fix
   const [draft, setDraft] = useState<Partial<FormDraft>>({
@@ -60,7 +60,7 @@ export function FormBuilder({ onComplete, role }: { onComplete: () => void; role
         ))}
       </div>
 
-      {step === 0 && <Step1BasicInfo draft={draft} update={update} onNext={next} userRole={role} />}
+      {step === 0 && <Step1BasicInfo draft={draft} update={update} onNext={next} userRole={role} umoorIds={umoorIds} />}
       {step === 1 && <Step2Audience draft={draft} update={update} onNext={next} onBack={back} />}
       {step === 2 && <Step3Questions draft={draft} update={update} onNext={next} onBack={back} />}
       {step === 3 && <Step4Access draft={draft} update={update} onNext={next} onBack={back} />}

@@ -14,14 +14,20 @@ export async function POST(
 
   const supabase = createAdminClient()
 
-  // Any role can add questions to their own form; SuperAdmin/Admin can add to any form
+  // Any role can add questions to their own form; SuperAdmin/Admin can add to any form;
+  // UmoorCoordinators can add to forms within their assigned umoor categories
   const { data: form } = await supabase
     .from('forms')
-    .select('created_by')
+    .select('created_by, umoor_category_id')
     .eq('id', formId)
     .single()
 
-  if (!form || (form.created_by !== session.its_no && session.role !== 'SuperAdmin' && session.role !== 'Admin')) {
+  const isUmoorScoped =
+    session.role === 'UmoorCoordinator' &&
+    form?.umoor_category_id != null &&
+    (session.umoor_ids ?? []).includes(form.umoor_category_id)
+
+  if (!form || (form.created_by !== session.its_no && session.role !== 'SuperAdmin' && session.role !== 'Admin' && !isUmoorScoped)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 

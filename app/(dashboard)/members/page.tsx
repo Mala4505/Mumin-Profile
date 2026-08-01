@@ -16,8 +16,17 @@ interface PageProps {
     status?: string
     search?: string
     paci_no?: string
+    age_from?: string
+    age_to?: string
     show_all?: string
   }>
+}
+
+/** Parse a non-negative integer age param; invalid values are ignored. */
+function parseAgeParam(value?: string): number | undefined {
+  if (!value || !/^\d+$/.test(value)) return undefined
+  const n = parseInt(value, 10)
+  return Number.isInteger(n) && n >= 0 ? n : undefined
 }
 
 export default async function MembersPage({ searchParams }: PageProps) {
@@ -36,13 +45,16 @@ export default async function MembersPage({ searchParams }: PageProps) {
     status: params.status as MemberFilters['status'],
     search: params.search,
     paci_no: params.paci_no,
+    age_from: parseAgeParam(params.age_from),
+    age_to: parseAgeParam(params.age_to),
     scopedSubsectorIds,
   }
 
   const showAll = params.show_all === '1'
   const hasActiveFilter = showAll || Boolean(
     params.search || params.sector_id || params.subsector_id || params.musaid_its_no ||
-    params.gender || params.balig_status || params.status || params.paci_no
+    params.gender || params.balig_status || params.status || params.paci_no ||
+    filters.age_from !== undefined || filters.age_to !== undefined
   )
 
   const members = await (hasActiveFilter ? getMembers(filters) : Promise.resolve([]))

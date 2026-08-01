@@ -46,6 +46,7 @@ interface FormsClientProps {
   role: Role
   itsNo: number
   isHof: boolean
+  umoorIds?: number[]
 }
 
 type TabId = 'my-forms' | 'pending-approval' | 'all-forms'
@@ -310,7 +311,7 @@ function FormCard({
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export function FormsClient({ role, itsNo, isHof }: FormsClientProps) {
+export function FormsClient({ role, itsNo, isHof, umoorIds }: FormsClientProps) {
   const [tab, setTab] = useState<TabId>('my-forms')
   const [forms, setForms] = useState<Form[]>([])
   const [loading, setLoading] = useState(true)
@@ -592,6 +593,7 @@ export function FormsClient({ role, itsNo, isHof }: FormsClientProps) {
                   fetchForms()
                 }}
                 role={role}
+                umoorIds={umoorIds}
               />
             </DialogContent>
           </Dialog>

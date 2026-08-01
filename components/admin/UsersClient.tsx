@@ -13,22 +13,25 @@ interface SystemUser {
   supabase_auth_id: string | null
   sector: Array<{ sector_id: number }>
   subsector: Array<{ subsector_id: number }>
+  umoor: Array<{ category_id: number }>
 }
 
 interface Sector { sector_id: number; sector_name: string }
 interface Subsector { subsector_id: number; sector_id: number; subsector_name: string }
+interface Category { id: number; name: string }
 
 interface Props {
   initialUsers: SystemUser[]
   sectors: Sector[]
   subsectors: Subsector[]
+  categories: Category[]
   mode: 'idle' | 'loaded'
   currentSearch: string
   currentRole: string
   showAll: boolean
 }
 
-const ROLES = ['SuperAdmin', 'Admin', 'Masool', 'Musaid', 'Mumin'] as const
+const ROLES = ['SuperAdmin', 'Admin', 'Masool', 'Musaid', 'Mumin', 'UmoorCoordinator'] as const
 type Role = typeof ROLES[number]
 
 const ALL_ROLES = ['', ...ROLES] as const
@@ -41,6 +44,7 @@ const ROLE_COLORS: Record<string, string> = {
   Masool: 'bg-primary/10 text-primary',
   Musaid: 'bg-blue-100 text-blue-700',
   Mumin: 'bg-muted text-muted-foreground',
+  UmoorCoordinator: 'bg-teal-100 text-teal-700',
 }
 
 function RoleBadge({ role }: { role: string }) {
@@ -51,7 +55,7 @@ function RoleBadge({ role }: { role: string }) {
   )
 }
 
-export function UsersClient({ initialUsers, sectors, subsectors, mode, currentSearch, currentRole, showAll }: Props) {
+export function UsersClient({ initialUsers, sectors, subsectors, categories, mode, currentSearch, currentRole, showAll }: Props) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -64,6 +68,7 @@ export function UsersClient({ initialUsers, sectors, subsectors, mode, currentSe
   const [editActive, setEditActive] = useState(true)
   const [editSectorIds, setEditSectorIds] = useState<number[]>([])
   const [editSubsectorIds, setEditSubsectorIds] = useState<number[]>([])
+  const [editUmoorIds, setEditUmoorIds] = useState<number[]>([])
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -106,6 +111,7 @@ export function UsersClient({ initialUsers, sectors, subsectors, mode, currentSe
     setEditActive(u.is_active)
     setEditSectorIds(u.sector.map(s => s.sector_id))
     setEditSubsectorIds(u.subsector.map(s => s.subsector_id))
+    setEditUmoorIds((u.umoor ?? []).map(s => s.category_id))
     setSaveError('')
   }
 
@@ -120,6 +126,10 @@ export function UsersClient({ initialUsers, sectors, subsectors, mode, currentSe
 
   function toggleSubsector(id: number) {
     setEditSubsectorIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  }
+
+  function toggleUmoor(id: number) {
+    setEditUmoorIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
   }
 
   async function handleSave() {
@@ -139,6 +149,8 @@ export function UsersClient({ initialUsers, sectors, subsectors, mode, currentSe
       body.sector_ids = []
       body.subsector_ids = []
     }
+
+    body.umoor_ids = editRole === 'UmoorCoordinator' ? editUmoorIds : []
 
     const res = await fetch(`/api/admin/users/${editing.its_no}`, {
       method: 'PATCH',
@@ -164,6 +176,7 @@ export function UsersClient({ initialUsers, sectors, subsectors, mode, currentSe
             supabase_auth_id: responseData.supabase_auth_id ?? u.supabase_auth_id,
             sector: (editRole === 'Admin' || editRole === 'Masool') ? editSectorIds.map(id => ({ sector_id: id })) : [],
             subsector: editRole === 'Musaid' ? editSubsectorIds.map(id => ({ subsector_id: id })) : [],
+            umoor: editRole === 'UmoorCoordinator' ? editUmoorIds.map(id => ({ category_id: id })) : [],
           }
         : u
     ))
@@ -302,7 +315,10 @@ export function UsersClient({ initialUsers, sectors, subsectors, mode, currentSe
               ) : paginated.map(u => {
                 const sectorNames = u.sector.map((s: any) => sectors.find(sec => sec.sector_id === s.sector_id)?.sector_name).filter(Boolean)
                 const subsectorNames = u.subsector.map((s: any) => subsectors.find(sub => sub.subsector_id === s.subsector_id)?.subsector_name).filter(Boolean)
-                const assignment = sectorNames.length > 0
+                const umoorNames = (u.umoor ?? []).map((s: any) => categories.find(c => c.id === s.category_id)?.name).filter(Boolean)
+                const assignment = u.role === 'UmoorCoordinator'
+                  ? (umoorNames.length > 0 ? umoorNames.join(', ') : '—')
+                  : sectorNames.length > 0
                   ? sectorNames.join(', ')
                   : subsectorNames.length > 0
                   ? subsectorNames.join(', ')
@@ -450,6 +466,31 @@ export function UsersClient({ initialUsers, sectors, subsectors, mode, currentSe
                     ))}
                     {sectors.length === 0 && <p className="text-xs text-muted-foreground">No sectors found</p>}
                   </div>
+                </div>
+              )}
+
+              {editRole === 'UmoorCoordinator' && (
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Assigned Umoors</label>
+                  <div className="space-y-1.5 bg-muted/30 rounded-lg p-3 border border-border max-h-48 overflow-y-auto">
+                    {categories.map(c => (
+                      <label key={c.id} className="flex items-center gap-2.5 cursor-pointer py-0.5">
+                        <input
+                          type="checkbox"
+                          checked={editUmoorIds.includes(c.id)}
+                          onChange={() => toggleUmoor(c.id)}
+                          className="w-4 h-4 accent-primary"
+                        />
+                        <span className="text-sm text-foreground">{c.name}</span>
+                      </label>
+                    ))}
+                    {categories.length === 0 && <p className="text-xs text-muted-foreground">No umoor categories found</p>}
+                  </div>
+                  {editUmoorIds.length === 0 && (
+                    <p className="text-xs text-amber-600 mt-1.5">
+                      No umoor assigned — this coordinator will not see any profile data until at least one umoor is assigned.
+                    </p>
+                  )}
                 </div>
               )}
 

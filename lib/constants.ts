@@ -3,6 +3,7 @@ export const ROLES = {
   MASOOL: 'Masool',
   MUSAID: 'Musaid',
   MUMIN: 'Mumin',
+  UMOOR_COORDINATOR: 'UmoorCoordinator',
 } as const
 
 export const MUMIN_STATUS = {
@@ -33,6 +34,7 @@ export const ROUTES = {
   REPORTS: '/reports',
   FORMS: '/forms',
   ADMIN_USERS: '/admin/users',
+  ADMIN_PROFILE_FIELDS: '/admin/profile-fields',
   ANALYTICS: '/analytics',
   REQUESTS: '/requests',
   ADMIN_REQUESTS: '/admin/requests',

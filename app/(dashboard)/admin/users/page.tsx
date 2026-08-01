@@ -26,11 +26,13 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
 
   const admin = createAdminClient()
 
-  const [sectorsResult, subsectorsResult, sectorAssignResult, subsectorAssignResult] = await Promise.all([
+  const [sectorsResult, subsectorsResult, sectorAssignResult, subsectorAssignResult, categoriesResult, umoorAssignResult] = await Promise.all([
     admin.from('sector').select('sector_id, sector_name').order('sector_name'),
     admin.from('subsector').select('subsector_id, sector_id, subsector_name').order('subsector_name'),
     admin.from('user_sector').select('its_no, sector_id'),
     admin.from('user_subsector').select('its_no, subsector_id'),
+    admin.from('profile_category').select('id, name').order('sort_order'),
+    admin.from('user_umoor').select('its_no, category_id'),
   ])
 
   let users: any[] = []
@@ -43,7 +45,7 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
       .limit(2000)
 
     if (roleFilter) {
-      query = query.eq('role', roleFilter as 'SuperAdmin' | 'Admin' | 'Masool' | 'Musaid' | 'Mumin')
+      query = query.eq('role', roleFilter as 'SuperAdmin' | 'Admin' | 'Masool' | 'Musaid' | 'Mumin' | 'UmoorCoordinator')
     }
 
     if (search) {
@@ -70,16 +72,24 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
       existing.push(s.subsector_id)
       subsectorMap.set(s.its_no, existing)
     }
+    const umoorMap = new Map<number, number[]>()
+    for (const u of (umoorAssignResult.data ?? []) as any[]) {
+      const existing = umoorMap.get(u.its_no) ?? []
+      existing.push(u.category_id)
+      umoorMap.set(u.its_no, existing)
+    }
 
     users = ((muminRows ?? []) as any[]).map((m: any) => ({
       ...m,
       sector: (sectorMap.get(m.its_no) ?? []).map((id: number) => ({ sector_id: id })),
       subsector: (subsectorMap.get(m.its_no) ?? []).map((id: number) => ({ subsector_id: id })),
+      umoor: (umoorMap.get(m.its_no) ?? []).map((id: number) => ({ category_id: id })),
     }))
   }
 
   const sectors = (sectorsResult.data ?? []) as any[]
   const subsectors = (subsectorsResult.data ?? []) as any[]
+  const categories = (categoriesResult.data ?? []) as any[]
 
   return (
     <div className="p-4 md:p-6 lg:p-8">
@@ -103,6 +113,7 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
         initialUsers={users}
         sectors={sectors}
         subsectors={subsectors}
+        categories={categories}
         mode={hasFilter ? 'loaded' : 'idle'}
         currentSearch={search}
         currentRole={roleFilter}

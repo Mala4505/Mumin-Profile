@@ -9,7 +9,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
  * Used by the Request Edit modal to populate the member picker.
  */
 export const GET = withAuth(
-  ['SuperAdmin', 'Admin', 'Masool', 'Musaid'],
+  ['SuperAdmin', 'Admin', 'Masool', 'Musaid', 'UmoorCoordinator'],
   async function handler(req: NextRequest, { session, scopedSubsectorIds }) {
     const { searchParams } = req.nextUrl
     const sabeelNo = searchParams.get('sabeel_no')

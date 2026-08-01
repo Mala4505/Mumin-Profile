@@ -28,7 +28,7 @@ export async function GET(
       event:event_id(title),
       forms:form_id(title, viewable_by_roles),
       profile_field:profile_field_id(
-        caption, field_type, visibility_level,
+        caption, field_type, visibility_level, category_id,
         profile_category!inner(name, sort_order)
       )
     `)
@@ -48,9 +48,19 @@ export async function GET(
     entries: { answer: string; submitted_at: string; label: string | null }[]
   }>()
 
+  // UmoorCoordinators only see history for fields in their assigned umoors
+  // (app-level filter — this route uses the service-role client which bypasses RLS)
+  const scopedCategoryIds =
+    session.role === 'UmoorCoordinator'
+      ? (session.umoor_ids.length > 0 ? session.umoor_ids : [-1])
+      : null
+
   for (const row of (data ?? []) as any[]) {
     const pf = row.profile_field as any
     if (!pf) continue
+
+    // Umoor scope gate for coordinators
+    if (scopedCategoryIds !== null && !scopedCategoryIds.includes(pf.category_id)) continue
 
     // Skip entries from staff_only forms
     const formMeta = row.forms as any

@@ -1,6 +1,6 @@
 import type { Database } from './database'
 
-export type Role = 'SuperAdmin' | 'Admin' | 'Masool' | 'Musaid' | 'Mumin'
+export type Role = 'SuperAdmin' | 'Admin' | 'Masool' | 'Musaid' | 'Mumin' | 'UmoorCoordinator'
 export type LoginMode = 'admin' | 'user'
 
 export type MuminStatus = 'active' | 'deceased' | 'relocated' | 'left_community' | 'inactive'
@@ -27,6 +27,7 @@ export interface AppMetadata {
   role: Role
   sector_ids: number[]
   subsector_ids: number[]
+  umoor_ids: number[]
   must_change_password: boolean
   is_hof: boolean
   sabeel_no: string
@@ -39,6 +40,7 @@ export interface SessionUser {
   role: Role
   sector_ids: number[]
   subsector_ids: number[]
+  umoor_ids: number[]
   must_change_password: boolean
   is_hof: boolean
   sabeel_no: string
@@ -82,6 +84,10 @@ export interface MemberFilters {
   status?: MuminStatus
   search?: string
   paci_no?: string
+  /** Minimum age in whole years (inclusive). Members with NULL date_of_birth drop out when set. */
+  age_from?: number
+  /** Maximum age in whole years (inclusive). Members with NULL date_of_birth drop out when set. */
+  age_to?: number
   /** null = unrestricted, number[] = restrict to these subsector_ids (role-based scope gate) */
   scopedSubsectorIds?: number[] | null
 }

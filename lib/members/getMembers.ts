@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { ageToDobRange } from "@/lib/members/ageToDobRange";
 import type { MemberFilters } from "@/lib/types/app";
 
 export interface MemberListItem {
@@ -79,6 +80,11 @@ export async function getMembers(
   } else {
     query = query.eq("status", "active");
   }
+  // Age range → date_of_birth cutoffs (NULL DOB rows drop out automatically)
+  const { minDob, maxDob } = ageToDobRange(filters.age_from, filters.age_to);
+  if (minDob) query = query.gte("date_of_birth", minDob);
+  if (maxDob) query = query.lte("date_of_birth", maxDob);
+
   if (paciSabeelNos !== null) query = query.in("sabeel_no", paciSabeelNos);
   if (musaidSubsectorIds !== null)
     query = query.in("subsector_id", musaidSubsectorIds);

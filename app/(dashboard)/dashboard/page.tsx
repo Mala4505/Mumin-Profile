@@ -8,12 +8,14 @@ import {
   getMasoolStats,
   getMusaidStats,
   getMuminStats,
+  getUmoorCoordinatorStats,
 } from '@/lib/dashboard/getStats'
 import SuperAdminDashboard from '@/components/dashboard/SuperAdminDashboard'
 import AdminDashboard from '@/components/dashboard/AdminDashboard'
 import MasoolDashboard from '@/components/dashboard/MasoolDashboard'
 import MusaidDashboard from '@/components/dashboard/MusaidDashboard'
 import MuminDashboard from '@/components/dashboard/MuminDashboard'
+import UmoorCoordinatorDashboard from '@/components/dashboard/UmoorCoordinatorDashboard'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { SessionUser } from '@/lib/types/app'
 
@@ -103,6 +105,15 @@ async function MusaidContent({ session }: { session: SessionUser }) {
   )
 }
 
+async function UmoorCoordinatorContent({ session }: { session: SessionUser }) {
+  const stats = await getUmoorCoordinatorStats(session)
+  return (
+    <div className="p-4 md:p-6 lg:p-8">
+      <UmoorCoordinatorDashboard stats={stats} />
+    </div>
+  )
+}
+
 async function MuminContent({ itsNo }: { itsNo: number }) {
   const stats = await getMuminStats(itsNo)
   if (!stats) redirect('/members')
@@ -152,6 +163,14 @@ export default async function DashboardPage() {
     return (
       <Suspense fallback={<DashboardSkeleton />}>
         <MusaidContent session={session} />
+      </Suspense>
+    )
+  }
+
+  if (session.role === 'UmoorCoordinator') {
+    return (
+      <Suspense fallback={<DashboardSkeleton />}>
+        <UmoorCoordinatorContent session={session} />
       </Suspense>
     )
   }

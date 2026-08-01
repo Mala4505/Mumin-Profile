@@ -42,6 +42,7 @@ interface ProfileField {
   field_type: string
   behavior: string
   options: string[] | null
+  category_id?: number
 }
 
 
@@ -58,6 +59,7 @@ interface Props {
   fields: FormField[]
   role: Role
   itsNo: number
+  umoorIds?: number[]
 }
 
 const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
@@ -68,7 +70,8 @@ const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   expired:          { label: 'Expired',          className: 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' },
 }
 
-export function FormEditClient({ form, fields: initialFields, role, itsNo }: Props) {
+export function FormEditClient({ form, fields: initialFields, role, itsNo, umoorIds }: Props) {
+  const isCoordinator = role === 'UmoorCoordinator'
   const router = useRouter()
   const [title, setTitle] = useState(form.title)
   const [description, setDescription] = useState(form.description)
@@ -96,11 +99,17 @@ export function FormEditClient({ form, fields: initialFields, role, itsNo }: Pro
 
   useEffect(() => {
     const supabase = createClient()
-    supabase
+    let query = supabase
       .from('profile_field')
-      .select('id, caption, field_type, behavior, options')
+      .select('id, caption, field_type, behavior, options, category_id')
+      .eq('is_active', true)
       .order('caption')
-      .then(({ data }) => setProfileFields((data ?? []) as ProfileField[]))
+    // Coordinators only pick from fields within their assigned umoors
+    if (isCoordinator) {
+      query = query.in('category_id', (umoorIds?.length ? umoorIds : [-1]))
+    }
+    query.then(({ data }) => setProfileFields((data ?? []) as ProfileField[]))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   function openCreate() {
@@ -120,7 +129,9 @@ export function FormEditClient({ form, fields: initialFields, role, itsNo }: Pro
       .then(({ data, error: catErr }) => {
         setCategoriesLoading(false)
         if (catErr) { setCreateError('Failed to load categories.'); return }
-        setCategories((data ?? []) as { id: number; name: string }[])
+        // Coordinators may only create questions inside their own umoors
+        const cats = (data ?? []) as { id: number; name: string }[]
+        setCategories(isCoordinator ? cats.filter(c => (umoorIds ?? []).includes(c.id)) : cats)
       })
   }
 
@@ -391,7 +402,7 @@ export function FormEditClient({ form, fields: initialFields, role, itsNo }: Pro
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {isAdmin && (
+            {(isAdmin || isCoordinator) && (
               <button
                 onClick={openCreate}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-primary/40 text-sm text-primary hover:bg-primary/5 transition-colors"

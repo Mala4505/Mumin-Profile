@@ -26,7 +26,7 @@ export async function GET(
   // Load form to check access
   const { data: form, error: formErr } = await supabase
     .from('forms')
-    .select('created_by, filler_access, status')
+    .select('created_by, filler_access, status, umoor_category_id')
     .eq('id', id)
     .single()
 
@@ -38,8 +38,13 @@ export async function GET(
   const isCreator = Number(session.its_no) === form.created_by
   const fillerAccess = form.filler_access as FillerAccess | null
   const isFiller = fillerAccess ? isAuthorizedFiller(fillerAccess, session) : false
+  // Coordinator: full audience access for forms in their assigned umoors (geo-unrestricted)
+  const isUmoorScoped =
+    session.role === 'UmoorCoordinator' &&
+    form.umoor_category_id !== null &&
+    (session.umoor_ids ?? []).includes(form.umoor_category_id)
 
-  if (!isAdmin && !isCreator && !isFiller) {
+  if (!isAdmin && !isCreator && !isFiller && !isUmoorScoped) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
@@ -81,10 +86,10 @@ export async function GET(
     } else {
       audience = []
     }
-  } else if (session.is_hof && session.sabeel_no && !isAdmin && !isCreator) {
+  } else if (session.is_hof && session.sabeel_no && !isAdmin && !isCreator && !isUmoorScoped) {
     audience = audience.filter((a) => a.mumin.sabeel_no === session.sabeel_no)
   }
-  // Admin / SuperAdmin / Creator → no filter, see all
+  // Admin / SuperAdmin / Creator / UmoorCoordinator (own umoor) → no filter, see all
 
   return NextResponse.json({
     audience: audience.map((a) => ({

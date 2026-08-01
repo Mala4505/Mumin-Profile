@@ -17,6 +17,7 @@ import {
   Filter,
 } from 'lucide-react'
 import type { Role } from '@/lib/types/app'
+import { RespondentDetailSheet } from './RespondentDetailSheet'
 
 const ReportsDistributionCharts = dynamic(
   () => import('./ReportsDistributionCharts').then(m => ({ default: m.ReportsDistributionCharts })),
@@ -38,6 +39,7 @@ const ReportsDistributionCharts = dynamic(
 
 interface ReportsClientProps {
   sectors: Array<{ sector_id: number; sector_name: string }>
+  categories: Array<{ id: number; name: string }>
   role: Role
 }
 
@@ -45,19 +47,24 @@ interface FormOption {
   id: string
   title: string
   status: string
+  umoor_category_id: number | null
   response_count: number
 }
 
-interface Question {
+export interface Question {
   field_id: number
   caption: string
   field_type: string
   sort_order: number
 }
 
-interface Respondent {
+export interface Respondent {
   its_no: number
   name: string
+  gender: 'M' | 'F' | null
+  age: number | null
+  sector_name: string | null
+  subsector_name: string | null
   submitted_at: string
 }
 
@@ -343,17 +350,28 @@ function FilterBuilder({
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export function ReportsClient({ sectors, role }: ReportsClientProps) {
+export function ReportsClient({ sectors, categories, role }: ReportsClientProps) {
   // ── Form list ──────────────────────────────────────────────────────────────
   const [forms, setForms] = useState<FormOption[]>([])
   const [loadingForms, setLoadingForms] = useState(true)
   const [formId, setFormId] = useState('')
+
+  // ── Umoor filter ───────────────────────────────────────────────────────────
+  const [categoryId, setCategoryId] = useState('')
 
   // ── Location filters ───────────────────────────────────────────────────────
   const [sectorId, setSectorId] = useState('')
   const [subsectorId, setSubsectorId] = useState('')
   const [subsectors, setSubsectors] = useState<Subsector[]>([])
   const [loadingSubsectors, setLoadingSubsectors] = useState(false)
+
+  // ── Demographic filters ────────────────────────────────────────────────────
+  const [gender, setGender] = useState('')
+  const [ageFrom, setAgeFrom] = useState('')
+  const [ageTo, setAgeTo] = useState('')
+
+  // ── Respondent detail sheet ────────────────────────────────────────────────
+  const [detailItsNo, setDetailItsNo] = useState<number | null>(null)
 
   // ── Report data ────────────────────────────────────────────────────────────
   const [data, setData] = useState<FormReportData | null>(null)
@@ -404,6 +422,9 @@ export function ReportsClient({ sectors, role }: ReportsClientProps) {
       const params = new URLSearchParams({ form_id: formId })
       if (sectorId) params.set('sector_id', sectorId)
       if (subsectorId) params.set('subsector_id', subsectorId)
+      if (gender) params.set('gender', gender)
+      if (ageFrom) params.set('age_from', ageFrom)
+      if (ageTo) params.set('age_to', ageTo)
 
       const res = await fetch(`/api/reports/forms?${params}`)
       if (!res.ok) {
@@ -413,6 +434,7 @@ export function ReportsClient({ sectors, role }: ReportsClientProps) {
       const json: FormReportData = await res.json()
       setData(json)
       setHasFetched(true)
+      setDetailItsNo(null)
       setSelectedFieldIds(new Set(json.questions.map((q) => q.field_id)))
       setFilterRules([])
     } catch (e) {
@@ -420,7 +442,14 @@ export function ReportsClient({ sectors, role }: ReportsClientProps) {
     } finally {
       setLoading(false)
     }
-  }, [formId, sectorId, subsectorId])
+  }, [formId, sectorId, subsectorId, gender, ageFrom, ageTo])
+
+  // ── Forms visible in the picker (umoor filter) ─────────────────────────────
+  const visibleForms = useMemo(() => {
+    if (!categoryId) return forms
+    const cid = Number(categoryId)
+    return forms.filter((f) => f.umoor_category_id === cid)
+  }, [forms, categoryId])
 
   // ── Filtered respondents ───────────────────────────────────────────────────
   const filteredRespondents = useMemo(() => {
@@ -439,6 +468,15 @@ export function ReportsClient({ sectors, role }: ReportsClientProps) {
     if (!data) return []
     return buildPivotRows(filteredRespondents, data.answers, data.questions, selectedFieldIds)
   }, [data, filteredRespondents, selectedFieldIds])
+
+  // ── Respondent lookup (demographic columns + detail sheet) ─────────────────
+  const respondentMap = useMemo(() => {
+    const map = new Map<number, Respondent>()
+    for (const r of data?.respondents ?? []) map.set(r.its_no, r)
+    return map
+  }, [data])
+
+  const detailRespondent = detailItsNo !== null ? respondentMap.get(detailItsNo) ?? null : null
 
   // ── Chart data (SuperAdmin) ────────────────────────────────────────────────
   const chartData = useMemo(() => {
@@ -480,6 +518,12 @@ export function ReportsClient({ sectors, role }: ReportsClientProps) {
         its_nos: itsNos,
         columns: colList.join(','),
       })
+      // Mirror the on-screen filters so the server-side export matches exactly
+      if (sectorId) params.set('sector_id', sectorId)
+      if (subsectorId) params.set('subsector_id', subsectorId)
+      if (gender) params.set('gender', gender)
+      if (ageFrom) params.set('age_from', ageFrom)
+      if (ageTo) params.set('age_to', ageTo)
       const res = await fetch(`/api/reports/forms/export?${params}`)
       if (!res.ok) throw new Error('Export failed')
       const blob = await res.blob()
@@ -502,9 +546,23 @@ export function ReportsClient({ sectors, role }: ReportsClientProps) {
     (r) => r.field_id && (['is_empty', 'is_not_empty'].includes(r.operator) || r.value.trim() !== ''),
   )
 
-  const showSectorFilter = role === 'SuperAdmin' || role === 'Admin'
+  // UmoorCoordinator is geo-unrestricted → sector/subsector filters are still useful to them.
+  const showSectorFilter = role === 'SuperAdmin' || role === 'Admin' || role === 'UmoorCoordinator'
   const showSubsectorFilter =
-    (role === 'SuperAdmin' || role === 'Admin' || role === 'Masool') && !!sectorId
+    (role === 'SuperAdmin' || role === 'Admin' || role === 'Masool' || role === 'UmoorCoordinator') && !!sectorId
+
+  function handleCategoryChange(next: string) {
+    setCategoryId(next)
+    if (!next || !formId) return
+    const current = forms.find((f) => f.id === formId)
+    if (current && current.umoor_category_id !== Number(next)) {
+      setFormId('')
+      setData(null)
+      setHasFetched(false)
+      setFilterRules([])
+      setDetailItsNo(null)
+    }
+  }
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -521,6 +579,15 @@ export function ReportsClient({ sectors, role }: ReportsClientProps) {
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+          <FilterSelect label="Umoor" value={categoryId} onChange={handleCategoryChange}>
+            <option value="">All Umoors</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </FilterSelect>
+
           {/* Form picker */}
           <div className="space-y-1.5 col-span-2 md:col-span-1 lg:col-span-2">
             <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide">
@@ -535,13 +602,18 @@ export function ReportsClient({ sectors, role }: ReportsClientProps) {
                   setData(null)
                   setHasFetched(false)
                   setFilterRules([])
+                  setDetailItsNo(null)
                 }}
                 className="w-full appearance-none px-3 py-2 text-sm border border-border rounded-lg bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors pr-8 disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <option value="">
-                  {loadingForms ? 'Loading forms…' : 'Select a form'}
+                  {loadingForms
+                    ? 'Loading forms…'
+                    : visibleForms.length
+                      ? 'Select a form'
+                      : 'No forms in this umoor'}
                 </option>
-                {forms.map((f) => (
+                {visibleForms.map((f) => (
                   <option key={f.id} value={f.id}>
                     {f.title}
                     {f.response_count > 0
@@ -575,6 +647,43 @@ export function ReportsClient({ sectors, role }: ReportsClientProps) {
               ))}
             </FilterSelect>
           )}
+
+          <FilterSelect label="Gender" value={gender} onChange={setGender}>
+            <option value="">All</option>
+            <option value="M">Male</option>
+            <option value="F">Female</option>
+          </FilterSelect>
+
+          <div className="space-y-1.5">
+            <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              Age range
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                max={120}
+                value={ageFrom}
+                onChange={(e) => setAgeFrom(e.target.value)}
+                placeholder="Min"
+                aria-label="Minimum age"
+                className="w-full min-w-0 px-3 py-2 text-sm border border-border rounded-lg bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors placeholder:text-muted-foreground/50"
+              />
+              <span className="text-xs text-muted-foreground flex-shrink-0">to</span>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                max={120}
+                value={ageTo}
+                onChange={(e) => setAgeTo(e.target.value)}
+                placeholder="Max"
+                aria-label="Maximum age"
+                className="w-full min-w-0 px-3 py-2 text-sm border border-border rounded-lg bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors placeholder:text-muted-foreground/50"
+              />
+            </div>
+          </div>
         </div>
 
         {/* AND/OR filter builder — appears after data is loaded */}
@@ -710,6 +819,9 @@ export function ReportsClient({ sectors, role }: ReportsClientProps) {
 
               <span className="text-xs text-muted-foreground">
                 {pivotRows.length} row{pivotRows.length !== 1 ? 's' : ''}
+                {pivotRows.length > 0 && (
+                  <span className="hidden sm:inline"> · click a row for full answers</span>
+                )}
               </span>
             </div>
 
@@ -752,6 +864,12 @@ export function ReportsClient({ sectors, role }: ReportsClientProps) {
                     <th className="sticky left-28 z-10 bg-muted/50 px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap min-w-[160px]">
                       Name
                     </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
+                      Gender
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
+                      Age
+                    </th>
                     {visibleColumns.map((q) => (
                       <th
                         key={q.field_id}
@@ -763,24 +881,46 @@ export function ReportsClient({ sectors, role }: ReportsClientProps) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {pivotRows.map((row) => (
-                    <tr key={row.its_no} className="hover:bg-muted/20 transition-colors">
-                      <td className="sticky left-0 z-10 bg-card px-4 py-2.5 text-xs text-muted-foreground font-mono whitespace-nowrap">
-                        {row.its_no}
-                      </td>
-                      <td className="sticky left-28 z-10 bg-card px-4 py-2.5 text-sm font-medium text-foreground whitespace-nowrap">
-                        {row.name}
-                      </td>
-                      {visibleColumns.map((q) => (
-                        <td
-                          key={q.field_id}
-                          className="px-4 py-2.5 text-sm text-foreground whitespace-nowrap"
-                        >
-                          {String(row[q.caption] ?? '')}
+                  {pivotRows.map((row) => {
+                    const itsNo = row.its_no as number
+                    const respondent = respondentMap.get(itsNo)
+                    return (
+                      <tr
+                        key={itsNo}
+                        tabIndex={0}
+                        onClick={() => setDetailItsNo(itsNo)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            setDetailItsNo(itsNo)
+                          }
+                        }}
+                        aria-label={`View all answers from ${row.name}`}
+                        className="cursor-pointer hover:bg-muted/20 focus-visible:bg-muted/20 focus-visible:outline-none transition-colors"
+                      >
+                        <td className="sticky left-0 z-10 bg-card px-4 py-2.5 text-xs text-muted-foreground font-mono whitespace-nowrap">
+                          {itsNo}
                         </td>
-                      ))}
-                    </tr>
-                  ))}
+                        <td className="sticky left-28 z-10 bg-card px-4 py-2.5 text-sm font-medium text-foreground whitespace-nowrap">
+                          {row.name}
+                        </td>
+                        <td className="px-4 py-2.5 text-sm text-foreground whitespace-nowrap">
+                          {respondent?.gender === 'M' ? 'Male' : respondent?.gender === 'F' ? 'Female' : ''}
+                        </td>
+                        <td className="px-4 py-2.5 text-sm text-foreground whitespace-nowrap">
+                          {respondent?.age ?? ''}
+                        </td>
+                        {visibleColumns.map((q) => (
+                          <td
+                            key={q.field_id}
+                            className="px-4 py-2.5 text-sm text-foreground whitespace-nowrap"
+                          >
+                            {String(row[q.caption] ?? '')}
+                          </td>
+                        ))}
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -800,6 +940,14 @@ export function ReportsClient({ sectors, role }: ReportsClientProps) {
           </p>
         </div>
       )}
+
+      {/* ── Respondent detail sheet ────────────────────────────────────────── */}
+      <RespondentDetailSheet
+        respondent={detailRespondent}
+        questions={data?.questions ?? []}
+        answers={detailItsNo !== null ? data?.answers[detailItsNo] ?? {} : {}}
+        onClose={() => setDetailItsNo(null)}
+      />
     </div>
   )
 }

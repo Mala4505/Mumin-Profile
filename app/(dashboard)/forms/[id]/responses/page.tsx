@@ -150,7 +150,7 @@ export default async function FormResponsesPage({
         profile_field_id: r.profile_field_id ?? 0,
         answer: r.answer ?? ''
       })),
-      submitted_at: firstRow.submitted_at,
+      submitted_at: firstRow.submitted_at ?? new Date().toISOString(),
       mumin: responseMumins[itsNo]
     }
   })

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/getSession'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export interface FieldHistoryEntry {
   id: string
@@ -23,7 +24,7 @@ export async function GET(
   const itsNo = parseInt(itsNoStr)
   if (isNaN(itsNo)) return NextResponse.json({ error: 'Invalid ITS' }, { status: 400 })
 
-  const isStaff = ['SuperAdmin', 'Admin', 'Masool', 'Musaid'].includes(session.role)
+  const isStaff = ['SuperAdmin', 'Admin', 'Masool', 'Musaid', 'UmoorCoordinator'].includes(session.role)
   if (!isStaff && session.its_no !== itsNo) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
@@ -35,6 +36,19 @@ export async function GET(
   const eventId = searchParams.get('event_id')
 
   if (!fieldId) return NextResponse.json({ error: 'field_id required' }, { status: 400 })
+
+  // UmoorCoordinators may only view history of fields within their assigned umoors
+  if (session.role === 'UmoorCoordinator' && session.its_no !== itsNo) {
+    const admin = createAdminClient()
+    const { data: field } = await admin
+      .from('profile_field')
+      .select('category_id')
+      .eq('id', parseInt(fieldId))
+      .maybeSingle()
+    if (!field || !session.umoor_ids.includes(field.category_id)) {
+      return NextResponse.json({ error: 'Forbidden: field is outside your assigned umoors' }, { status: 403 })
+    }
+  }
 
   const supabase = await createClient()
 
@@ -73,7 +87,7 @@ export async function GET(
     id: r.id,
     answer: r.answer,
     remarks: r.remarks,
-    submitted_at: r.submitted_at,
+    submitted_at: r.submitted_at ?? new Date().toISOString(),
     event_title: r.event_id ? (eventTitleMap.get(r.event_id) ?? null) : null,
     filled_by_its: r.filled_by ?? null,
     filled_by_name: r.filled_by ? (fillerNameMap.get(r.filled_by) ?? null) : null,

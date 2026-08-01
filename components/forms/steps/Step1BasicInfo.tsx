@@ -25,15 +25,23 @@ interface Props {
   update: (patch: Partial<FormDraft>) => void
   onNext: () => void
   userRole?: string
+  umoorIds?: number[]
 }
 
 const selectClass =
   'appearance-none w-full bg-card border border-border rounded-lg px-3 py-2 pr-8 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-colors cursor-pointer'
 
-export function Step1BasicInfo({ draft, update, onNext, userRole }: Props) {
+export function Step1BasicInfo({ draft, update, onNext, userRole, umoorIds }: Props) {
   const [categories, setCategories] = useState<ProfileCategory[]>([])
   const [events, setEvents] = useState<Event[]>([])
   const [titleError, setTitleError] = useState(false)
+  const [umoorError, setUmoorError] = useState(false)
+
+  // Umoor Coordinators can only create forms inside their assigned umoors
+  const isCoordinator = userRole === 'UmoorCoordinator'
+  const visibleCategories = isCoordinator
+    ? categories.filter((c) => (umoorIds ?? []).includes(c.id))
+    : categories
 
   // Inline new-event form state
   const [showNewEvent, setShowNewEvent] = useState(false)
@@ -67,6 +75,11 @@ export function Step1BasicInfo({ draft, update, onNext, userRole }: Props) {
       return
     }
     setTitleError(false)
+    if (isCoordinator && !draft.umoor_category_id) {
+      setUmoorError(true)
+      return
+    }
+    setUmoorError(false)
     onNext()
   }
 
@@ -148,19 +161,25 @@ export function Step1BasicInfo({ draft, update, onNext, userRole }: Props) {
       {/* Umoor Category */}
       <div className="space-y-1.5">
         <Label htmlFor="umoor-category">
-          Umoor Category <span className="text-muted-foreground font-normal">(optional)</span>
+          Umoor Category{' '}
+          {isCoordinator ? (
+            <span className="text-destructive">*</span>
+          ) : (
+            <span className="text-muted-foreground font-normal">(optional)</span>
+          )}
         </Label>
         <div className="relative">
           <select
             id="umoor-category"
             value={draft.umoor_category_id ?? ''}
-            onChange={(e) =>
+            onChange={(e) => {
               update({ umoor_category_id: e.target.value ? Number(e.target.value) : undefined })
-            }
+              if (e.target.value) setUmoorError(false)
+            }}
             className={selectClass}
           >
             <option value="">Select category...</option>
-            {categories.map((c) => (
+            {visibleCategories.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>
@@ -168,6 +187,14 @@ export function Step1BasicInfo({ draft, update, onNext, userRole }: Props) {
           </select>
           <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
         </div>
+        {isCoordinator && visibleCategories.length === 0 && (
+          <p className="text-xs text-amber-600 mt-1">
+            No umoors are assigned to your account — ask a SuperAdmin to assign one before creating forms.
+          </p>
+        )}
+        {umoorError && (
+          <p className="text-xs text-destructive mt-1">Umoor category is required for Umoor Coordinators.</p>
+        )}
       </div>
 
       {/* Event */}
@@ -321,7 +348,7 @@ export function Step1BasicInfo({ draft, update, onNext, userRole }: Props) {
       </div>
 
       {/* Response Visibility */}
-      {userRole && ['Masool', 'Musaid', 'Admin', 'SuperAdmin'].includes(userRole) && (
+      {userRole && ['Masool', 'Musaid', 'Admin', 'SuperAdmin', 'UmoorCoordinator'].includes(userRole) && (
         <div className="space-y-2">
           <Label>Who can view responses for this form?</Label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

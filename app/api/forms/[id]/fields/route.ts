@@ -79,15 +79,20 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // Only form creator or SuperAdmin can update
+  // Only form creator, SuperAdmin, or an UmoorCoordinator of the form's umoor can update
   const supabase = createAdminClient()
   const { data: form } = await supabase
     .from('forms')
-    .select('created_by')
+    .select('created_by, umoor_category_id')
     .eq('id', formId)
     .single()
 
-  if (!form || (form.created_by !== session.its_no && session.role !== 'SuperAdmin')) {
+  const isUmoorScoped =
+    session.role === 'UmoorCoordinator' &&
+    form?.umoor_category_id != null &&
+    (session.umoor_ids ?? []).includes(form.umoor_category_id)
+
+  if (!form || (form.created_by !== session.its_no && session.role !== 'SuperAdmin' && !isUmoorScoped)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 

@@ -22,6 +22,11 @@ export async function GET(
   const isAdmin = ['SuperAdmin', 'Admin'].includes(session.role)
   const fillerAccess = data.filler_access as FillerAccess | null
   const isFiller = fillerAccess ? isAuthorizedFiller(fillerAccess, session) : false
+  // Coordinator may access any form belonging to their assigned umoor categories
+  const isUmoorScoped =
+    session.role === 'UmoorCoordinator' &&
+    data.umoor_category_id !== null &&
+    (session.umoor_ids ?? []).includes(data.umoor_category_id)
 
   // Mumin can only GET a form for self-fill: must be in audience + form must allow self
   if (session.role === 'Mumin') {
@@ -37,7 +42,7 @@ export async function GET(
     return NextResponse.json({ form: data })
   }
 
-  if (!isCreator && !isAdmin && !isFiller) {
+  if (!isCreator && !isAdmin && !isFiller && !isUmoorScoped) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
@@ -58,9 +63,26 @@ export async function PUT(
 
   const isCreator = Number(session.its_no) === existing.created_by // fixed integer
   const isAdmin = ['SuperAdmin', 'Admin'].includes(session.role)
-  if (!isCreator && !isAdmin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  // Coordinator may manage any form belonging to their assigned umoor categories
+  const isUmoorScoped =
+    session.role === 'UmoorCoordinator' &&
+    existing.umoor_category_id !== null &&
+    (session.umoor_ids ?? []).includes(existing.umoor_category_id)
+  if (!isCreator && !isAdmin && !isUmoorScoped) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const body = await req.json()
+
+  // Coordinators cannot move a form outside their assigned umoors
+  if (
+    session.role === 'UmoorCoordinator' &&
+    'umoor_category_id' in body &&
+    (body.umoor_category_id === null || !(session.umoor_ids ?? []).includes(Number(body.umoor_category_id)))
+  ) {
+    return NextResponse.json(
+      { error: 'Forbidden: umoor category is outside your assigned umoors' },
+      { status: 403 },
+    )
+  }
 
   // Handle publish transition
   if (body.status === 'published' && existing.status !== 'published') {
@@ -84,8 +106,8 @@ export async function PUT(
     }
   }
 
-  // Handle submit-for-approval by Masool/Musaid
-  if (body.status === 'pending_approval' && ['Masool', 'Musaid'].includes(session.role)) {
+  // Handle submit-for-approval by Masool/Musaid/UmoorCoordinator
+  if (body.status === 'pending_approval' && ['Masool', 'Musaid', 'UmoorCoordinator'].includes(session.role)) {
     const { data: admins } = await supabase
       .from('mumin')
       .select('its_no')

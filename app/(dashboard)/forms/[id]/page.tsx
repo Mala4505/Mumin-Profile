@@ -26,7 +26,12 @@ export default async function FormEditPage({
 
   const isCreator = Number(session.its_no) === form.created_by
   const isAdmin = ['SuperAdmin', 'Admin'].includes(session.role)
-  if (!isCreator && !isAdmin) redirect('/forms')
+  // Umoor Coordinators may manage forms belonging to their assigned umoor categories
+  const isUmoorScoped =
+    session.role === 'UmoorCoordinator' &&
+    form.umoor_category_id !== null &&
+    (session.umoor_ids ?? []).includes(form.umoor_category_id)
+  if (!isCreator && !isAdmin && !isUmoorScoped) redirect('/forms')
 
   const { data: fieldRows } = await supabase
     .from('form_fields')
@@ -64,6 +69,7 @@ export default async function FormEditPage({
         fields={(fieldRows ?? []) as any}
         role={session.role as Role}
         itsNo={session.its_no}
+        umoorIds={session.umoor_ids}
       />
     </div>
   )

@@ -1,7 +1,7 @@
 import type { SessionUser, MemberFilters } from '@/lib/types/app'
 
 export function canViewAllMembers(user: SessionUser): boolean {
-  return user.role === 'SuperAdmin' || user.role === 'Admin' || user.role === 'Masool' || user.role === 'Musaid'
+  return user.role === 'SuperAdmin' || user.role === 'Admin' || user.role === 'Masool' || user.role === 'Musaid' || user.role === 'UmoorCoordinator'
 }
 
 export function canEditMember(user: SessionUser, memberSubsectorId: number): boolean {
@@ -31,6 +31,8 @@ export function canAssignSubsectors(user: SessionUser): boolean {
 export function canViewProfileField(user: SessionUser, visibilityLevel: 1 | 2 | 3): boolean {
   if (user.role === 'SuperAdmin') return true
   if (user.role === 'Admin' || user.role === 'Masool' || user.role === 'Musaid') return visibilityLevel <= 2
+  // UmoorCoordinator: staff-level visibility; umoor scoping is enforced separately (resolveUmoorScope)
+  if (user.role === 'UmoorCoordinator') return visibilityLevel <= 2
   if (user.role === 'Mumin') return visibilityLevel === 1
   return false
 }

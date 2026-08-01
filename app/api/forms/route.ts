@@ -136,6 +136,47 @@ export async function GET() {
     formData.sort(
       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
     )
+  } else if (session.role === 'UmoorCoordinator') {
+    // Coordinator sees forms they created + any form in their assigned umoor categories
+    const itsNo = Number(session.its_no)
+    const umoorIds = session.umoor_ids ?? []
+
+    const queries: PromiseLike<any>[] = [
+      // Forms this user created (any status)
+      supabase
+        .from('forms')
+        .select('*, event:event_id(title, event_date, end_date)')
+        .eq('created_by', itsNo)
+        .order('created_at', { ascending: false }),
+    ]
+
+    if (umoorIds.length > 0) {
+      queries.push(
+        // Forms belonging to their assigned umoor categories (any status)
+        supabase
+          .from('forms')
+          .select('*, event:event_id(title, event_date, end_date)')
+          .in('umoor_category_id', umoorIds)
+          .order('created_at', { ascending: false }),
+      )
+    }
+
+    const results = await Promise.all(queries)
+
+    // Merge and deduplicate by form ID
+    const seen = new Set<string>()
+    for (const result of results) {
+      for (const form of (result.data ?? []) as any[]) {
+        if (!seen.has(form.id)) {
+          seen.add(form.id)
+          formData.push(form)
+        }
+      }
+    }
+
+    formData.sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    )
   } else {
     // SuperAdmin / Admin — see all forms
     const { data, error } = await supabase
@@ -193,6 +234,23 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
+
+  // UmoorCoordinators must create forms inside one of their assigned umoor categories
+  if (session.role === 'UmoorCoordinator') {
+    if (!body.umoor_category_id) {
+      return NextResponse.json(
+        { error: 'umoor_category_id is required for Umoor Coordinators' },
+        { status: 400 },
+      )
+    }
+    if (!(session.umoor_ids ?? []).includes(Number(body.umoor_category_id))) {
+      return NextResponse.json(
+        { error: 'Forbidden: umoor category is outside your assigned umoors' },
+        { status: 403 },
+      )
+    }
+  }
+
   const supabase = await createClient()
 
   const { data, error } = await supabase

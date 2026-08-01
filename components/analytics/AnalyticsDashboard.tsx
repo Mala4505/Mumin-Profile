@@ -47,6 +47,8 @@ interface MemberRow {
   its_no: number
   name: string
   gender: string | null
+  date_of_birth: string | null
+  age: number | null
   status: string | null
   phone: string | null
   sector_name: string | null
@@ -136,6 +138,8 @@ export function AnalyticsDashboard({ role }: { role: Role }) {
   const [drillSearch, setDrillSearch] = React.useState('')
   const [drillGender, setDrillGender] = React.useState<string>('__all__')
   const [drillStatus, setDrillStatus] = React.useState<string>('__all__')
+  const [drillAgeFrom, setDrillAgeFrom] = React.useState('')
+  const [drillAgeTo, setDrillAgeTo] = React.useState('')
 
   const [formRates, setFormRates] = React.useState<FormRate[]>([])
 
@@ -144,15 +148,19 @@ export function AnalyticsDashboard({ role }: { role: Role }) {
 
   const filteredDrillMembers = React.useMemo(() => {
     const q = drillSearch.trim().toLowerCase()
+    const ageFrom = /^\d+$/.test(drillAgeFrom.trim()) ? parseInt(drillAgeFrom.trim(), 10) : null
+    const ageTo = /^\d+$/.test(drillAgeTo.trim()) ? parseInt(drillAgeTo.trim(), 10) : null
     return drillMembers.filter(m => {
       if (drillGender !== '__all__' && m.gender !== drillGender) return false
       if (drillStatus !== '__all__' && m.status !== drillStatus) return false
+      if (ageFrom !== null && (m.age === null || m.age < ageFrom)) return false
+      if (ageTo !== null && (m.age === null || m.age > ageTo)) return false
       if (q) {
         if (!m.name.toLowerCase().includes(q) && !String(m.its_no).includes(q) && !(m.phone ?? '').includes(q)) return false
       }
       return true
     })
-  }, [drillMembers, drillSearch, drillGender, drillStatus])
+  }, [drillMembers, drillSearch, drillGender, drillStatus, drillAgeFrom, drillAgeTo])
 
   const drillGenders = React.useMemo(
     () => [...new Set(drillMembers.map(m => m.gender).filter((g): g is string => !!g))].sort(),
@@ -182,6 +190,8 @@ export function AnalyticsDashboard({ role }: { role: Role }) {
     setDrillSearch('')
     setDrillGender('__all__')
     setDrillStatus('__all__')
+    setDrillAgeFrom('')
+    setDrillAgeTo('')
 
     fetch(`/api/analytics/dashboard?type=groups&groupBy=${groupBy}`)
       .then(r => r.json())
@@ -384,18 +394,44 @@ export function AnalyticsDashboard({ role }: { role: Role }) {
               <span className="bg-blue-50 border border-blue-200 text-blue-700 text-xs px-2 py-0.5 rounded-full dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300">
                 {selectedGroup}
               </span>
-              <div className="ml-auto flex items-center gap-2">
+              <div className="ml-auto flex flex-wrap items-center gap-2">
                 {drillGenders.length > 0 && (
-                  <Select value={drillGender} onValueChange={setDrillGender}>
-                    <SelectTrigger className="h-7 text-xs w-28">
-                      <SelectValue placeholder="All Genders" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__all__">All Genders</SelectItem>
-                      {drillGenders.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex items-center gap-1">
+                    {drillGenders.map(g => (
+                      <button
+                        key={g}
+                        onClick={() => setDrillGender(prev => prev === g ? '__all__' : g)}
+                        className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${drillGender === g
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-card text-foreground border-border hover:border-primary/50'
+                          }`}
+                      >
+                        {g === 'M' ? 'Male' : g === 'F' ? 'Female' : g}
+                      </button>
+                    ))}
+                  </div>
                 )}
+                <div className="flex items-center gap-1">
+                  <Input
+                    type="number"
+                    min={0}
+                    inputMode="numeric"
+                    placeholder="Min age"
+                    className="h-7 text-xs w-20"
+                    value={drillAgeFrom}
+                    onChange={e => setDrillAgeFrom(e.target.value)}
+                  />
+                  <span className="text-muted-foreground text-xs select-none">–</span>
+                  <Input
+                    type="number"
+                    min={0}
+                    inputMode="numeric"
+                    placeholder="Max age"
+                    className="h-7 text-xs w-20"
+                    value={drillAgeTo}
+                    onChange={e => setDrillAgeTo(e.target.value)}
+                  />
+                </div>
                 {drillStatuses.length > 1 && (
                   <Select value={drillStatus} onValueChange={setDrillStatus}>
                     <SelectTrigger className="h-7 text-xs w-28">
@@ -428,6 +464,7 @@ export function AnalyticsDashboard({ role }: { role: Role }) {
                       <tr className="border-b border-border bg-muted/30">
                         <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">ITS No</th>
                         <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Name</th>
+                        <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Age</th>
                         <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hidden sm:table-cell">Mobile No</th>
                         <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hidden sm:table-cell">Sector</th>
                         <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hidden md:table-cell">Subsector</th>
@@ -439,6 +476,7 @@ export function AnalyticsDashboard({ role }: { role: Role }) {
                         <tr key={m.its_no} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
                           <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">{m.its_no}</td>
                           <td className="px-4 py-2.5 font-medium text-foreground">{m.name}</td>
+                          <td className="px-4 py-2.5 text-muted-foreground tabular-nums">{m.age ?? '-'}</td>
                           <td className="px-4 py-2.5 text-muted-foreground hidden sm:table-cell">{m.phone ?? 'â€"'}</td>
                           <td className="px-4 py-2.5 text-muted-foreground hidden sm:table-cell">{m.sector_name ?? 'â€"'}</td>
                           <td className="px-4 py-2.5 text-muted-foreground hidden md:table-cell">{m.subsector_name ?? 'â€"'}</td>

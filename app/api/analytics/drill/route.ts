@@ -2,6 +2,18 @@ import { NextRequest, NextResponse } from 'next/server'
 import { withAuth } from '@/lib/auth/withAuth'
 import { createClient } from '@/lib/supabase/server'
 
+/** Whole years elapsed since DOB; null when DOB is missing/invalid. */
+function ageFromDob(dob: string | null): number | null {
+  if (!dob) return null
+  const birth = new Date(dob)
+  if (isNaN(birth.getTime())) return null
+  const today = new Date()
+  let age = today.getFullYear() - birth.getFullYear()
+  const m = today.getMonth() - birth.getMonth()
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--
+  return age
+}
+
 export const GET = withAuth(
   ['SuperAdmin', 'Admin', 'Masool', 'Musaid'],
   async (req: NextRequest, { scopedSubsectorIds }) => {
@@ -13,7 +25,7 @@ export const GET = withAuth(
 
     let query = supabase
       .from('mumin')
-      .select('its_no, name, gender, status, phone, subsector_id, subsector!subsector_id(subsector_name, sector_id, sector!sector_id(sector_name))')
+      .select('its_no, name, gender, date_of_birth, status, phone, subsector_id, subsector!subsector_id(subsector_name, sector_id, sector!sector_id(sector_name))')
       .limit(500)
 
     if (scopedSubsectorIds !== null) {
@@ -28,6 +40,7 @@ export const GET = withAuth(
       its_no: number
       name: string
       gender: string | null
+      date_of_birth: string | null
       status: string | null
       phone: string | null
       subsector_id: number | null
@@ -60,6 +73,8 @@ export const GET = withAuth(
       its_no: row.its_no,
       name: row.name,
       gender: row.gender ?? null,
+      date_of_birth: row.date_of_birth ?? null,
+      age: ageFromDob(row.date_of_birth ?? null),
       status: row.status ?? null,
       phone: row.phone ?? null,
       sector_name: row.subsector?.sector?.sector_name ?? null,

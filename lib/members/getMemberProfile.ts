@@ -67,17 +67,20 @@ export async function getMemberProfile(
   if (!row) return null;
 
   return {
-    its_no: row.its_no,
-    name: row.name,
-    gender: row.gender,
+    // its_no/name/gender/balig_status/sabeel_no/subsector_id come from mumin's own
+    // NOT NULL columns via v_member_profile's inner joins; the view's generated type
+    // marks them nullable because Postgres view metadata doesn't carry that guarantee.
+    its_no: row.its_no!,
+    name: row.name!,
+    gender: row.gender as "M" | "F",
     date_of_birth: row.date_of_birth,
-    balig_status: row.balig_status,
+    balig_status: row.balig_status as "Balig" | "Ghair Balig",
     phone: row.phone,
     alternate_phone: row.alternate_phone,
     email: row.email,
-    status: row.status,
-    sabeel_no: row.sabeel_no,
-    subsector_id: row.subsector_id,
+    status: row.status ?? "active",
+    sabeel_no: row.sabeel_no!,
+    subsector_id: row.subsector_id!,
     subsector_name: row.subsector_name ?? "",
     sector_name: row.sector_name ?? "",
     building_name: row.building_name ?? "",

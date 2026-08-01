@@ -11,20 +11,100 @@ const VALID_STATUSES = ['active', 'deceased', 'relocated', 'left_community', 'in
 const VALID_GENDERS = ['M', 'F']
 const VALID_BALIG = ['Balig', 'Ghair Balig']
 
+/** Returns true when value is a real calendar date in YYYY-MM-DD format that lies in the past. */
+function isValidPastDate(value: unknown): value is string {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  const [y, m, d] = value.split('-').map(Number)
+  const dt = new Date(Date.UTC(y, m - 1, d))
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) return false
+  const todayIso = new Date().toISOString().split('T')[0]
+  return value < todayIso
+}
+
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ its_no: string }> },
 ) {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!['SuperAdmin', 'Admin'].includes(session.role)) {
-    return NextResponse.json({ error: 'Forbidden — SuperAdmin/Admin only' }, { status: 403 })
-  }
+
+  // Effective role: staff browsing in "user view mode" (login_mode cookie) are treated as Mumin,
+  // mirroring the contact route and proxy.ts.
+  const loginMode = req.cookies.get('login_mode')?.value ?? 'admin'
+  const effectiveRole = loginMode === 'user' ? 'Mumin' : session.role
 
   const { its_no } = await params
   const targetItsNo = parseInt(its_no, 10)
   if (isNaN(targetItsNo)) {
     return NextResponse.json({ error: 'Invalid ITS No' }, { status: 400 })
+  }
+
+  // ── Self-service branch: a Mumin may set their OWN date_of_birth (and nothing else) ──
+  if (effectiveRole === 'Mumin') {
+    if (session.its_no !== targetItsNo) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    const selfBody = await req.json() as Record<string, unknown>
+    const keys = Object.keys(selfBody)
+    if (keys.length === 0) {
+      return NextResponse.json({ error: 'No fields provided' }, { status: 400 })
+    }
+    if (keys.some((k) => k !== 'date_of_birth')) {
+      return NextResponse.json(
+        { error: 'Forbidden — you may only update your own date_of_birth' },
+        { status: 403 },
+      )
+    }
+
+    const dob = selfBody.date_of_birth
+    if (!isValidPastDate(dob)) {
+      return NextResponse.json(
+        { error: 'date_of_birth must be a valid past date in YYYY-MM-DD format' },
+        { status: 400 },
+      )
+    }
+
+    const selfAdmin = createAdminClient()
+    const { data: currentSelf } = await selfAdmin
+      .from('mumin')
+      .select('date_of_birth')
+      .eq('its_no', targetItsNo)
+      .maybeSingle()
+
+    if (!currentSelf) return NextResponse.json({ error: 'Member not found' }, { status: 404 })
+
+    const { error: selfError } = await selfAdmin
+      .from('mumin')
+      .update({ date_of_birth: dob })
+      .eq('its_no', targetItsNo)
+
+    if (selfError) return NextResponse.json({ error: selfError.message }, { status: 500 })
+
+    // Best-effort activity log — don't fail the request if this errors
+    try {
+      await selfAdmin.from('activity_log').insert({
+        performed_by_its: session.its_no,
+        action: 'edit_member_core',
+        entity_type: 'mumin',
+        entity_id: String(targetItsNo),
+        metadata: {
+          changes: [{
+            field: 'date_of_birth',
+            old_value: String((currentSelf as any).date_of_birth ?? ''),
+            new_value: dob,
+          }],
+          self_service: true,
+        },
+      } as any)
+    } catch { /* non-fatal */ }
+
+    return NextResponse.json({ success: true })
+  }
+
+  // ── Staff branch (unchanged): SuperAdmin/Admin full Tier-1 edit ──
+  if (!['SuperAdmin', 'Admin'].includes(effectiveRole)) {
+    return NextResponse.json({ error: 'Forbidden — SuperAdmin/Admin only' }, { status: 403 })
   }
 
   const body = await req.json() as Record<string, unknown>

@@ -21,7 +21,7 @@ export default async function FormsPage() {
             : 'Create, manage and review masool/musaid forms'}
         </p>
       </div>
-      <FormsClient role={session.role} itsNo={session.its_no} isHof={session.is_hof} />
+      <FormsClient role={session.role} itsNo={session.its_no} isHof={session.is_hof} umoorIds={session.umoor_ids} />
     </div>
   )
 }

@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Pencil, Check, X, Loader2, FileText, Clock, CheckCircle2, Activity, Calendar } from 'lucide-react'
+import { useState, useEffect, useMemo, useRef } from 'react'
+import { Pencil, Check, X, Loader2, FileText, Clock, CheckCircle2, XCircle, Activity, Calendar } from 'lucide-react'
 import Link from 'next/link'
 import { LumaSpin } from '@/components/ui/luma-spin'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { UmoorChipNav } from './UmoorChipNav'
 
 interface ProfileValue {
   field_id: number
@@ -111,6 +112,148 @@ function formatRelative(iso: string): string {
   return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
+function slugify(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+}
+
+function localISODate(d: Date): string {
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${m}-${day}`
+}
+
+function formatDob(iso: string): string {
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return iso
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+function ageFromDob(iso: string): number | null {
+  const dob = new Date(iso)
+  if (isNaN(dob.getTime())) return null
+  const now = new Date()
+  let age = now.getFullYear() - dob.getFullYear()
+  const m = now.getMonth() - dob.getMonth()
+  if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) age--
+  return age >= 0 ? age : null
+}
+
+interface ToastMsg {
+  id: number
+  type: 'success' | 'error'
+  message: string
+}
+
+function DobRow({
+  dob,
+  saving,
+  onSave,
+}: {
+  dob: string | null
+  saving: boolean
+  onSave: (newDob: string) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+  const [error, setError] = useState<string | null>(null)
+
+  const today = localISODate(new Date())
+  const yesterday = new Date()
+  yesterday.setDate(yesterday.getDate() - 1)
+  const maxDate = localISODate(yesterday)
+
+  const startEdit = () => {
+    setDraft(dob ?? '')
+    setError(null)
+    setEditing(true)
+  }
+
+  const cancel = () => {
+    setEditing(false)
+    setError(null)
+  }
+
+  const submit = () => {
+    if (!draft) {
+      setError('Select a date')
+      return
+    }
+    if (draft >= today) {
+      setError('Date of birth must be in the past')
+      return
+    }
+    setEditing(false)
+    setError(null)
+    onSave(draft)
+  }
+
+  const age = dob ? ageFromDob(dob) : null
+
+  return (
+    <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/30 px-4 py-3">
+      <div className="flex min-w-0 items-center gap-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+          <Calendar className="h-4 w-4" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-xs text-muted-foreground">Date of Birth</p>
+          {editing ? (
+            <div className="mt-1">
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="date"
+                  value={draft}
+                  onChange={(e) => {
+                    setDraft(e.target.value)
+                    setError(null)
+                  }}
+                  min="1900-01-01"
+                  max={maxDate}
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') submit()
+                    if (e.key === 'Escape') cancel()
+                  }}
+                  className="text-sm border border-border rounded px-2 py-1 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+                <button onClick={submit} aria-label="Save date of birth" className="p-1 rounded hover:bg-muted text-green-600">
+                  <Check className="w-3.5 h-3.5" />
+                </button>
+                <button onClick={cancel} aria-label="Cancel" className="p-1 rounded hover:bg-muted text-destructive">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              {error && <p className="text-xs text-destructive mt-1">{error}</p>}
+            </div>
+          ) : dob ? (
+            <p className="text-sm font-medium text-foreground">
+              {formatDob(dob)}
+              {age !== null && (
+                <span className="ml-2 text-xs font-normal text-muted-foreground">{age} years</span>
+              )}
+              {saving && <Loader2 className="ml-2 inline w-3.5 h-3.5 animate-spin text-muted-foreground" />}
+            </p>
+          ) : (
+            <button onClick={startEdit} className="text-sm font-medium text-primary hover:underline">
+              Add your date of birth
+            </button>
+          )}
+        </div>
+      </div>
+      {!editing && dob && (
+        <button
+          onClick={startEdit}
+          disabled={saving}
+          aria-label="Edit date of birth"
+          className="p-1.5 rounded hover:bg-muted text-muted-foreground shrink-0 disabled:opacity-50"
+        >
+          <Pencil className="w-3.5 h-3.5" />
+        </button>
+      )}
+    </div>
+  )
+}
+
 function EditableProfileField({
   field,
   itsNo,
@@ -214,6 +357,27 @@ export function MuminPortalTabs({ itsNo }: Props) {
   const [historyValues, setHistoryValues] = useState<HistoricalField[]>([])
   const [profileLoading, setProfileLoading] = useState(true)
 
+  // Date of birth (self-service, saved via /core)
+  const [dob, setDob] = useState<string | null>(null)
+  const [dobSaving, setDobSaving] = useState(false)
+
+  // Umoor section navigation
+  const [activeSectionId, setActiveSectionId] = useState<string | null>(null)
+  const sectionRefs = useRef(new Map<string, HTMLElement>())
+  // While a chip-triggered smooth scroll is in flight, hold that chip active
+  // so intermediate sections don't flicker through the highlight.
+  const scrollLockRef = useRef<{ until: number } | null>(null)
+
+  // Toasts (same idiom as FormsClient)
+  const [toasts, setToasts] = useState<ToastMsg[]>([])
+  const toastCounter = useRef(0)
+
+  function pushToast(type: 'success' | 'error', message: string) {
+    const id = ++toastCounter.current
+    setToasts((prev) => [...prev, { id, type, message }])
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 4000)
+  }
+
   // Forms + Activity tab state (loaded together on first forms/activity tab visit)
   const [forms, setForms] = useState<Form[]>([])
   const [submittedFormIds, setSubmittedFormIds] = useState<Set<string>>(new Set())
@@ -229,6 +393,8 @@ export function MuminPortalTabs({ itsNo }: Props) {
       .then(([pvData, phData]) => {
         setProfileValues(pvData.profile_values ?? [])
         setHistoryValues(phData.history ?? [])
+        // Defensive: `member` lands with the Phase 3 API change
+        setDob(pvData.member?.date_of_birth ?? null)
       })
       .catch(() => {})
       .finally(() => setProfileLoading(false))
@@ -265,7 +431,97 @@ export function MuminPortalTabs({ itsNo }: Props) {
     )
   }
 
-  const mergedCategories = groupAllByCategory(profileValues, historyValues)
+  const mergedCategories = useMemo(() => {
+    const cats = groupAllByCategory(profileValues, historyValues)
+    const seen = new Set<string>()
+    return cats.map((c) => {
+      const base = slugify(c.name) || 'umoor'
+      let id = base
+      let n = 2
+      while (seen.has(id)) id = `${base}-${n++}`
+      seen.add(id)
+      const filled =
+        c.staticFields.filter((f) => f.value !== null && f.value !== '').length +
+        c.historicalFields.filter((f) => f.entries.length > 0).length
+      const total = c.staticFields.length + c.historicalFields.length
+      return { ...c, id, filled, total }
+    })
+  }, [profileValues, historyValues])
+
+  // ── Sticky chip nav geometry ────────────────────────────────────────────────
+  // The Mumin layout branch scrolls the WINDOW; the only fixed overlay is the
+  // portal header (MobileHeader, h-14 = 56px, all breakpoints — `main` uses
+  // pt-20 to clear it). The chip bar sticks at top-14 (56px); sections need
+  // header (56) + chip bar (~48) + breathing room ≈ 112px → scroll-mt-28.
+  const ACTIVATION_LINE_PX = 120
+
+  // Track which section is currently in view (rAF-throttled window scroll).
+  useEffect(() => {
+    if (activeTab !== 'profile' || mergedCategories.length === 0) return
+    let raf = 0
+    const compute = () => {
+      raf = 0
+      const lock = scrollLockRef.current
+      if (lock && Date.now() < lock.until) return
+      const ids = mergedCategories.map((c) => c.id)
+      let current = ids[0]
+      const atBottom =
+        window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2
+      if (atBottom) {
+        // Sections near the end can never reach the activation line
+        current = ids[ids.length - 1]
+      } else {
+        for (const id of ids) {
+          const el = sectionRefs.current.get(id)
+          if (el && el.getBoundingClientRect().top <= ACTIVATION_LINE_PX) current = id
+        }
+      }
+      setActiveSectionId((prev) => (prev === current ? prev : current))
+    }
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(compute)
+    }
+    compute()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('resize', onScroll)
+    return () => {
+      if (raf) cancelAnimationFrame(raf)
+      window.removeEventListener('scroll', onScroll)
+      window.removeEventListener('resize', onScroll)
+    }
+  }, [activeTab, mergedCategories])
+
+  const handleChipClick = (id: string) => {
+    const el = sectionRefs.current.get(id)
+    if (!el) return
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    setActiveSectionId(id)
+    scrollLockRef.current = { until: Date.now() + (reduced ? 150 : 1000) }
+    el.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' })
+  }
+
+  const handleDobSave = async (newDob: string) => {
+    const prev = dob
+    setDob(newDob) // optimistic
+    setDobSaving(true)
+    try {
+      const res = await fetch(`/api/members/${itsNo}/core`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date_of_birth: newDob }),
+      })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        throw new Error(d.error ?? 'Failed to update date of birth')
+      }
+      pushToast('success', 'Date of birth updated.')
+    } catch (e) {
+      setDob(prev)
+      pushToast('error', e instanceof Error ? e.message : 'Failed to update date of birth')
+    } finally {
+      setDobSaving(false)
+    }
+  }
 
   const now = new Date()
   const pendingForms = forms.filter(
@@ -274,9 +530,28 @@ export function MuminPortalTabs({ itsNo }: Props) {
   const completedForms = forms.filter((f) => submittedFormIds.has(f.id))
 
   return (
-    <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
+    // NOTE: no overflow-hidden here — it would break position:sticky for the
+    // chip bar inside the profile tab. TabsList clips its own top corners.
+    <div className="bg-card border border-border rounded-xl shadow-sm">
+      {/* Toast notifications */}
+      {toasts.length > 0 && (
+        <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2">
+          {toasts.map((t) => (
+            <div
+              key={t.id}
+              className={`flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-lg text-sm font-medium transition-all ${
+                t.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+              }`}
+            >
+              {t.type === 'success' ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <XCircle className="w-4 h-4 shrink-0" />}
+              {t.message}
+            </div>
+          ))}
+        </div>
+      )}
+
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'profile' | 'forms' | 'activity')}>
-        <TabsList className="w-full rounded-none border-b border-border h-auto p-0">
+        <TabsList className="w-full rounded-none rounded-t-xl overflow-hidden border-b border-border h-auto p-0">
           <TabsTrigger
             value="profile"
             className="flex-1 py-3 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-primary/5"
@@ -308,47 +583,79 @@ export function MuminPortalTabs({ itsNo }: Props) {
             <div className="flex items-center justify-center py-8">
               <LumaSpin size={36} />
             </div>
-          ) : mergedCategories.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-6">No profile data available yet.</p>
           ) : (
-            <div className="space-y-5">
-              {mergedCategories.map((cat) => (
-                <div key={cat.name}>
-                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                    {cat.name}
-                  </h3>
-                  <div>
-                    {cat.staticFields.map((f) => (
-                      <EditableProfileField
-                        key={f.field_id}
-                        field={f}
-                        itsNo={itsNo}
-                        onSaved={handleFieldSaved}
-                      />
-                    ))}
-                    {cat.historicalFields.map((f) => (
-                      <div key={f.field_id} className="py-2.5 border-b border-border last:border-0">
-                        <p className="text-xs text-muted-foreground mb-0.5">{f.caption}</p>
-                        {f.entries.length === 0 ? (
-                          <p className="text-sm text-muted-foreground italic">No records</p>
-                        ) : (
-                          <div className="space-y-1">
-                            {f.entries.map((e, i) => (
-                              <div key={`${e.submitted_at}-${i}`} className="flex justify-between items-center">
-                                <span className="text-sm font-medium text-foreground">{e.answer}</span>
-                                <span className="text-xs text-muted-foreground ml-2 shrink-0">
-                                  {e.label ?? new Date(e.submitted_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+            <>
+              <DobRow dob={dob} saving={dobSaving} onSave={handleDobSave} />
+
+              {mergedCategories.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-6">No profile data available yet.</p>
+              )}
+
+              {mergedCategories.length > 1 && (
+                <div className="sticky top-14 z-20 -mx-4 mb-4 border-b border-border bg-card px-4 py-2">
+                  <UmoorChipNav
+                    chips={mergedCategories.map((c) => ({
+                      id: c.id,
+                      name: c.name,
+                      filled: c.filled,
+                      total: c.total,
+                    }))}
+                    activeId={activeSectionId}
+                    onChipClick={handleChipClick}
+                  />
                 </div>
-              ))}
-            </div>
+              )}
+
+              <div className="space-y-4">
+                {mergedCategories.map((cat) => (
+                  <section
+                    key={cat.id}
+                    id={`umoor-section-${cat.id}`}
+                    ref={(el) => {
+                      if (el) sectionRefs.current.set(cat.id, el)
+                      else sectionRefs.current.delete(cat.id)
+                    }}
+                    className="scroll-mt-28 overflow-hidden rounded-xl border border-border"
+                  >
+                    <header className="flex items-center justify-between gap-2 border-b border-border bg-muted/40 px-4 py-2.5">
+                      <h3 className="text-sm font-semibold text-foreground">{cat.name}</h3>
+                      <span className="text-xs tabular-nums text-muted-foreground shrink-0">
+                        {cat.filled}/{cat.total} filled
+                      </span>
+                    </header>
+                    <div className="px-4 py-1">
+                      {cat.staticFields.map((f) => (
+                        <EditableProfileField
+                          key={f.field_id}
+                          field={f}
+                          itsNo={itsNo}
+                          onSaved={handleFieldSaved}
+                        />
+                      ))}
+                      {cat.historicalFields.map((f) => (
+                        <div key={f.field_id} className="py-2.5 border-b border-border last:border-0">
+                          <p className="text-xs text-muted-foreground mb-0.5">{f.caption}</p>
+                          {f.entries.length === 0 ? (
+                            <p className="text-sm text-muted-foreground italic">No records</p>
+                          ) : (
+                            <div className="space-y-1">
+                              {f.entries.map((e, i) => (
+                                <div key={`${e.submitted_at}-${i}`} className="flex justify-between items-center">
+                                  <span className="text-sm font-medium text-foreground">{e.answer}</span>
+                                  <span className="text-xs text-muted-foreground ml-2 shrink-0">
+                                    {e.label ?? new Date(e.submitted_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            </>
           )}
         </TabsContent>
 

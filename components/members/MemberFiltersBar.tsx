@@ -79,6 +79,14 @@ export function MemberFiltersBar({
   const [searchValue, setSearchValue] = useState(currentFilters.search ?? '')
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  const [ageFrom, setAgeFrom] = useState(
+    currentFilters.age_from !== undefined ? String(currentFilters.age_from) : '',
+  )
+  const [ageTo, setAgeTo] = useState(
+    currentFilters.age_to !== undefined ? String(currentFilters.age_to) : '',
+  )
+  const ageDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   const [sectors, setSectors] = useState<Sector[]>([])
   const [allSubsectors, setAllSubsectors] = useState<Subsector[]>([])
   const [musaids, setMusaids] = useState<Musaid[]>([])
@@ -138,15 +146,43 @@ export function MemberFiltersBar({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchValue])
 
+  // Debounced age range (mirrors the search input; only pushes valid non-negative integers)
+  useEffect(() => {
+    if (ageDebounceRef.current) clearTimeout(ageDebounceRef.current)
+    ageDebounceRef.current = setTimeout(() => {
+      const params = new URLSearchParams(searchParams.toString())
+      const setOrDelete = (key: string, raw: string) => {
+        if (/^\d+$/.test(raw.trim())) params.set(key, raw.trim())
+        else params.delete(key)
+      }
+      setOrDelete('age_from', ageFrom)
+      setOrDelete('age_to', ageTo)
+      if (params.toString() !== searchParams.toString()) {
+        startTransition(() => {
+          router.push(`${pathname}?${params.toString()}`)
+        })
+      }
+    }, 300)
+    return () => {
+      if (ageDebounceRef.current) clearTimeout(ageDebounceRef.current)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ageFrom, ageTo])
+
   const clearAll = () => {
     setSearchValue('')
+    setAgeFrom('')
+    setAgeTo('')
     startTransition(() => {
       router.push(pathname)
     })
   }
 
   const hasFilters =
-    Object.values(currentFilters).some((v) => v !== undefined && v !== '') || searchValue !== ''
+    Object.values(currentFilters).some((v) => v !== undefined && v !== '') ||
+    searchValue !== '' ||
+    ageFrom !== '' ||
+    ageTo !== ''
 
   const showSectorFilter = role === 'SuperAdmin' || role === 'Admin' || role === 'Masool'
 
@@ -261,6 +297,29 @@ export function MemberFiltersBar({
             <option value="inactive">Inactive</option>
           </select>
           <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+        </div>
+
+        {/* Age range */}
+        <div className="flex items-center gap-1.5">
+          <input
+            type="number"
+            min={0}
+            inputMode="numeric"
+            value={ageFrom}
+            onChange={(e) => setAgeFrom(e.target.value)}
+            placeholder="Min age"
+            className="w-20 px-3 py-2 text-sm bg-card border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
+          />
+          <span className="text-muted-foreground text-xs select-none">–</span>
+          <input
+            type="number"
+            min={0}
+            inputMode="numeric"
+            value={ageTo}
+            onChange={(e) => setAgeTo(e.target.value)}
+            placeholder="Max age"
+            className="w-20 px-3 py-2 text-sm bg-card border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
+          />
         </div>
 
         {/* View All */}

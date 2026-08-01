@@ -35,19 +35,40 @@ export async function PATCH(
       if (isNaN(itsNo)) return NextResponse.json({ error: 'Invalid ITS No' }, { status: 400 })
         
         const body = await request.json() as {
-          role?: 'SuperAdmin' | 'Admin' | 'Masool' | 'Musaid' | 'Mumin'
+          role?: 'SuperAdmin' | 'Admin' | 'Masool' | 'Musaid' | 'Mumin' | 'UmoorCoordinator'
           is_active?: boolean
           sector_ids?: number[]
           subsector_ids?: number[]
+          umoor_ids?: number[]
         }
-        
+
         const admin = createAdminClient()
-        const muminUpdate: Database['public']['Tables']['mumin']['Update'] = {}
-        
+
+  // Fetch the current row up-front: needed for role↔umoor validation and provisioning below
+  const { data: currentRow } = await admin
+    .from('mumin')
+    .select('supabase_auth_id, sabeel_no, role')
+    .eq('its_no', itsNo)
+    .single()
+
+  if (!currentRow) return NextResponse.json({ error: 'Member not found' }, { status: 404 })
+
+  // Validate role ↔ umoor consistency: umoor assignments only make sense for UmoorCoordinator.
+  // (A coordinator with 0 umoors is allowed — they simply see no profile data until assigned.)
+  const effectiveRole = body.role ?? currentRow.role
+  if (body.umoor_ids !== undefined && body.umoor_ids.length > 0 && effectiveRole !== 'UmoorCoordinator') {
+    return NextResponse.json(
+      { error: 'umoor_ids can only be assigned to the UmoorCoordinator role' },
+      { status: 400 }
+    )
+  }
+
+  const muminUpdate: Database['public']['Tables']['mumin']['Update'] = {}
+
   // Update role and/or active status on mumin table
   if (body.role !== undefined) muminUpdate.role = body.role
   if (body.is_active !== undefined) muminUpdate.is_active = body.is_active
-  
+
   if (Object.keys(muminUpdate).length > 0) {
     const { error } = await admin.from('mumin').update(muminUpdate).eq('its_no', itsNo)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -75,12 +96,19 @@ export async function PATCH(
     }
   }
 
+  // Replace umoor assignments (UmoorCoordinator)
+  if (body.umoor_ids !== undefined) {
+    await admin.from('user_umoor').delete().eq('its_no', itsNo)
+    if (body.umoor_ids.length > 0) {
+      const { error } = await admin.from('user_umoor').insert(
+        body.umoor_ids.map(cid => ({ its_no: itsNo, category_id: cid }))
+      )
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+  }
+
   // Check if a Supabase auth account exists; create one if not
-  const { data: muminRow } = await admin
-    .from('mumin')
-    .select('supabase_auth_id, sabeel_no, role')
-    .eq('its_no', itsNo)
-    .single()
+  const muminRow = currentRow
 
   let newAuthId: string | null = muminRow?.supabase_auth_id ?? null
 
@@ -105,6 +133,7 @@ export async function PATCH(
         role: body.role ?? muminRow?.role ?? 'Mumin',
         sector_ids: body.sector_ids ?? [],
         subsector_ids: body.subsector_ids ?? [],
+        umoor_ids: body.umoor_ids ?? [],
         must_change_password: false,
       },
     })

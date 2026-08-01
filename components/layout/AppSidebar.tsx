@@ -13,7 +13,9 @@ import {
   ClipboardList,
   ClipboardCheck,
   FileText,
+  FileSearch,
   LineChart,
+  ListChecks,
   UserCircle,
   ArrowLeftRight,
 } from 'lucide-react'
@@ -38,22 +40,23 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: null,
     items: [
-      { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid', 'Mumin'] },
+      { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid', 'Mumin', 'UmoorCoordinator'] },
     ],
   },
   {
     label: 'MANAGE',
     items: [
-      { label: 'Members', href: ROUTES.MEMBERS, icon: Users, roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid'] },
+      { label: 'Members', href: ROUTES.MEMBERS, icon: Users, roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid', 'UmoorCoordinator'] },
       { label: 'Import', href: ROUTES.IMPORT, icon: Upload, roles: ['SuperAdmin', 'Admin', 'Masool'] },
     ],
   },
   {
     label: 'ACTIVITY',
     items: [
-      { label: 'Forms', href: ROUTES.FORMS, icon: FileText, roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid'] },
+      { label: 'Forms', href: ROUTES.FORMS, icon: FileText, roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid', 'UmoorCoordinator'] },
       { label: 'Requests', href: ROUTES.REQUESTS, icon: ClipboardList, roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid'] },
       { label: 'Analytics', href: '/analytics', icon: LineChart, roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid'] },
+      { label: 'Response Explorer', href: ROUTES.REPORTS, icon: FileSearch, roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid', 'UmoorCoordinator'] },
     ],
   },
   {
@@ -61,6 +64,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: 'Admin', href: ROUTES.ADMIN_USERS, icon: Settings, roles: ['SuperAdmin'] },
       { label: 'Request Review', href: ROUTES.ADMIN_REQUESTS, icon: ClipboardCheck, roles: ['SuperAdmin'] },
+      { label: 'Profile Fields', href: ROUTES.ADMIN_PROFILE_FIELDS, icon: ListChecks, roles: ['SuperAdmin', 'Admin', 'UmoorCoordinator'] },
     ],
   },
 ]
@@ -71,6 +75,7 @@ const ROLE_LABELS: Record<Role, string> = {
   Masool: 'Masool',
   Musaid: 'Musaid',
   Mumin: 'Mumin',
+  UmoorCoordinator: 'Umoor Coordinator',
 }
 
 interface AppSidebarProps {

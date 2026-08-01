@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { AudienceFilters } from "@/lib/types/forms";
+import { ageToDobRange } from "@/lib/members/ageToDobRange";
 
 export async function materializeAudience(
   formId: string,
@@ -37,23 +38,9 @@ export async function materializeAudience(
     }
 
     if (filters.age_from || filters.age_to) {
-      const now = new Date();
-      if (filters.age_to) {
-        const minDob = new Date(
-          now.getFullYear() - filters.age_to,
-          now.getMonth(),
-          now.getDate(),
-        );
-        query = query.gte("date_of_birth", minDob.toISOString().split("T")[0]);
-      }
-      if (filters.age_from) {
-        const maxDob = new Date(
-          now.getFullYear() - filters.age_from,
-          now.getMonth(),
-          now.getDate(),
-        );
-        query = query.lte("date_of_birth", maxDob.toISOString().split("T")[0]);
-      }
+      const { minDob, maxDob } = ageToDobRange(filters.age_from, filters.age_to);
+      if (minDob) query = query.gte("date_of_birth", minDob);
+      if (maxDob) query = query.lte("date_of_birth", maxDob);
     }
   }
 

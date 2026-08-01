@@ -135,7 +135,7 @@ const _fetchSuperAdminStats = unstable_cache(
     const supabase = createAdminClient()
     const { data, error } = await supabase.rpc('get_superadmin_dashboard_stats')
     if (error) throw error
-    return data as SuperAdminStats
+    return data as unknown as SuperAdminStats
   },
   ['dashboard-superadmin'],
   { revalidate: 60, tags: ['dashboard'] }
@@ -154,7 +154,7 @@ const _fetchAdminStats = unstable_cache(
       p_sector_ids: sectorIds,
     })
     if (error) throw error
-    return data as AdminStats
+    return data as unknown as AdminStats
   },
   ['dashboard-admin'],
   { revalidate: 60, tags: ['dashboard'] }
@@ -185,7 +185,7 @@ const _fetchMasoolStats = unstable_cache(
       p_sector_ids: sectorIds,
     })
     if (error) throw error
-    return data as MasoolStats
+    return data as unknown as MasoolStats
   },
   ['dashboard-masool'],
   { revalidate: 60, tags: ['dashboard'] }
@@ -221,7 +221,7 @@ const _fetchMusaidStats = unstable_cache(
       p_subsector_ids: subsectorIds,
     })
     if (error) throw error
-    return data as MusaidStats
+    return data as unknown as MusaidStats
   },
   ['dashboard-musaid'],
   { revalidate: 60, tags: ['dashboard'] }
@@ -269,4 +269,96 @@ const _fetchMuminStats = unstable_cache(
 
 export async function getMuminStats(itsNo: number): Promise<MuminStats | null> {
   return _fetchMuminStats(itsNo)
+}
+
+// ─── Umoor Coordinator (multi-umoor) ─────────────────────────────────────────
+
+export interface UmoorCoordinatorStats {
+  totalMumineen: number;
+  umoors: Array<{
+    category_id: number;
+    name: string;
+    field_count: number;
+    filled_value_count: number;
+    form_count: number;
+    published_form_count: number;
+  }>;
+}
+
+const _fetchUmoorCoordinatorStats = unstable_cache(
+  async (categoryIds: number[]): Promise<UmoorCoordinatorStats> => {
+    const supabase = createAdminClient()
+
+    const [muminCountRes, categoriesRes, fieldsRes, formsRes] = await Promise.all([
+      supabase
+        .from('mumin')
+        .select('its_no', { count: 'exact', head: true })
+        .eq('is_active', true),
+      supabase
+        .from('profile_category')
+        .select('id, name, sort_order')
+        .in('id', categoryIds)
+        .order('sort_order'),
+      supabase
+        .from('profile_field')
+        .select('id, category_id')
+        .in('category_id', categoryIds)
+        .eq('is_active', true),
+      supabase
+        .from('forms')
+        .select('id, umoor_category_id, status')
+        .in('umoor_category_id', categoryIds),
+    ])
+
+    const fields = (fieldsRes.data ?? []) as Array<{ id: number; category_id: number }>
+    const forms = (formsRes.data ?? []) as Array<{ id: string; umoor_category_id: number | null; status: string | null }>
+    const categories = (categoriesRes.data ?? []) as Array<{ id: number; name: string }>
+
+    const fieldIdsByCategory = new Map<number, number[]>()
+    for (const f of fields) {
+      const list = fieldIdsByCategory.get(f.category_id) ?? []
+      list.push(f.id)
+      fieldIdsByCategory.set(f.category_id, list)
+    }
+
+    // Filled profile-value counts per umoor (parallel head-count queries)
+    const filledCounts = await Promise.all(
+      categories.map(async (cat) => {
+        const fieldIds = fieldIdsByCategory.get(cat.id) ?? []
+        if (fieldIds.length === 0) return 0
+        const { count } = await supabase
+          .from('profile_value')
+          .select('id', { count: 'exact', head: true })
+          .in('field_id', fieldIds)
+        return count ?? 0
+      })
+    )
+
+    return {
+      totalMumineen: muminCountRes.count ?? 0,
+      umoors: categories.map((cat, i) => {
+        const catForms = forms.filter((f) => f.umoor_category_id === cat.id)
+        return {
+          category_id: cat.id,
+          name: cat.name,
+          field_count: (fieldIdsByCategory.get(cat.id) ?? []).length,
+          filled_value_count: filledCounts[i],
+          form_count: catForms.length,
+          published_form_count: catForms.filter((f) => f.status === 'published').length,
+        }
+      }),
+    }
+  },
+  ['dashboard-umoor-coordinator'],
+  { revalidate: 60, tags: ['dashboard'] }
+)
+
+export async function getUmoorCoordinatorStats(
+  session: SessionUser,
+): Promise<UmoorCoordinatorStats> {
+  const categoryIds = session.umoor_ids ?? []
+  if (categoryIds.length === 0) {
+    return { totalMumineen: 0, umoors: [] }
+  }
+  return _fetchUmoorCoordinatorStats([...categoryIds].sort((a, b) => a - b))
 }

@@ -4,7 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
 export const GET = withAuth(
-  ['SuperAdmin', 'Admin', 'Masool', 'Musaid'],
+  ['SuperAdmin', 'Admin', 'Masool', 'Musaid', 'UmoorCoordinator'],
   async function handler(req: NextRequest, { session }) {
 
   const sectorId = req.nextUrl.searchParams.get('sector_id')

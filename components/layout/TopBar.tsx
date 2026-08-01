@@ -24,7 +24,10 @@ export async function TopBar({ role, its_no, loginMode }: TopBarProps) {
   ])
 
   const name = muminData?.name ?? `#${its_no}`
-  const initialNotifications = notifData ?? []
+  const initialNotifications = (notifData ?? []).map((n) => ({
+    ...n,
+    created_at: n.created_at ?? new Date().toISOString(),
+  }))
 
   return (
     <div className="hidden md:flex items-center gap-3 px-4 py-2 border-b border-border bg-background">

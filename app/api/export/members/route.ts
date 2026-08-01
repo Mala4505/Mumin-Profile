@@ -4,7 +4,15 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { generateExcel, BASE_COLUMNS, ExportColumn } from '@/lib/export/generateExcel'
 import { resolveScope } from '@/lib/auth/resolveScope'
+import { ageToDobRange } from '@/lib/members/ageToDobRange'
 import type { MemberFilters } from '@/lib/types/app'
+
+/** Parse a non-negative integer age param; invalid values are ignored (same rule as the members page). */
+function parseAgeParam(value: string | null): number | undefined {
+  if (!value || !/^\d+$/.test(value)) return undefined
+  const n = parseInt(value, 10)
+  return Number.isInteger(n) && n >= 0 ? n : undefined
+}
 
 export async function GET(req: NextRequest) {
   const session = await getSession()
@@ -19,6 +27,8 @@ export async function GET(req: NextRequest) {
     balig_status: searchParams.get('balig_status') as 'Balig' | 'Ghair Balig' | undefined || undefined,
     status: searchParams.get('status') as MemberFilters['status'] || undefined,
     search: searchParams.get('search') || undefined,
+    age_from: parseAgeParam(searchParams.get('age_from')),
+    age_to: parseAgeParam(searchParams.get('age_to')),
   }
 
   const scopedSubsectorIds = await resolveScope(session)
@@ -38,6 +48,11 @@ export async function GET(req: NextRequest) {
   if (filters.status) query = query.eq('status', filters.status)
   else query = query.eq('status', 'active')
   if (filters.search) query = query.ilike('name', `%${filters.search}%`)
+
+  // Age range → date_of_birth cutoffs (same semantics as the members list)
+  const { minDob, maxDob } = ageToDobRange(filters.age_from, filters.age_to)
+  if (minDob) query = query.gte('date_of_birth', minDob)
+  if (maxDob) query = query.lte('date_of_birth', maxDob)
 
   const { data, error } = await query
   if (error) return new NextResponse('Export failed', { status: 500 })

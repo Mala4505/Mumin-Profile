@@ -13,9 +13,11 @@ import {
   ClipboardList,
   ClipboardCheck,
   LineChart,
+  ListChecks,
   ArrowLeftRight,
   UserCircle,
   FileText,
+  FileSearch,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -50,13 +52,13 @@ const NAV_ITEMS: NavItem[] = [
     label: 'Dashboard',
     href: '/dashboard',
     icon: LayoutDashboard,
-    roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid', 'Mumin'],
+    roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid', 'Mumin', 'UmoorCoordinator'],
   },
   {
     label: 'Members',
     href: ROUTES.MEMBERS,
     icon: Users,
-    roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid'],
+    roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid', 'UmoorCoordinator'],
   },
   {
     label: 'Import',
@@ -68,7 +70,7 @@ const NAV_ITEMS: NavItem[] = [
     label: 'Forms',
     href: ROUTES.FORMS,
     icon: FileText,
-    roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid'],
+    roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid', 'UmoorCoordinator'],
   },
   {
     label: 'Requests',
@@ -89,10 +91,22 @@ const NAV_ITEMS: NavItem[] = [
     roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid'],
   },
   {
+    label: 'Response Explorer',
+    href: ROUTES.REPORTS,
+    icon: FileSearch,
+    roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid', 'UmoorCoordinator'],
+  },
+  {
     label: 'Request Review',
     href: ROUTES.ADMIN_REQUESTS,
     icon: ClipboardCheck,
     roles: ['SuperAdmin'],
+  },
+  {
+    label: 'Profile Fields',
+    href: ROUTES.ADMIN_PROFILE_FIELDS,
+    icon: ListChecks,
+    roles: ['SuperAdmin', 'Admin', 'UmoorCoordinator'],
   },
 ]
 

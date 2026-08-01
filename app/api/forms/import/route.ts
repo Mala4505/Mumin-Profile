@@ -25,7 +25,7 @@ function parseCsv(text: string): string[][] {
 
 export async function POST(req: NextRequest) {
   const session = await getSession()
-  if (!session || !['SuperAdmin', 'Admin', 'Masool'].includes(session.role)) {
+  if (!session || !['SuperAdmin', 'Admin', 'Masool', 'UmoorCoordinator'].includes(session.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
   // Verify form exists and is accessible
   const { data: form, error: formErr } = await supabase
     .from('forms')
-    .select('id, status, expires_at')
+    .select('id, status, expires_at, umoor_category_id, created_by')
     .eq('id', formId)
     .single()
 
@@ -62,6 +62,20 @@ export async function POST(req: NextRequest) {
   }
   if (form.expires_at && new Date(form.expires_at) < new Date()) {
     return NextResponse.json({ error: 'Form has expired' }, { status: 400 })
+  }
+
+  // UmoorCoordinators may only import into their own forms or forms of their assigned umoors
+  if (session.role === 'UmoorCoordinator') {
+    const isCreator = Number(session.its_no) === form.created_by
+    const isUmoorScoped =
+      form.umoor_category_id !== null &&
+      (session.umoor_ids ?? []).includes(form.umoor_category_id)
+    if (!isCreator && !isUmoorScoped) {
+      return NextResponse.json(
+        { error: 'Forbidden: form is outside your assigned umoors' },
+        { status: 403 },
+      )
+    }
   }
 
   // Read CSV

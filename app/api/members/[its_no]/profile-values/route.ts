@@ -21,23 +21,40 @@ export async function GET(
 
   const admin = createAdminClient()
 
-  // Fetch all profile fields (not just ones with values) so we show all fields
-  const { data: fields, error: fieldsErr } = await admin
+  // Fetch all active profile fields (not just ones with values) so we show all fields.
+  // UmoorCoordinators only see fields belonging to their assigned umoor categories
+  // (app-level filter — this route uses the service-role client which bypasses RLS).
+  let fieldsQuery = admin
     .from('profile_field')
-    .select('id, caption, field_type, visibility_level, is_data_entry, mumin_can_edit, sort_order, profile_category!inner(name, sort_order)')
+    .select('id, category_id, caption, field_type, visibility_level, is_data_entry, mumin_can_edit, sort_order, profile_category!inner(name, sort_order)')
+    .eq('is_active', true)
     .order('sort_order')
 
-  if (fieldsErr) return NextResponse.json({ error: fieldsErr.message }, { status: 500 })
+  if (session.role === 'UmoorCoordinator') {
+    const scopedCategoryIds = session.umoor_ids.length > 0 ? session.umoor_ids : [-1]
+    fieldsQuery = fieldsQuery.in('category_id', scopedCategoryIds)
+  }
 
-  const { data: values } = await admin
-    .from('profile_value')
-    .select('field_id, value, recorded_date')
-    .eq('its_no', targetItsNo)
+  const [{ data: fields, error: fieldsErr }, { data: values }, { data: memberRow }] = await Promise.all([
+    fieldsQuery,
+    admin
+      .from('profile_value')
+      .select('field_id, value, recorded_date')
+      .eq('its_no', targetItsNo),
+    admin
+      .from('mumin')
+      .select('date_of_birth')
+      .eq('its_no', targetItsNo)
+      .maybeSingle(),
+  ])
+
+  if (fieldsErr) return NextResponse.json({ error: fieldsErr.message }, { status: 500 })
 
   const valueByFieldId = new Map((values ?? []).map((v: any) => [v.field_id, v.value]))
 
   const profileValues = (fields ?? []).map((f: any) => ({
     field_id: f.id,
+    category_id: f.category_id,
     caption: f.caption,
     category_name: f.profile_category?.name ?? '',
     category_sort_order: f.profile_category?.sort_order ?? 0,
@@ -49,10 +66,13 @@ export async function GET(
     sort_order: f.sort_order,
   }))
 
-  return NextResponse.json({ profile_values: profileValues })
+  return NextResponse.json({
+    profile_values: profileValues,
+    member: { date_of_birth: (memberRow as any)?.date_of_birth ?? null },
+  })
 }
 
-function getJwtMeta(accessToken: string): { role?: string; its_no?: number; sector_ids?: number[]; subsector_ids?: number[] } {
+function getJwtMeta(accessToken: string): { role?: string; its_no?: number; sector_ids?: number[]; subsector_ids?: number[]; umoor_ids?: number[] } {
   try {
     const b64 = accessToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
     const payload = JSON.parse(Buffer.from(b64, 'base64').toString('utf-8'))
@@ -89,7 +109,7 @@ export async function PATCH(
   // Fetch the field to check permissions
   const { data: field } = await admin
     .from('profile_field')
-    .select('id, visibility_level, mumin_can_edit')
+    .select('id, category_id, visibility_level, mumin_can_edit')
     .eq('id', body.field_id)
     .maybeSingle()
 
@@ -121,6 +141,11 @@ export async function PATCH(
     }
     if (callerRole === 'Musaid' && !meta.subsector_ids?.includes(memberSubsectorId)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+  } else if (effectiveRole === 'UmoorCoordinator') {
+    // Coordinator may edit ANY member, but only fields belonging to their assigned umoors
+    if (!meta.umoor_ids?.includes(field.category_id)) {
+      return NextResponse.json({ error: 'Forbidden: field is outside your assigned umoors' }, { status: 403 })
     }
   } else if (effectiveRole !== 'SuperAdmin') {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
