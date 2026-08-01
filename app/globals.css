@@ -1,5 +1,14 @@
 @import "tailwindcss";
 
+/*
+ * The app ships a light-only palette (no `.dark` token block exists). Tailwind
+ * v4's stock `dark:` variant is `prefers-color-scheme: dark`, which made stray
+ * `dark:` utilities fire on OS-dark devices while every CSS variable stayed
+ * light — producing half-dark badges on white cards. Bind the variant to an
+ * explicit `.dark` class so it stays inert until a real dark theme lands.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   /* ── Page ──────────────────────────────────────────────── */
   --background: #F8FAFC;
@@ -68,6 +77,8 @@
   --color-navy: #0D1B2A;
   --color-amber: #F59E0B;
   --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  /* Extra step for large phones (Pixel/iPhone Plus) between 320px and `sm`. */
+  --breakpoint-xs: 26rem;
   --radius-sm: calc(var(--radius) - 2px);
   --radius-md: var(--radius);
   --radius-lg: calc(var(--radius) + 4px);

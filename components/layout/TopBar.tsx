@@ -7,23 +7,22 @@ import type { Role, LoginMode } from '@/lib/types/app'
 interface TopBarProps {
   role: Role
   its_no: number
+  /** Resolved once in the dashboard layout and shared with MobileHeader. */
+  userName: string
   loginMode: LoginMode
 }
 
-export async function TopBar({ role, its_no, loginMode }: TopBarProps) {
+export async function TopBar({ role, its_no, userName, loginMode }: TopBarProps) {
   const supabase = await createClient()
 
-  const [{ data: muminData }, { data: notifData }] = await Promise.all([
-    supabase.from('mumin').select('name').eq('its_no', its_no).single(),
-    supabase
-      .from('notifications')
-      .select('id, type, title, body, read, related_form_id, created_at')
-      .eq('its_no', its_no)
-      .order('created_at', { ascending: false })
-      .limit(20),
-  ])
+  const { data: notifData } = await supabase
+    .from('notifications')
+    .select('id, type, title, body, read, related_form_id, created_at')
+    .eq('its_no', its_no)
+    .order('created_at', { ascending: false })
+    .limit(20)
 
-  const name = muminData?.name ?? `#${its_no}`
+  const name = userName
   const initialNotifications = (notifData ?? []).map((n) => ({
     ...n,
     created_at: n.created_at ?? new Date().toISOString(),

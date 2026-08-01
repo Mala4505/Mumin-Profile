@@ -5,6 +5,8 @@ import { getSession } from '@/lib/auth/getSession'
 import { getMemberProfile } from '@/lib/members/getMemberProfile'
 import { getFilteredResponses } from '@/lib/members/getFilteredResponses'
 import { MemberProfileView } from '@/components/members/MemberProfileView'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { PAGE_SHELL } from '@/lib/members/display'
 import type { LoginMode } from '@/lib/types/app'
 
 interface PageProps {
@@ -31,21 +33,28 @@ export default async function MemberProfilePage({ params }: PageProps) {
 
   const historicalResponses = await getFilteredResponses(itsNo, session)
 
+  const admin = createAdminClient()
+  const { data: categoryRows } = await admin
+    .from('profile_category')
+    .select('name')
+    .order('sort_order')
+  const allCategories = (categoryRows ?? []).map((c) => c.name)
+
   return (
-    <div className="p-4 md:p-6 lg:p-8">
+    <div className={PAGE_SHELL}>
       {/* Breadcrumb */}
-      <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-6">
+      <nav className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground mb-6">
         <a
           href="/members"
-          className="hover:text-foreground transition-colors"
+          className="shrink-0 hover:text-foreground transition-colors"
         >
           Members
         </a>
-        <ChevronRight className="w-4 h-4" />
-        <span className="text-foreground font-medium">{profile.name}</span>
+        <ChevronRight className="w-4 h-4 shrink-0" />
+        <span className="min-w-0 truncate text-foreground font-medium">{profile.name}</span>
       </nav>
 
-      <MemberProfileView profile={profile} session={session} initialResponses={historicalResponses} loginMode={loginMode} />
+      <MemberProfileView profile={profile} session={session} initialResponses={historicalResponses} loginMode={loginMode} allCategories={allCategories} />
     </div>
   )
 }

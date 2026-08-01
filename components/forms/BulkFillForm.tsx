@@ -23,6 +23,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { LumaSpin } from '@/components/ui/luma-spin'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { MemberIdentity } from '@/components/members/MemberPrimitives'
 
 const PAGE_SIZE = 30
 
@@ -300,8 +301,8 @@ export function BulkFillForm({ formId, role, itsNo }: BulkFillFormProps) {
   if (submitSuccess) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-        <div className="w-14 h-14 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-          <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
+        <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center">
+          <CheckCircle className="w-8 h-8 text-green-600" />
         </div>
         <p className="text-base font-semibold text-foreground">Form submitted successfully!</p>
         <p className="text-sm text-muted-foreground">Redirecting to forms…</p>
@@ -369,7 +370,7 @@ export function BulkFillForm({ formId, role, itsNo }: BulkFillFormProps) {
             {/* Autosave indicator */}
             {saveStatus !== 'idle' && (
               <div className={`flex items-center gap-1.5 text-xs font-medium transition-all ${
-                saveStatus === 'saving' ? 'text-muted-foreground' : 'text-green-600 dark:text-green-400'
+                saveStatus === 'saving' ? 'text-muted-foreground' : 'text-green-600'
               }`}>
                 {saveStatus === 'saving' ? (
                   <Loader2 className="w-3 h-3 animate-spin" />
@@ -403,7 +404,7 @@ export function BulkFillForm({ formId, role, itsNo }: BulkFillFormProps) {
 
         {/* Draft restored banner */}
         {draftRestored && (
-          <div className="flex items-center justify-between gap-2.5 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 text-blue-800 dark:text-blue-300 rounded-lg px-4 py-3 text-sm">
+          <div className="flex items-center justify-between gap-2.5 bg-blue-50 border border-blue-200 text-blue-800 rounded-lg px-4 py-3 text-sm">
             <div className="flex items-center gap-2">
               <History className="w-4 h-4 shrink-0" />
               Draft restored — your previous progress has been loaded.
@@ -423,7 +424,7 @@ export function BulkFillForm({ formId, role, itsNo }: BulkFillFormProps) {
 
         {/* Load error banner */}
         {loadError && (
-          <div className="flex items-center gap-2.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 text-amber-800 dark:text-amber-300 rounded-lg px-4 py-3 text-sm">
+          <div className="flex items-center gap-2.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-4 py-3 text-sm">
             <AlertTriangle className="w-4 h-4 shrink-0" />
             {loadError}
           </div>
@@ -465,7 +466,7 @@ export function BulkFillForm({ formId, role, itsNo }: BulkFillFormProps) {
         {members.length > 0 && (
           <div className="flex items-center gap-4 px-4 py-2.5 bg-muted/30 rounded-lg border border-border text-xs text-muted-foreground">
             <span>
-              <span className="font-semibold text-green-700 dark:text-green-400">{filledCount}</span>
+              <span className="font-semibold text-green-700">{filledCount}</span>
               {' '}/ {members.length} fully filled
             </span>
             <span className="text-border">·</span>
@@ -483,7 +484,7 @@ export function BulkFillForm({ formId, role, itsNo }: BulkFillFormProps) {
 
         {/* Empty state */}
         {!loadError && members.length === 0 && (
-          <div className="bg-card border border-border rounded-xl px-5 py-16 text-center">
+          <div className="bg-card rounded-xl border border-border shadow-sm px-5 py-16 text-center">
             <p className="text-sm font-medium text-foreground mb-1">No audience members assigned</p>
             <p className="text-xs text-muted-foreground">
               Publish this form first so the audience is materialised.
@@ -493,7 +494,7 @@ export function BulkFillForm({ formId, role, itsNo }: BulkFillFormProps) {
 
         {/* Data grid */}
         {members.length > 0 && (
-          <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
+          <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm border-collapse">
                 <thead>
@@ -510,10 +511,10 @@ export function BulkFillForm({ formId, role, itsNo }: BulkFillFormProps) {
                           <span>{q.question_text}</span>
                           <div className="flex items-center justify-between gap-2">
                             <div
-                              className={`flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded-md w-fit ${
+                              className={`flex items-center gap-1 text-[11px] sm:text-[10px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded-md w-fit ${
                                 q.behavior === 'static'
-                                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                                  : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                                  ? 'bg-blue-100 text-blue-700'
+                                  : 'bg-amber-100 text-amber-700'
                               }`}
                             >
                               {q.behavior === 'static' ? (
@@ -531,7 +532,7 @@ export function BulkFillForm({ formId, role, itsNo }: BulkFillFormProps) {
                                   )
                                   setQuickFillValue('')
                                 }}
-                                className={`flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded transition-colors ${
+                                className={`flex items-center gap-0.5 text-[11px] sm:text-[10px] font-semibold px-1.5 py-0.5 rounded transition-colors ${
                                   quickFillFieldId === q.profile_field_id
                                     ? 'bg-primary/10 text-primary'
                                     : 'text-muted-foreground hover:text-primary hover:bg-primary/10'
@@ -558,7 +559,7 @@ export function BulkFillForm({ formId, role, itsNo }: BulkFillFormProps) {
                               <button
                                 onClick={() => handleQuickFill(q.profile_field_id, quickFillValue)}
                                 disabled={!quickFillValue}
-                                className="px-2 py-1.5 bg-primary text-primary-foreground rounded-md text-[10px] font-semibold disabled:opacity-40 whitespace-nowrap hover:bg-primary/90 transition-colors"
+                                className="px-2 py-1.5 bg-primary text-primary-foreground rounded-md text-[11px] sm:text-[10px] font-semibold disabled:opacity-40 whitespace-nowrap hover:bg-primary/90 transition-colors"
                               >
                                 Apply
                               </button>
@@ -576,17 +577,12 @@ export function BulkFillForm({ formId, role, itsNo }: BulkFillFormProps) {
                     return (
                       <tr
                         key={member.its_no}
-                        className={`hover:bg-muted/20 transition-colors group ${filled ? 'bg-green-50/30 dark:bg-green-900/5' : ''}`}
+                        className={`hover:bg-muted/20 transition-colors group ${filled ? 'bg-green-50/30' : ''}`}
                       >
-                        <td className={`p-4 sticky left-0 z-10 border-r border-border/50 group-hover:bg-muted/20 ${filled ? 'bg-green-50/30 dark:bg-green-900/5' : 'bg-card'}`}>
+                        <td className={`p-4 sticky left-0 z-10 border-r border-border/50 group-hover:bg-muted/20 ${filled ? 'bg-green-50/30' : 'bg-card'}`}>
                           <div className="flex items-center gap-2">
-                            {filled && <CheckCircle className="w-3.5 h-3.5 text-green-600 dark:text-green-400 shrink-0" />}
-                            <div>
-                              <div className="font-semibold text-foreground">{member.name}</div>
-                              <div className="text-xs font-mono text-muted-foreground">
-                                {member.its_no}
-                              </div>
-                            </div>
+                            {filled && <CheckCircle className="w-3.5 h-3.5 text-green-600 shrink-0" />}
+                            <MemberIdentity name={member.name} itsNo={member.its_no} size="sm" />
                           </div>
                         </td>
                         {visibleQuestions.map((q) => {

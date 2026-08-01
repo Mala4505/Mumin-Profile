@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
-import { createClient } from '@/lib/supabase/client'
 import type { FillerAccess } from '@/lib/types/forms'
 import type { Role } from '@/lib/types/app'
 import type { FormDraft } from '../FormBuilder'
@@ -142,13 +141,12 @@ export function Step4Access({ draft, update, onNext, onBack }: Props) {
   const specificMusaid = (fillers.find((f) => f.type === 'specific_musaid') as { type: 'specific_musaid'; value: number[] } | undefined)?.value ?? []
 
   useEffect(() => {
-    const supabase = createClient()
-    supabase.from('mumin').select('its_no, name').eq('role', 'Masool').then(({ data }) =>
-      setMasools((data ?? []).map((d) => ({ its_no: d.its_no as number, name: d.name })))
-    )
-    supabase.from('mumin').select('its_no, name').eq('role', 'Musaid').then(({ data }) =>
-      setMusaids((data ?? []).map((d) => ({ its_no: d.its_no as number, name: d.name })))
-    )
+    fetch('/api/members/by-role?role=Masool')
+      .then((res) => res.json())
+      .then((json) => setMasools((json.members ?? []) as MuminOption[]))
+    fetch('/api/members/by-role?role=Musaid')
+      .then((res) => res.json())
+      .then((json) => setMusaids((json.members ?? []) as MuminOption[]))
   }, [])
 
   function buildFillers(patch: {

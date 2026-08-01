@@ -38,12 +38,25 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import {
+  BaligPill,
+  GenderPill,
+  InfoField,
+  INFO_GRID,
+  MemberAvatar,
+  MemberIdentity,
+  MemberStatusBadge,
+  SectionCard,
+  SectionHeader,
+} from '@/components/members/MemberPrimitives'
+import { TOUCH_TARGET } from '@/lib/members/display'
 
 interface Props {
   profile: MemberProfile
   session: SessionUser
   initialResponses?: InitialResponse[]
   loginMode?: LoginMode
+  allCategories?: string[]
 }
 
 interface HistoryEntry {
@@ -69,75 +82,6 @@ interface InitialResponse {
   submitted_at: string
   remarks: string | null
   event_title: string | null
-}
-
-const STATUS_STYLES: Record<string, string> = {
-  active: 'bg-green-100 text-green-700 border border-green-200',
-  deceased: 'bg-gray-100 text-gray-500 border border-gray-200',
-  relocated: 'bg-blue-100 text-blue-700 border border-blue-200',
-  left_community: 'bg-red-100 text-red-700 border border-red-200',
-  inactive: 'bg-yellow-100 text-yellow-700 border border-yellow-200',
-}
-
-const STATUS_LABELS: Record<string, string> = {
-  active: 'Active',
-  deceased: 'Deceased',
-  relocated: 'Relocated',
-  left_community: 'Left Community',
-  inactive: 'Inactive',
-}
-
-const UMOOR_CATEGORIES = [
-  'Deeniyah', 'Talimiyah', 'Kharejiyah', 'Dakheliyah',
-  'Sehhat', 'Faizul Mawaidil Burhaniyah', 'Mawarid Bashariyah',
-  'Iqtesaadiyah', 'Maliyah', 'Amlaak', 'Marafiq Burhaniyah', 'Qaza',
-]
-
-function InfoField({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <span className="block text-xs text-muted-foreground mb-0.5">{label}</span>
-      <span className="text-sm font-medium text-foreground">{value || '—'}</span>
-    </div>
-  )
-}
-
-function GenderPill({ gender }: { gender: 'M' | 'F' }) {
-  const isMale = gender === 'M'
-  return (
-    <span
-      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${
-        isMale
-          ? 'bg-blue-100 text-blue-700 border border-blue-200'
-          : 'bg-pink-100 text-pink-700 border border-pink-200'
-      }`}
-    >
-      {isMale ? (
-        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="10" cy="14" r="5" /><line x1="19" y1="5" x2="14.14" y2="9.86" /><polyline points="15 5 19 5 19 9" />
-        </svg>
-      ) : (
-        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="9" r="5" /><line x1="12" y1="14" x2="12" y2="22" /><line x1="9" y1="19" x2="15" y2="19" />
-        </svg>
-      )}
-      {isMale ? 'Male' : 'Female'}
-    </span>
-  )
-}
-
-function BaligPill({ status }: { status: string }) {
-  if (status === 'Balig')
-    return (
-      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700 border border-orange-200">
-        Balig
-      </span>
-    )
-  return (
-    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700 border border-yellow-200">
-      Ghair Balig
-    </span>
-  )
 }
 
 // ── Static editable field ────────────────────────────────────────────────────
@@ -189,38 +133,43 @@ function EditableField({
               if (e.key === 'Enter') save()
               if (e.key === 'Escape') cancel()
             }}
-            className="flex-1 h-8 text-sm"
+            className="flex-1 min-w-0 h-11 sm:h-9 text-sm"
           />
           <button
             onClick={save}
             disabled={saving}
-            className="p-1 rounded text-green-600 hover:bg-green-50 disabled:opacity-50"
+            className={`${TOUCH_TARGET} shrink-0 rounded text-green-600 hover:bg-green-50 disabled:opacity-50`}
+            title="Save"
           >
             {saving ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
-              <Check className="w-3.5 h-3.5" />
+              <Check className="w-4 h-4" />
             )}
           </button>
           <button
             onClick={cancel}
-            className="p-1 rounded text-muted-foreground hover:bg-muted/40"
+            className={`${TOUCH_TARGET} shrink-0 rounded text-muted-foreground hover:bg-muted/40`}
+            title="Cancel"
           >
-            <X className="w-3.5 h-3.5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
       ) : (
         <div className="flex items-center justify-between gap-2">
-          <span className="text-sm font-medium text-foreground">{field.value ?? '—'}</span>
+          <span className="min-w-0 text-sm font-medium text-foreground break-words">
+            {field.value ?? '—'}
+          </span>
           {canEdit && (
             <button
               onClick={() => {
                 setVal(field.value ?? '')
                 setEditing(true)
               }}
-              className="opacity-0 group-hover:opacity-100 p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-all"
+              className={`${TOUCH_TARGET} shrink-0 rounded text-muted-foreground opacity-100 transition-all hover:text-foreground hover:bg-muted/40 md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100`}
+              title="Edit"
             >
-              <Pencil className="w-3 h-3" />
+              <Pencil className="w-4 h-4 md:w-3 md:h-3" />
             </button>
           )}
         </div>
@@ -256,15 +205,17 @@ function HistoricalField({
             <div key={i} className="relative">
               <div className="absolute -left-[17px] top-1.5 w-2 h-2 rounded-full bg-primary/40" />
               <div className="flex justify-between items-baseline gap-2">
-                <span className="text-sm font-semibold text-foreground">{entry.answer}</span>
-                <span className="text-[10px] font-mono text-muted-foreground flex-shrink-0">
+                <span className="min-w-0 text-sm font-semibold text-foreground break-words">
+                  {entry.answer}
+                </span>
+                <span className="text-[11px] sm:text-[10px] font-mono text-muted-foreground flex-shrink-0">
                   {new Date(entry.submitted_at).toLocaleDateString('en-GB', {
                     day: '2-digit',
                     month: 'short',
                   })}
                 </span>
               </div>
-              <p className="text-[10px] text-muted-foreground italic">
+              <p className="text-[11px] sm:text-[10px] text-muted-foreground italic break-words">
                 {entry.event_title ?? 'Record'}
               </p>
             </div>
@@ -275,7 +226,7 @@ function HistoricalField({
       {history.length > 3 && (
         <button
           onClick={onViewAll}
-          className="mt-2 text-xs text-primary hover:underline flex items-center gap-1"
+          className="mt-1 inline-flex items-center gap-1 min-h-11 sm:min-h-8 text-xs text-primary hover:underline"
         >
           <Clock className="w-3 h-3" />
           View all {history.length} records
@@ -311,7 +262,7 @@ function UmoorSection({
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
       {fields.map((f) => {
         if (f.behavior === 'historical') {
           return (
@@ -337,7 +288,7 @@ function UmoorSection({
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export function MemberProfileView({ profile, session, initialResponses = [], loginMode = 'admin' }: Props) {
+export function MemberProfileView({ profile, session, initialResponses = [], loginMode = 'admin', allCategories = [] }: Props) {
   const router = useRouter()
   const effectiveRole = loginMode === 'user' ? 'Mumin' : session.role
   const isStaff =
@@ -362,7 +313,7 @@ export function MemberProfileView({ profile, session, initialResponses = [], log
   const [contactSaving, setContactSaving] = useState(false)
   const [contactError, setContactError] = useState('')
   const [displayProfile, setDisplayProfile] = useState(profile)
-  const [activeTab, setActiveTab] = useState<string>(UMOOR_CATEGORIES[0])
+  const [activeTab, setActiveTab] = useState<string>(allCategories[0] ?? '')
   const [openAccordion, setOpenAccordion] = useState<string | null>(null)
 
   // Historical data
@@ -498,16 +449,16 @@ export function MemberProfileView({ profile, session, initialResponses = [], log
   const dataCategories = Object.keys(categoriesMap)
 
   // Coordinators only get tabs for the umoors present in their (already scoped)
-  // data; other roles keep the full hardcoded taxonomy plus any extra categories.
+  // data; other roles keep the full DB taxonomy plus any extra categories.
   const orderedCategories = isCoordinator
     ? dataCategories
     : [
-        ...UMOOR_CATEGORIES,
-        ...dataCategories.filter((cat) => !UMOOR_CATEGORIES.includes(cat)),
+        ...allCategories,
+        ...dataCategories.filter((cat) => !allCategories.includes(cat)),
       ]
 
   // Keep the active tab valid when the derived category list doesn't include it
-  // (e.g. coordinator whose first umoor isn't the first hardcoded category)
+  // (e.g. coordinator whose first umoor isn't the first DB category)
   useEffect(() => {
     if (orderedCategories.length > 0 && !orderedCategories.includes(activeTab)) {
       setActiveTab(orderedCategories[0])
@@ -515,49 +466,31 @@ export function MemberProfileView({ profile, session, initialResponses = [], log
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderedCategories.join('|')])
 
-  const initials = displayProfile.name
-    .split(' ')
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? '')
-    .join('')
-  const statusCls =
-    STATUS_STYLES[displayProfile.status] ?? 'bg-gray-100 text-gray-500 border border-gray-200'
-  const statusLabel = STATUS_LABELS[displayProfile.status] ?? displayProfile.status
-
-
   return (
     <div className="space-y-5">
       {/* Hero Card */}
-      <div className="bg-card rounded-xl border border-border shadow-sm p-5">
+      <SectionCard className="p-4 sm:p-5">
         <div className="flex gap-3 items-start">
-          <div className="relative flex-shrink-0">
-            <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center text-lg font-bold select-none">
-              {initials}
-            </div>
-            <span
-              className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-card ${
-                displayProfile.status === 'active' ? 'bg-green-500' : 'bg-gray-400'
-              }`}
-            />
-          </div>
+          <MemberAvatar
+            name={displayProfile.name}
+            status={displayProfile.status}
+            size="md"
+          />
 
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
-              <div>
-                <h1 className="text-lg font-bold text-foreground leading-tight">
-                  {displayProfile.name}
-                </h1>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  ITS {displayProfile.its_no}
-                  <span className="mx-1.5">·</span>
-                  Sabeel {displayProfile.sabeel_no}
-                </p>
-              </div>
-              <div className="flex items-center gap-1">
+              <MemberIdentity
+                name={displayProfile.name}
+                itsNo={displayProfile.its_no}
+                sabeelNo={displayProfile.sabeel_no}
+                size="lg"
+                className="min-w-0 flex-1"
+              />
+              <div className="flex shrink-0 items-center gap-1">
                 {canDirectEdit && (
                   <button
                     onClick={() => setCoreEditOpen(true)}
-                    className="flex-shrink-0 px-2 py-1 rounded-lg text-xs font-medium text-muted-foreground border border-border hover:text-foreground hover:bg-muted/40 transition-colors flex items-center gap-1"
+                    className="flex shrink-0 items-center gap-1 min-h-11 sm:min-h-8 px-3 sm:px-2 rounded-lg text-xs font-medium text-muted-foreground border border-border hover:text-foreground hover:bg-muted/40 transition-colors"
                     title="Edit member details"
                   >
                     <Pencil className="w-3 h-3" />
@@ -575,7 +508,7 @@ export function MemberProfileView({ profile, session, initialResponses = [], log
                       })
                       setContactEditOpen(true)
                     }}
-                    className="flex-shrink-0 p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+                    className={`${TOUCH_TARGET} shrink-0 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors`}
                     title="Edit contact info"
                   >
                     <Pencil className="w-4 h-4" />
@@ -585,28 +518,24 @@ export function MemberProfileView({ profile, session, initialResponses = [], log
             </div>
 
             <div className="flex flex-wrap items-center gap-1.5 mt-2">
-              <span
-                className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${statusCls}`}
-              >
-                {statusLabel}
-              </span>
-              <GenderPill gender={displayProfile.gender} />
-              <BaligPill status={displayProfile.balig_status} />
+              <MemberStatusBadge status={displayProfile.status} size="md" />
+              <GenderPill gender={displayProfile.gender} size="md" />
+              <BaligPill status={displayProfile.balig_status} size="md" />
             </div>
           </div>
         </div>
 
-        <div className="border-t border-border mt-4 pt-4 grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-3">
+        <div className={`border-t border-border mt-4 pt-4 ${INFO_GRID}`}>
           {displayProfile.date_of_birth && (
             <InfoField label="Date of Birth" value={displayProfile.date_of_birth} />
           )}
-          <InfoField label="Phone" value={displayProfile.phone ?? '—'} />
+          <InfoField label="Phone" value={displayProfile.phone} />
           {isStaff && (
-            <InfoField label="Alt. Phone" value={displayProfile.alternate_phone ?? '—'} />
+            <InfoField label="Alt. Phone" value={displayProfile.alternate_phone} />
           )}
-          {isStaff && <InfoField label="Email" value={displayProfile.email ?? '—'} />}
+          {isStaff && <InfoField label="Email" value={displayProfile.email} />}
         </div>
-      </div>
+      </SectionCard>
 
       {/* Core Edit Modal (SuperAdmin/Admin) */}
       {canDirectEdit && (
@@ -738,44 +667,44 @@ export function MemberProfileView({ profile, session, initialResponses = [], log
           }
         }}
       >
-        <SheetContent side="right" className="w-full sm:max-w-xl flex flex-col p-0">
+        <SheetContent side="right" className="sm:max-w-xl flex flex-col p-0">
           {/* Header */}
-          <SheetHeader className="px-5 pt-5 pb-4 border-b border-border shrink-0">
-            <SheetTitle className="flex items-center gap-2 text-base">
+          <SheetHeader className="pb-4 border-b border-border shrink-0 space-y-1">
+            <SheetTitle className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-base">
               <History className="w-4 h-4 text-amber-500 shrink-0" />
-              {historyModal?.caption}
+              <span className="min-w-0 break-words">{historyModal?.caption}</span>
               <span className="font-normal text-muted-foreground">— Full History</span>
             </SheetTitle>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-xs text-muted-foreground break-words">
               {profile.name} · ITS {profile.its_no}
             </p>
           </SheetHeader>
 
           {/* Filters */}
-          <div className="px-5 py-3 border-b border-border bg-muted/30 shrink-0">
+          <div className="px-4 sm:px-6 py-3 border-b border-border bg-muted/30 shrink-0">
             <div className="flex items-center gap-2 mb-2">
-              <Filter className="w-3.5 h-3.5 text-muted-foreground" />
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <Filter className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+              <span className="text-[11px] sm:text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Filter by Date Range
               </span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="flex-1 relative">
-                <CalendarRange className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative flex-1 min-w-[7.5rem]">
+                <CalendarRange className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
                 <Input
                   type="date"
-                  className="pl-8 h-8 text-xs"
+                  className="pl-8 h-11 sm:h-9 text-xs"
                   value={historyFrom}
                   onChange={e => setHistoryFrom(e.target.value)}
                   placeholder="From"
                 />
               </div>
               <span className="text-xs text-muted-foreground shrink-0">to</span>
-              <div className="flex-1 relative">
-                <CalendarRange className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+              <div className="relative flex-1 min-w-[7.5rem]">
+                <CalendarRange className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
                 <Input
                   type="date"
-                  className="pl-8 h-8 text-xs"
+                  className="pl-8 h-11 sm:h-9 text-xs"
                   value={historyTo}
                   onChange={e => setHistoryTo(e.target.value)}
                   placeholder="To"
@@ -785,7 +714,7 @@ export function MemberProfileView({ profile, session, initialResponses = [], log
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-8 text-xs px-2"
+                  className="h-11 sm:h-9 text-xs px-3 ml-auto"
                   onClick={() => { setHistoryFrom(''); setHistoryTo('') }}
                 >
                   Clear
@@ -796,7 +725,7 @@ export function MemberProfileView({ profile, session, initialResponses = [], log
 
           {/* Entry count */}
           {!historyLoading && (
-            <div className="px-5 py-2 shrink-0 flex items-center justify-between">
+            <div className="px-4 sm:px-6 py-2 shrink-0 flex items-center justify-between">
               <span className="text-xs text-muted-foreground">
                 {fullHistory.length} record{fullHistory.length !== 1 ? 's' : ''}
                 {(historyFrom || historyTo) ? ' (filtered)' : ''}
@@ -805,7 +734,7 @@ export function MemberProfileView({ profile, session, initialResponses = [], log
           )}
 
           {/* Timeline entries */}
-          <div className="flex-1 overflow-y-auto px-5 pb-6">
+          <div className="flex-1 overflow-y-auto overscroll-contain px-4 sm:px-6 pb-6">
             {historyLoading ? (
               <div className="space-y-3 pt-2">
                 {[1, 2, 3, 4].map(i => (
@@ -837,10 +766,10 @@ export function MemberProfileView({ profile, session, initialResponses = [], log
                       <div className="bg-card border border-border rounded-xl p-4 shadow-sm">
                         {/* Answer */}
                         <div className="flex items-start justify-between gap-3 mb-2">
-                          <p className="text-sm font-bold text-foreground leading-snug">
+                          <p className="min-w-0 text-sm font-bold text-foreground leading-snug break-words">
                             {entry.answer ?? '—'}
                           </p>
-                          <span className="text-[10px] font-mono text-muted-foreground whitespace-nowrap shrink-0 pt-0.5">
+                          <span className="text-[11px] sm:text-[10px] font-mono text-muted-foreground whitespace-nowrap shrink-0 pt-0.5">
                             {new Date(entry.submitted_at).toLocaleDateString('en-GB', {
                               day: '2-digit',
                               month: 'short',
@@ -853,7 +782,7 @@ export function MemberProfileView({ profile, session, initialResponses = [], log
                         {entry.event_title && (
                           <Badge
                             variant="outline"
-                            className="text-[10px] h-5 px-1.5 mb-2 font-normal text-muted-foreground border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800"
+                            className="text-[11px] sm:text-[10px] h-auto py-0.5 px-1.5 mb-2 font-normal text-muted-foreground border-amber-200 bg-amber-50 whitespace-normal break-words"
                           >
                             {entry.event_title}
                           </Badge>
@@ -869,8 +798,8 @@ export function MemberProfileView({ profile, session, initialResponses = [], log
                         {/* Filled by */}
                         {entry.filled_by_name && (
                           <div className="flex items-center gap-1.5 mt-2.5">
-                            <User className="w-3 h-3 text-muted-foreground/60" />
-                            <span className="text-[10px] text-muted-foreground">
+                            <User className="w-3 h-3 shrink-0 text-muted-foreground/60" />
+                            <span className="min-w-0 text-[11px] sm:text-[10px] text-muted-foreground break-words">
                               Filled by{' '}
                               <span className="font-medium text-foreground">
                                 {entry.filled_by_name}
@@ -893,12 +822,13 @@ export function MemberProfileView({ profile, session, initialResponses = [], log
 
       {/* Location Card */}
       {(isStaff || isOwnProfile) && (
-        <div className="bg-card rounded-xl border border-border shadow-sm p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <MapPin className="w-4 h-4 text-primary" />
-            <h2 className="text-sm font-semibold text-foreground">Location</h2>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-4">
+        <SectionCard className="p-4 sm:p-5">
+          <SectionHeader
+            icon={<MapPin className="w-4 h-4 shrink-0 text-primary" />}
+            title="Location"
+            className="mb-4"
+          />
+          <div className={INFO_GRID}>
             <InfoField label="Sector" value={displayProfile.sector_name} />
             <InfoField label="Subsector" value={displayProfile.subsector_name} />
             <InfoField label="Building" value={displayProfile.building_name} />
@@ -913,20 +843,21 @@ export function MemberProfileView({ profile, session, initialResponses = [], log
               <InfoField label="Flat" value={displayProfile.flat_no} />
             )}
           </div>
-        </div>
+        </SectionCard>
       )}
 
       {/* 12 Umoor Section */}
-      <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-        <div className="flex items-center gap-2 px-5 pt-5 pb-4 border-b border-border">
-          <BookOpen className="w-4 h-4 text-primary" />
-          <h2 className="text-sm font-semibold text-foreground">12 Umoor Profile</h2>
-        </div>
+      <SectionCard className="overflow-hidden">
+        <SectionHeader
+          icon={<BookOpen className="w-4 h-4 shrink-0 text-primary" />}
+          title="12 Umoor Profile"
+          className="px-4 sm:px-5 pt-5 pb-4 border-b border-border"
+        />
 
         {/* Desktop Tabs */}
-        <div className="hidden md:block">
+        <div className="hidden lg:block">
           <div className="px-4 pt-4 pb-0">
-            <div className="flex gap-1 overflow-x-auto bg-muted rounded-xl p-1">
+            <div className="flex gap-1 overflow-x-auto scroll-smooth snap-x bg-muted rounded-xl p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {orderedCategories.map((cat) => {
                 const hasData = (categoriesMap[cat]?.length ?? 0) > 0
                 const isActive = activeTab === cat
@@ -934,7 +865,7 @@ export function MemberProfileView({ profile, session, initialResponses = [], log
                   <button
                     key={cat}
                     onClick={() => setActiveTab(cat)}
-                    className={`relative flex-shrink-0 px-3 py-1.5 text-sm rounded-lg transition-all whitespace-nowrap ${
+                    className={`relative flex-shrink-0 snap-start inline-flex items-center min-h-11 sm:min-h-9 px-3 py-1.5 text-sm rounded-lg transition-all whitespace-nowrap ${
                       isActive
                         ? 'bg-card shadow-sm text-primary font-semibold'
                         : 'text-muted-foreground hover:text-foreground'
@@ -949,7 +880,7 @@ export function MemberProfileView({ profile, session, initialResponses = [], log
               })}
             </div>
           </div>
-          <div className="p-5">
+          <div className="p-4 sm:p-5">
             <UmoorSection
               fields={categoriesMap[activeTab] ?? []}
               historicalData={historicalData}
@@ -960,8 +891,8 @@ export function MemberProfileView({ profile, session, initialResponses = [], log
           </div>
         </div>
 
-        {/* Mobile Accordion */}
-        <div className="md:hidden divide-y divide-border">
+        {/* Mobile / tablet Accordion */}
+        <div className="lg:hidden divide-y divide-border">
           {orderedCategories.map((cat) => {
             const hasData = (categoriesMap[cat]?.length ?? 0) > 0
             const isOpen = openAccordion === cat
@@ -969,16 +900,16 @@ export function MemberProfileView({ profile, session, initialResponses = [], log
               <div key={cat}>
                 <button
                   onClick={() => setOpenAccordion(isOpen ? null : cat)}
-                  className="w-full flex items-center justify-between px-4 py-3.5 text-left hover:bg-muted/30 transition-colors"
+                  className="w-full flex items-center justify-between gap-2 min-h-11 px-4 py-3.5 text-left hover:bg-muted/30 transition-colors"
                 >
-                  <span className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-foreground">{cat}</span>
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="text-sm font-medium text-foreground break-words">{cat}</span>
                     {hasData && (
                       <span className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
                     )}
                   </span>
                   <ChevronDown
-                    className={`w-4 h-4 text-muted-foreground transition-transform ${
+                    className={`w-4 h-4 shrink-0 text-muted-foreground transition-transform ${
                       isOpen ? 'rotate-180' : ''
                     }`}
                   />
@@ -1000,7 +931,7 @@ export function MemberProfileView({ profile, session, initialResponses = [], log
             )
           })}
         </div>
-      </div>
+      </SectionCard>
     </div>
   )
 }

@@ -13,6 +13,21 @@ import {
   DialogDescription,
   DialogClose,
 } from '@/components/ui/dialog'
+import { Chip, MemberIdentity } from '@/components/members/MemberPrimitives'
+import { TOUCH_TARGET } from '@/lib/members/display'
+
+/** Canonical table-header typography, shared with every other table in the app. */
+const TH = 'px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground'
+
+/**
+ * Request status is a different semantic domain from member status, so it keeps
+ * its own colours — but it renders through the shared `Chip` for matching geometry.
+ */
+const REQUEST_STATUS_TONE: Record<string, string> = {
+  done: 'bg-green-100 text-green-700 border-green-200',
+  rejected: 'bg-red-100 text-red-700 border-red-200',
+  pending: 'bg-amber-100 text-amber-700 border-amber-200',
+}
 
 
 interface Family {
@@ -344,7 +359,7 @@ export function RequestsClient({ families, initialRequests, mode, currentSearch,
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Family List */}
-        <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm flex flex-col">
+        <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden flex flex-col">
           <div className="px-4 py-3 border-b border-border bg-muted/40 flex items-center justify-between shrink-0">
             <h2 className="font-semibold text-foreground text-sm">
               Families{' '}
@@ -372,7 +387,7 @@ export function RequestsClient({ families, initialRequests, mode, currentSearch,
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-mono text-xs text-muted-foreground">{f.sabeel_no}</span>
                       {f.subsector_name && (
-                        <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                        <span className="text-[11px] sm:text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
                           {f.subsector_name}
                         </span>
                       )}
@@ -392,7 +407,7 @@ export function RequestsClient({ families, initialRequests, mode, currentSearch,
         </div>
 
         {/* Request Form */}
-        <div className="bg-card border border-border rounded-xl p-5 flex flex-col gap-4">
+        <div className="bg-card rounded-xl border border-border shadow-sm p-5 flex flex-col gap-4">
           <h2 className="font-semibold text-foreground">Submit Request</h2>
 
           {selected ? (
@@ -411,16 +426,22 @@ export function RequestsClient({ families, initialRequests, mode, currentSearch,
                     Change
                   </button>
                 </div>
-                <p className="text-sm font-semibold text-foreground">{selected.hof_name}</p>
-                <div className="flex items-center gap-3 flex-wrap">
-                  <span className="font-mono text-xs text-muted-foreground">Sabeel: {selected.sabeel_no}</span>
-                  {selected.building_name !== '—' && (
-                    <span className="text-xs text-muted-foreground">{selected.building_name}</span>
-                  )}
-                  {selected.hof_phone && (
-                    <span className="text-xs text-muted-foreground">{selected.hof_phone}</span>
-                  )}
-                </div>
+                <MemberIdentity
+                  name={selected.hof_name}
+                  itsNo={selected.hof_its}
+                  sabeelNo={selected.sabeel_no}
+                  size="sm"
+                  meta={
+                    <>
+                      {selected.building_name !== '—' && (
+                        <><span className="mx-1.5">·</span>{selected.building_name}</>
+                      )}
+                      {selected.hof_phone && (
+                        <><span className="mx-1.5">·</span>{selected.hof_phone}</>
+                      )}
+                    </>
+                  }
+                />
               </div>
 
               {/* Remark */}
@@ -541,14 +562,13 @@ export function RequestsClient({ families, initialRequests, mode, currentSearch,
                                 key={m.its_no}
                                 type="button"
                                 onClick={() => handleEditMemberSelect(m)}
-                                className={`w-full text-left px-3 py-2 text-sm transition-colors hover:bg-muted/40 flex items-center justify-between gap-2 ${
+                                className={`w-full min-h-11 text-left px-3 py-2 text-sm transition-colors hover:bg-muted/40 flex items-center gap-2 ${
                                   editSelectedMember?.its_no === m.its_no
                                     ? 'bg-primary/5 border-l-2 border-l-primary'
                                     : ''
                                 }`}
                               >
-                                <span className="font-medium text-foreground truncate">{m.name}</span>
-                                <span className="font-mono text-xs text-muted-foreground shrink-0">{m.its_no}</span>
+                                <MemberIdentity name={m.name} itsNo={m.its_no} size="sm" />
                               </button>
                             ))}
                           </div>
@@ -643,7 +663,7 @@ export function RequestsClient({ families, initialRequests, mode, currentSearch,
       <div>
         <h2 className="text-base font-semibold text-foreground mb-3">My Requests</h2>
         {requests.length === 0 ? (
-          <div className="bg-card border border-border rounded-lg p-8 text-center text-sm text-muted-foreground">
+          <div className="bg-card rounded-xl border border-border shadow-sm p-8 text-center text-sm text-muted-foreground">
             No requests submitted yet.
           </div>
         ) : (
@@ -657,15 +677,16 @@ export function RequestsClient({ families, initialRequests, mode, currentSearch,
 
 function RequestsTable({ requests, onDelete }: { requests: ChangeRequest[], onDelete: (id: number) => void }) {
   return (
-    <div className="bg-card border border-border rounded-lg overflow-hidden">
+    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+      <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead className="bg-muted/40">
           <tr>
-            <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Sabeel</th>
-            <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Remark</th>
-            <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hidden sm:table-cell">Date</th>
-            <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Status</th>
-            <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
+            <th className={TH}>Sabeel</th>
+            <th className={TH}>Remark</th>
+            <th className={`${TH} hidden sm:table-cell`}>Date</th>
+            <th className={TH}>Status</th>
+            <th className={TH}>Actions</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
@@ -677,23 +698,15 @@ function RequestsTable({ requests, onDelete }: { requests: ChangeRequest[], onDe
                 {new Date(r.created_at).toLocaleDateString()}
               </td>
               <td className="px-4 py-3">
-                <span
-                  className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
-                    r.status === 'done'
-                      ? 'bg-green-100 text-green-700'
-                      : r.status === 'rejected'
-                      ? 'bg-red-100 text-red-700'
-                      : 'bg-amber-100 text-amber-700'
-                  }`}
-                >
+                <Chip tone={REQUEST_STATUS_TONE[r.status] ?? REQUEST_STATUS_TONE.pending}>
                   {r.status === 'done' ? 'Done' : r.status === 'rejected' ? 'Rejected' : 'Pending'}
-                </span>
+                </Chip>
               </td>
               <td className="px-4 py-3">
                 <Dialog>
                   <DialogTrigger asChild>
                     <button
-                      className="p-1 rounded hover:bg-muted/20 transition-colors"
+                      className={`${TOUCH_TARGET} rounded hover:bg-muted/20 transition-colors`}
                       aria-label="Delete request"
                     >
                       <Trash2Icon className="w-4 h-4 text-red-600" />
@@ -726,6 +739,7 @@ function RequestsTable({ requests, onDelete }: { requests: ChangeRequest[], onDe
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   )
 }

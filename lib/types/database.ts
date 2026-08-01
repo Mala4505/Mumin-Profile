@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.4"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       activity_log: {
@@ -61,15 +86,88 @@ export type Database = {
             foreignKeyName: "activity_log_performed_by_fkey"
             columns: ["performed_by_its"]
             isOneToOne: false
-            referencedRelation: "mumin_auth"
+            referencedRelation: "v_member_profile"
+            referencedColumns: ["its_no"]
+          },
+        ]
+      }
+      auth_accounts: {
+        Row: {
+          created_at: string
+          default_credential: string | null
+          force_relogin_at: string | null
+          has_custom_password: boolean
+          is_active: boolean
+          its_no: number
+          last_login_at: string | null
+          login_credential: string
+          must_change_password: boolean
+          paci_no: string | null
+          role: string
+          sabeel_no: string
+          supabase_auth_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          default_credential?: string | null
+          force_relogin_at?: string | null
+          has_custom_password?: boolean
+          is_active?: boolean
+          its_no: number
+          last_login_at?: string | null
+          login_credential?: string
+          must_change_password?: boolean
+          paci_no?: string | null
+          role?: string
+          sabeel_no: string
+          supabase_auth_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          default_credential?: string | null
+          force_relogin_at?: string | null
+          has_custom_password?: boolean
+          is_active?: boolean
+          its_no?: number
+          last_login_at?: string | null
+          login_credential?: string
+          must_change_password?: boolean
+          paci_no?: string | null
+          role?: string
+          sabeel_no?: string
+          supabase_auth_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "auth_accounts_its_no_fkey"
+            columns: ["its_no"]
+            isOneToOne: true
+            referencedRelation: "member_directory"
             referencedColumns: ["its_no"]
           },
           {
-            foreignKeyName: "activity_log_performed_by_fkey"
-            columns: ["performed_by_its"]
-            isOneToOne: false
+            foreignKeyName: "auth_accounts_its_no_fkey"
+            columns: ["its_no"]
+            isOneToOne: true
+            referencedRelation: "mumin"
+            referencedColumns: ["its_no"]
+          },
+          {
+            foreignKeyName: "auth_accounts_its_no_fkey"
+            columns: ["its_no"]
+            isOneToOne: true
             referencedRelation: "v_member_profile"
             referencedColumns: ["its_no"]
+          },
+          {
+            foreignKeyName: "auth_accounts_role_fkey"
+            columns: ["role"]
+            isOneToOne: false
+            referencedRelation: "role_master"
+            referencedColumns: ["role_name"]
           },
         ]
       }
@@ -174,13 +272,6 @@ export type Database = {
             foreignKeyName: "change_request_requested_by_fkey"
             columns: ["requested_by"]
             isOneToOne: false
-            referencedRelation: "mumin_auth"
-            referencedColumns: ["its_no"]
-          },
-          {
-            foreignKeyName: "change_request_requested_by_fkey"
-            columns: ["requested_by"]
-            isOneToOne: false
             referencedRelation: "v_member_profile"
             referencedColumns: ["its_no"]
           },
@@ -196,13 +287,6 @@ export type Database = {
             columns: ["reviewed_by"]
             isOneToOne: false
             referencedRelation: "mumin"
-            referencedColumns: ["its_no"]
-          },
-          {
-            foreignKeyName: "change_request_reviewed_by_fkey"
-            columns: ["reviewed_by"]
-            isOneToOne: false
-            referencedRelation: "mumin_auth"
             referencedColumns: ["its_no"]
           },
           {
@@ -281,13 +365,6 @@ export type Database = {
             foreignKeyName: "event_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
-            referencedRelation: "mumin_auth"
-            referencedColumns: ["its_no"]
-          },
-          {
-            foreignKeyName: "event_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
             referencedRelation: "v_member_profile"
             referencedColumns: ["its_no"]
           },
@@ -337,13 +414,6 @@ export type Database = {
             columns: ["exported_by"]
             isOneToOne: false
             referencedRelation: "mumin"
-            referencedColumns: ["its_no"]
-          },
-          {
-            foreignKeyName: "export_log_exported_by_fkey"
-            columns: ["exported_by"]
-            isOneToOne: false
-            referencedRelation: "mumin_auth"
             referencedColumns: ["its_no"]
           },
           {
@@ -432,13 +502,6 @@ export type Database = {
             foreignKeyName: "form_audience_its_no_fkey"
             columns: ["its_no"]
             isOneToOne: false
-            referencedRelation: "mumin_auth"
-            referencedColumns: ["its_no"]
-          },
-          {
-            foreignKeyName: "form_audience_its_no_fkey"
-            columns: ["its_no"]
-            isOneToOne: false
             referencedRelation: "v_member_profile"
             referencedColumns: ["its_no"]
           },
@@ -495,94 +558,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "forms"
             referencedColumns: ["id"]
-          },
-        ]
-      }
-      form_filler_member_status: {
-        Row: {
-          filler_its_no: number
-          form_id: string
-          last_updated: string
-          member_its_no: number
-          status: string
-        }
-        Insert: {
-          filler_its_no: number
-          form_id: string
-          last_updated?: string
-          member_its_no: number
-          status?: string
-        }
-        Update: {
-          filler_its_no?: number
-          form_id?: string
-          last_updated?: string
-          member_its_no?: number
-          status?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "form_filler_member_status_filler_its_no_fkey"
-            columns: ["filler_its_no"]
-            isOneToOne: false
-            referencedRelation: "member_directory"
-            referencedColumns: ["its_no"]
-          },
-          {
-            foreignKeyName: "form_filler_member_status_filler_its_no_fkey"
-            columns: ["filler_its_no"]
-            isOneToOne: false
-            referencedRelation: "mumin"
-            referencedColumns: ["its_no"]
-          },
-          {
-            foreignKeyName: "form_filler_member_status_filler_its_no_fkey"
-            columns: ["filler_its_no"]
-            isOneToOne: false
-            referencedRelation: "mumin_auth"
-            referencedColumns: ["its_no"]
-          },
-          {
-            foreignKeyName: "form_filler_member_status_filler_its_no_fkey"
-            columns: ["filler_its_no"]
-            isOneToOne: false
-            referencedRelation: "v_member_profile"
-            referencedColumns: ["its_no"]
-          },
-          {
-            foreignKeyName: "form_filler_member_status_form_id_fkey"
-            columns: ["form_id"]
-            isOneToOne: false
-            referencedRelation: "forms"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "form_filler_member_status_member_its_no_fkey"
-            columns: ["member_its_no"]
-            isOneToOne: false
-            referencedRelation: "member_directory"
-            referencedColumns: ["its_no"]
-          },
-          {
-            foreignKeyName: "form_filler_member_status_member_its_no_fkey"
-            columns: ["member_its_no"]
-            isOneToOne: false
-            referencedRelation: "mumin"
-            referencedColumns: ["its_no"]
-          },
-          {
-            foreignKeyName: "form_filler_member_status_member_its_no_fkey"
-            columns: ["member_its_no"]
-            isOneToOne: false
-            referencedRelation: "mumin_auth"
-            referencedColumns: ["its_no"]
-          },
-          {
-            foreignKeyName: "form_filler_member_status_member_its_no_fkey"
-            columns: ["member_its_no"]
-            isOneToOne: false
-            referencedRelation: "v_member_profile"
-            referencedColumns: ["its_no"]
           },
         ]
       }
@@ -652,13 +627,6 @@ export type Database = {
             foreignKeyName: "form_responses_filled_by_fkey"
             columns: ["filled_by"]
             isOneToOne: false
-            referencedRelation: "mumin_auth"
-            referencedColumns: ["its_no"]
-          },
-          {
-            foreignKeyName: "form_responses_filled_by_fkey"
-            columns: ["filled_by"]
-            isOneToOne: false
             referencedRelation: "v_member_profile"
             referencedColumns: ["its_no"]
           },
@@ -681,13 +649,6 @@ export type Database = {
             columns: ["filled_for"]
             isOneToOne: false
             referencedRelation: "mumin"
-            referencedColumns: ["its_no"]
-          },
-          {
-            foreignKeyName: "form_responses_its_no_fkey"
-            columns: ["filled_for"]
-            isOneToOne: false
-            referencedRelation: "mumin_auth"
             referencedColumns: ["its_no"]
           },
           {
@@ -783,13 +744,6 @@ export type Database = {
             foreignKeyName: "forms_approved_by_fkey"
             columns: ["approved_by"]
             isOneToOne: false
-            referencedRelation: "mumin_auth"
-            referencedColumns: ["its_no"]
-          },
-          {
-            foreignKeyName: "forms_approved_by_fkey"
-            columns: ["approved_by"]
-            isOneToOne: false
             referencedRelation: "v_member_profile"
             referencedColumns: ["its_no"]
           },
@@ -805,13 +759,6 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "mumin"
-            referencedColumns: ["its_no"]
-          },
-          {
-            foreignKeyName: "forms_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "mumin_auth"
             referencedColumns: ["its_no"]
           },
           {
@@ -976,13 +923,6 @@ export type Database = {
             foreignKeyName: "import_log_imported_by_fkey"
             columns: ["imported_by"]
             isOneToOne: false
-            referencedRelation: "mumin_auth"
-            referencedColumns: ["its_no"]
-          },
-          {
-            foreignKeyName: "import_log_imported_by_fkey"
-            columns: ["imported_by"]
-            isOneToOne: false
             referencedRelation: "v_member_profile"
             referencedColumns: ["its_no"]
           },
@@ -1015,24 +955,18 @@ export type Database = {
           email: string | null
           email_verified: boolean
           family_type: string | null
-          force_relogin_at: string | null
           gender: string
-          is_active: boolean
           is_hof: boolean
           its_no: number
-          last_login_at: string | null
-          must_change_password: boolean
           name: string
           notes: string | null
           phone: string | null
           phone_verified: boolean
-          role: string
           sabeel_no: string
           status: string
           status_changed_at: string | null
           status_notes: string | null
           subsector_id: number
-          supabase_auth_id: string | null
           updated_at: string
         }
         Insert: {
@@ -1043,24 +977,18 @@ export type Database = {
           email?: string | null
           email_verified?: boolean
           family_type?: string | null
-          force_relogin_at?: string | null
           gender: string
-          is_active?: boolean
           is_hof?: boolean
           its_no: number
-          last_login_at?: string | null
-          must_change_password?: boolean
           name: string
           notes?: string | null
           phone?: string | null
           phone_verified?: boolean
-          role?: string
           sabeel_no: string
           status?: string
           status_changed_at?: string | null
           status_notes?: string | null
           subsector_id: number
-          supabase_auth_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -1071,34 +999,21 @@ export type Database = {
           email?: string | null
           email_verified?: boolean
           family_type?: string | null
-          force_relogin_at?: string | null
           gender?: string
-          is_active?: boolean
           is_hof?: boolean
           its_no?: number
-          last_login_at?: string | null
-          must_change_password?: boolean
           name?: string
           notes?: string | null
           phone?: string | null
           phone_verified?: boolean
-          role?: string
           sabeel_no?: string
           status?: string
           status_changed_at?: string | null
           status_notes?: string | null
           subsector_id?: number
-          supabase_auth_id?: string | null
           updated_at?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "mumin_role_fkey"
-            columns: ["role"]
-            isOneToOne: false
-            referencedRelation: "role_master"
-            referencedColumns: ["role_name"]
-          },
           {
             foreignKeyName: "mumin_sabeel_no_fkey"
             columns: ["sabeel_no"]
@@ -1166,13 +1081,6 @@ export type Database = {
             columns: ["its_no"]
             isOneToOne: false
             referencedRelation: "mumin"
-            referencedColumns: ["its_no"]
-          },
-          {
-            foreignKeyName: "notifications_its_no_fkey"
-            columns: ["its_no"]
-            isOneToOne: false
-            referencedRelation: "mumin_auth"
             referencedColumns: ["its_no"]
           },
           {
@@ -1321,13 +1229,6 @@ export type Database = {
             foreignKeyName: "fk_profile_value_updated_by"
             columns: ["updated_by"]
             isOneToOne: false
-            referencedRelation: "mumin_auth"
-            referencedColumns: ["its_no"]
-          },
-          {
-            foreignKeyName: "fk_profile_value_updated_by"
-            columns: ["updated_by"]
-            isOneToOne: false
             referencedRelation: "v_member_profile"
             referencedColumns: ["its_no"]
           },
@@ -1350,13 +1251,6 @@ export type Database = {
             columns: ["its_no"]
             isOneToOne: false
             referencedRelation: "mumin"
-            referencedColumns: ["its_no"]
-          },
-          {
-            foreignKeyName: "profile_value_its_no_fkey"
-            columns: ["its_no"]
-            isOneToOne: false
-            referencedRelation: "mumin_auth"
             referencedColumns: ["its_no"]
           },
           {
@@ -1388,68 +1282,6 @@ export type Database = {
           sort_order?: number
         }
         Relationships: []
-      }
-      saved_report: {
-        Row: {
-          column_config: Json
-          created_at: string
-          created_by: number
-          filter_config: Json
-          id: number
-          is_public: boolean
-          name: string
-          updated_at: string
-        }
-        Insert: {
-          column_config?: Json
-          created_at?: string
-          created_by: number
-          filter_config?: Json
-          id?: number
-          is_public?: boolean
-          name: string
-          updated_at?: string
-        }
-        Update: {
-          column_config?: Json
-          created_at?: string
-          created_by?: number
-          filter_config?: Json
-          id?: number
-          is_public?: boolean
-          name?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "saved_report_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "member_directory"
-            referencedColumns: ["its_no"]
-          },
-          {
-            foreignKeyName: "saved_report_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "mumin"
-            referencedColumns: ["its_no"]
-          },
-          {
-            foreignKeyName: "saved_report_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "mumin_auth"
-            referencedColumns: ["its_no"]
-          },
-          {
-            foreignKeyName: "saved_report_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "v_member_profile"
-            referencedColumns: ["its_no"]
-          },
-        ]
       }
       sector: {
         Row: {
@@ -1610,13 +1442,6 @@ export type Database = {
             foreignKeyName: "user_umoor_its_no_fkey"
             columns: ["its_no"]
             isOneToOne: false
-            referencedRelation: "mumin_auth"
-            referencedColumns: ["its_no"]
-          },
-          {
-            foreignKeyName: "user_umoor_its_no_fkey"
-            columns: ["its_no"]
-            isOneToOne: false
             referencedRelation: "v_member_profile"
             referencedColumns: ["its_no"]
           },
@@ -1648,31 +1473,6 @@ export type Database = {
           status: string | null
           subsector_id: number | null
           subsector_name: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "family_paci_no_fkey"
-            columns: ["paci_no"]
-            isOneToOne: false
-            referencedRelation: "house"
-            referencedColumns: ["paci_no"]
-          },
-          {
-            foreignKeyName: "mumin_sabeel_no_fkey"
-            columns: ["sabeel_no"]
-            isOneToOne: false
-            referencedRelation: "family"
-            referencedColumns: ["sabeel_no"]
-          },
-        ]
-      }
-      mumin_auth: {
-        Row: {
-          is_active: boolean | null
-          its_no: number | null
-          paci_no: string | null
-          sabeel_no: string | null
-          supabase_auth_id: string | null
         }
         Relationships: [
           {
@@ -1937,6 +1737,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },

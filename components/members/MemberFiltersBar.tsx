@@ -4,6 +4,8 @@ import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState, TransitionStartFunction } from 'react'
 import { Search, SlidersHorizontal, ChevronDown, X, Eye } from 'lucide-react'
 import type { MemberFilters, Role } from '@/lib/types/app'
+import { GENDER_LABELS, MUMIN_STATUS_LABELS } from '@/lib/constants'
+import { STATUS_SHORT_LABELS } from '@/lib/members/display'
 
 interface Sector {
   sector_id: number
@@ -30,21 +32,32 @@ interface Props {
   startTransition: TransitionStartFunction
 }
 
+// `truncate`/`max-w` do nothing to a native <select>'s option list and only
+// clipped long subsector labels, so the control is fluid inside its flex parent.
 const selectClass =
-  'appearance-none bg-card border border-border rounded-lg px-3 py-2 pr-8 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors cursor-pointer max-w-[200px] truncate'
+  'appearance-none w-full bg-card border border-border rounded-lg px-3 py-2 pr-8 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors cursor-pointer'
+
+const inputClass =
+  'px-3 py-2 text-sm bg-card border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors'
+
+/** Fluid flex item for each native <select>, capped so one control can't hog the row. */
+const SELECT_WRAP = 'relative flex-1 min-w-40 sm:max-w-64'
 
 type PillGroup = {
   key: string
   options: Array<{ label: string; value: string }>
 }
 
+/**
+ * Single source of truth for the filter vocabularies — derived from the shared
+ * label maps so the pills, the status <select> and the table can never drift.
+ */
+const STATUS_ORDER = ['active', 'deceased', 'relocated', 'left_community', 'inactive']
+
 const PILL_GROUPS: PillGroup[] = [
   {
     key: 'gender',
-    options: [
-      { label: 'Male', value: 'M' },
-      { label: 'Female', value: 'F' },
-    ],
+    options: (['M', 'F'] as const).map((value) => ({ label: GENDER_LABELS[value], value })),
   },
   {
     key: 'balig_status',
@@ -55,13 +68,10 @@ const PILL_GROUPS: PillGroup[] = [
   },
   {
     key: 'status',
-    options: [
-      { label: 'Active', value: 'active' },
-      { label: 'Deceased', value: 'deceased' },
-      { label: 'Relocated', value: 'relocated' },
-      { label: 'Left', value: 'left_community' },
-      { label: 'Inactive', value: 'inactive' },
-    ],
+    options: STATUS_ORDER.map((value) => ({
+      label: STATUS_SHORT_LABELS[value] ?? value,
+      value,
+    })),
   },
 ]
 
@@ -227,7 +237,7 @@ export function MemberFiltersBar({
 
         {/* Sector */}
         {showSectorFilter && sectors.length > 0 && (
-          <div className="relative">
+          <div className={SELECT_WRAP}>
             <select
               value={currentFilters.sector_id ?? ''}
               onChange={(e) => updateFilter('sector_id', e.target.value)}
@@ -246,7 +256,7 @@ export function MemberFiltersBar({
 
         {/* Subsector */}
         {dedupedSubsectors.length > 0 && (
-          <div className="relative">
+          <div className={SELECT_WRAP}>
             <select
               value={currentFilters.subsector_id ?? ''}
               onChange={(e) => updateFilter('subsector_id', e.target.value)}
@@ -265,7 +275,7 @@ export function MemberFiltersBar({
 
         {/* Musaid */}
         {musaids.length > 0 && (
-          <div className="relative">
+          <div className={SELECT_WRAP}>
             <select
               value={currentFilters.musaid_its_no ?? ''}
               onChange={(e) => updateFilter('musaid_its_no', e.target.value)}
@@ -283,24 +293,24 @@ export function MemberFiltersBar({
         )}
 
         {/* Status */}
-        <div className="relative">
+        <div className={SELECT_WRAP}>
           <select
             value={currentFilters.status ?? ''}
             onChange={(e) => updateFilter('status', e.target.value)}
             className={selectClass}
           >
             <option value="">Active only</option>
-            <option value="active">Active</option>
-            <option value="deceased">Deceased</option>
-            <option value="relocated">Relocated</option>
-            <option value="left_community">Left Community</option>
-            <option value="inactive">Inactive</option>
+            {STATUS_ORDER.map((value) => (
+              <option key={value} value={value}>
+                {MUMIN_STATUS_LABELS[value] ?? value}
+              </option>
+            ))}
           </select>
           <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
         </div>
 
         {/* Age range */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-1 items-center gap-1.5 min-w-56 sm:max-w-64">
           <input
             type="number"
             min={0}
@@ -308,7 +318,8 @@ export function MemberFiltersBar({
             value={ageFrom}
             onChange={(e) => setAgeFrom(e.target.value)}
             placeholder="Min age"
-            className="w-20 px-3 py-2 text-sm bg-card border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
+            aria-label="Minimum age"
+            className={`w-full min-w-24 ${inputClass}`}
           />
           <span className="text-muted-foreground text-xs select-none">–</span>
           <input
@@ -318,7 +329,8 @@ export function MemberFiltersBar({
             value={ageTo}
             onChange={(e) => setAgeTo(e.target.value)}
             placeholder="Max age"
-            className="w-20 px-3 py-2 text-sm bg-card border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
+            aria-label="Maximum age"
+            className={`w-full min-w-24 ${inputClass}`}
           />
         </div>
 
@@ -357,7 +369,7 @@ export function MemberFiltersBar({
                   <button
                     key={opt.value}
                     onClick={() => togglePill(group.key, opt.value)}
-                    className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+                    className={`inline-flex items-center justify-center min-h-9 sm:min-h-8 px-3 rounded-full text-xs font-medium border transition-colors ${
                       isActive
                         ? 'bg-primary text-primary-foreground border-primary'
                         : 'bg-background text-muted-foreground border-border hover:border-primary/50 hover:text-foreground'
@@ -367,7 +379,7 @@ export function MemberFiltersBar({
                   </button>
                 )
               })}
-              <span className="text-border text-xs select-none">|</span>
+              <span className="hidden sm:inline text-border text-xs select-none">|</span>
             </div>
           )
         })}

@@ -5,6 +5,7 @@ import { Pencil, Check, X, Loader2, FileText, Clock, CheckCircle2, XCircle, Acti
 import Link from 'next/link'
 import { LumaSpin } from '@/components/ui/luma-spin'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { InfoField } from '@/components/members/MemberPrimitives'
 import { UmoorChipNav } from './UmoorChipNav'
 
 interface ProfileValue {
@@ -298,47 +299,48 @@ function EditableProfileField({
   }
 
   return (
-    <div className="group flex items-start justify-between gap-2 py-2.5 border-b border-border last:border-0">
-      <div className="flex-1 min-w-0">
-        <p className="text-xs text-muted-foreground mb-0.5">{field.caption}</p>
-        {editing ? (
-          <div className="space-y-1">
+    <div className="group rounded-lg border border-border/60 bg-muted/30 p-3">
+      {editing ? (
+        <div className="min-w-0">
+          <span className="mb-1 block text-xs text-muted-foreground">{field.caption}</span>
+          <div className="flex items-center gap-1.5">
             <input
               type="text"
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              className="w-full text-sm border border-border rounded px-2 py-1 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              className="min-w-0 flex-1 text-sm border border-border rounded px-2 py-1 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
               autoFocus
               onKeyDown={(e) => {
                 if (e.key === 'Enter') save()
                 if (e.key === 'Escape') cancel()
               }}
             />
-            {error && <p className="text-xs text-destructive">{error}</p>}
+            <button
+              onClick={save}
+              disabled={saving}
+              aria-label={`Save ${field.caption}`}
+              className="shrink-0 p-1 rounded hover:bg-muted text-green-600 disabled:opacity-50"
+            >
+              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+            </button>
+            <button
+              onClick={cancel}
+              aria-label="Cancel"
+              className="shrink-0 p-1 rounded hover:bg-muted text-destructive"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
           </div>
-        ) : (
-          <p className="text-sm font-medium text-foreground">{field.value || <span className="text-muted-foreground italic">Not set</span>}</p>
-        )}
-      </div>
-      {field.mumin_can_edit && (
-        <div className="flex items-center gap-1 shrink-0 pt-4">
-          {editing ? (
-            <>
-              <button
-                onClick={save}
-                disabled={saving}
-                className="p-1 rounded hover:bg-muted text-green-600 disabled:opacity-50"
-              >
-                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-              </button>
-              <button onClick={cancel} className="p-1 rounded hover:bg-muted text-destructive">
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </>
-          ) : (
+          {error && <p className="text-xs text-destructive mt-1">{error}</p>}
+        </div>
+      ) : (
+        <div className="flex items-start justify-between gap-2">
+          <InfoField label={field.caption} value={field.value} />
+          {field.mumin_can_edit && (
             <button
               onClick={() => setEditing(true)}
-              className="p-1 rounded hover:bg-muted text-muted-foreground md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+              aria-label={`Edit ${field.caption}`}
+              className="shrink-0 p-1 rounded hover:bg-muted text-muted-foreground transition-opacity md:opacity-0 md:group-hover:opacity-100"
             >
               <Pencil className="w-3.5 h-3.5" />
             </button>
@@ -450,9 +452,9 @@ export function MuminPortalTabs({ itsNo }: Props) {
 
   // ── Sticky chip nav geometry ────────────────────────────────────────────────
   // The Mumin layout branch scrolls the WINDOW; the only fixed overlay is the
-  // portal header (MobileHeader, h-14 = 56px, all breakpoints — `main` uses
-  // pt-20 to clear it). The chip bar sticks at top-14 (56px); sections need
-  // header (56) + chip bar (~48) + breathing room ≈ 112px → scroll-mt-28.
+  // portal header (MobileHeader, a 56px row plus env(safe-area-inset-top) —
+  // `main` clears it with pt-[calc(5rem+inset)]). The chip bar sticks below the
+  // header; sections need header (56) + chip bar (~48) + breathing room ≈ 112px.
   const ACTIVATION_LINE_PX = 120
 
   // Track which section is currently in view (rAF-throttled window scroll).
@@ -540,7 +542,9 @@ export function MuminPortalTabs({ itsNo }: Props) {
             <div
               key={t.id}
               className={`flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-lg text-sm font-medium transition-all ${
-                t.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+                t.type === 'success'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-destructive text-destructive-foreground'
               }`}
             >
               {t.type === 'success' ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <XCircle className="w-4 h-4 shrink-0" />}
@@ -592,7 +596,7 @@ export function MuminPortalTabs({ itsNo }: Props) {
               )}
 
               {mergedCategories.length > 1 && (
-                <div className="sticky top-14 z-20 -mx-4 mb-4 border-b border-border bg-card px-4 py-2">
+                <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-20 -mx-4 mb-4 border-b border-border bg-card px-4 py-2">
                   <UmoorChipNav
                     chips={mergedCategories.map((c) => ({
                       id: c.id,
@@ -615,7 +619,7 @@ export function MuminPortalTabs({ itsNo }: Props) {
                       if (el) sectionRefs.current.set(cat.id, el)
                       else sectionRefs.current.delete(cat.id)
                     }}
-                    className="scroll-mt-28 overflow-hidden rounded-xl border border-border"
+                    className="scroll-mt-[calc(7rem+env(safe-area-inset-top))] overflow-hidden rounded-xl border border-border"
                   >
                     <header className="flex items-center justify-between gap-2 border-b border-border bg-muted/40 px-4 py-2.5">
                       <h3 className="text-sm font-semibold text-foreground">{cat.name}</h3>
@@ -623,7 +627,7 @@ export function MuminPortalTabs({ itsNo }: Props) {
                         {cat.filled}/{cat.total} filled
                       </span>
                     </header>
-                    <div className="px-4 py-1">
+                    <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
                       {cat.staticFields.map((f) => (
                         <EditableProfileField
                           key={f.field_id}
@@ -633,18 +637,29 @@ export function MuminPortalTabs({ itsNo }: Props) {
                         />
                       ))}
                       {cat.historicalFields.map((f) => (
-                        <div key={f.field_id} className="py-2.5 border-b border-border last:border-0">
-                          <p className="text-xs text-muted-foreground mb-0.5">{f.caption}</p>
+                        <div
+                          key={f.field_id}
+                          className="rounded-lg border border-border/60 bg-muted/30 p-3"
+                        >
+                          <span className="mb-2 block text-xs text-muted-foreground">{f.caption}</span>
                           {f.entries.length === 0 ? (
-                            <p className="text-sm text-muted-foreground italic">No records</p>
+                            <span className="block text-sm font-medium text-foreground">—</span>
                           ) : (
-                            <div className="space-y-1">
+                            <div className="space-y-2 border-l-2 border-primary/20 pl-3">
                               {f.entries.map((e, i) => (
-                                <div key={`${e.submitted_at}-${i}`} className="flex justify-between items-center">
-                                  <span className="text-sm font-medium text-foreground">{e.answer}</span>
-                                  <span className="text-xs text-muted-foreground ml-2 shrink-0">
-                                    {e.label ?? new Date(e.submitted_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                                  </span>
+                                <div key={`${e.submitted_at}-${i}`} className="relative">
+                                  <div
+                                    className="absolute -left-[17px] top-1.5 w-2 h-2 rounded-full bg-primary/40"
+                                    aria-hidden
+                                  />
+                                  <div className="flex items-baseline justify-between gap-2">
+                                    <span className="min-w-0 break-words text-sm font-medium text-foreground">
+                                      {e.answer}
+                                    </span>
+                                    <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+                                      {e.label ?? new Date(e.submitted_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                    </span>
+                                  </div>
                                 </div>
                               ))}
                             </div>

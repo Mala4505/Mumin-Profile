@@ -13,14 +13,14 @@ const { DistributionPie, SectorBarChart } = {
     () => import('./FormAnalyticsCharts').then(m => ({ default: m.DistributionPie })),
     {
       ssr: false,
-      loading: () => <div className="bg-card border border-border rounded-xl p-5 h-64 animate-pulse"><div className="h-4 bg-muted rounded w-40 mb-4" /><div className="h-48 bg-muted rounded" /></div>,
+      loading: () => <div className="bg-card rounded-xl border border-border shadow-sm p-5 h-64 animate-pulse"><div className="h-4 bg-muted rounded w-40 mb-4" /><div className="h-48 bg-muted rounded" /></div>,
     }
   ),
   SectorBarChart: dynamic(
     () => import('./FormAnalyticsCharts').then(m => ({ default: m.SectorBarChart })),
     {
       ssr: false,
-      loading: () => <div className="bg-card border border-border rounded-xl p-5 h-64 animate-pulse"><div className="h-4 bg-muted rounded w-40 mb-4" /><div className="h-48 bg-muted rounded" /></div>,
+      loading: () => <div className="bg-card rounded-xl border border-border shadow-sm p-5 h-64 animate-pulse"><div className="h-4 bg-muted rounded w-40 mb-4" /><div className="h-48 bg-muted rounded" /></div>,
     }
   ),
 }
@@ -32,6 +32,12 @@ import type { AnalyticsForm } from '@/app/api/analytics/forms/route'
 import type {
   FormFieldMeta, FormAnswersResponse,
 } from '@/app/api/analytics/forms/[id]/route'
+import { MemberIdentity } from '@/components/members/MemberPrimitives'
+
+/** Canonical table-header typography, shared with every other table in the app. */
+const TH = 'px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap'
+/** Width of the sticky identity column. Kept in sync with ReportsClient. */
+const STICKY_COL = 'w-56 min-w-56'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -124,8 +130,8 @@ function buildPivotRows(
 function SectionHeader({ icon: Icon, title, sub }: { icon: React.ElementType; title: string; sub?: string }) {
   return (
     <div className="flex items-start gap-3 mb-6">
-      <span className="flex-shrink-0 w-9 h-9 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
-        <Icon className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+      <span className="flex-shrink-0 w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center">
+        <Icon className="w-4 h-4 text-amber-600" />
       </span>
       <div>
         <h2 className="text-lg font-bold text-foreground leading-tight">{title}</h2>
@@ -139,10 +145,10 @@ function FieldTypeBadge({ type, behavior }: { type: string; behavior: string }) 
   const isHistorical = behavior === 'historical'
   return (
     <Badge
-      className={`text-[10px] px-1.5 py-0 font-medium border ${
+      className={`text-[11px] sm:text-[10px] px-1.5 py-0 font-medium border ${
         isHistorical
-          ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800'
-          : 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800'
+          ? 'bg-amber-50 text-amber-700 border-amber-200'
+          : 'bg-blue-50 text-blue-700 border-blue-200'
       }`}
     >
       {isHistorical ? 'Event' : 'Profile'} · {type}
@@ -529,7 +535,7 @@ export function FormAnalyticsSection() {
       {/* Form + Field selectors */}
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex-1 min-w-[200px]">
-          <label className="block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
+          <label className="block text-[11px] sm:text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
             Form
           </label>
           {formsLoading ? (
@@ -547,7 +553,7 @@ export function FormAnalyticsSection() {
                     <span className="flex items-center gap-2">
                       {f.title}
                       {f.event_title && (
-                        <span className="text-[10px] text-muted-foreground">· {f.event_title}</span>
+                        <span className="text-[11px] sm:text-[10px] text-muted-foreground">· {f.event_title}</span>
                       )}
                     </span>
                   </SelectItem>
@@ -559,7 +565,7 @@ export function FormAnalyticsSection() {
 
         {fields.length > 0 && (
           <div className="flex-1 min-w-[180px]">
-            <label className="block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
+            <label className="block text-[11px] sm:text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
               Field
             </label>
             <Select
@@ -580,7 +586,7 @@ export function FormAnalyticsSection() {
 
         {selectedField && (
           <div>
-            <label className="block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
+            <label className="block text-[11px] sm:text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
               Group by
             </label>
             <div className="flex gap-1">
@@ -607,12 +613,12 @@ export function FormAnalyticsSection() {
         <div className="flex items-center gap-2">
           <FieldTypeBadge type={selectedField.field_type} behavior={selectedField.behavior} />
           {selectedField.is_required && (
-            <Badge variant="outline" className="text-[10px]">Required</Badge>
+            <Badge variant="outline" className="text-[11px] sm:text-[10px]">Required</Badge>
           )}
           {selectedAnswer && (
             <button
               onClick={() => setSelectedAnswer(null)}
-              className="flex items-center gap-1 text-xs bg-amber-50 border border-amber-200 text-amber-700 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-300 px-2 py-0.5 rounded-full hover:bg-amber-100 transition-colors"
+              className="flex items-center gap-1 text-xs bg-amber-50 border border-amber-200 text-amber-700 px-2 py-0.5 rounded-full hover:bg-amber-100 transition-colors"
             >
               Filtered: {selectedAnswer}
               <X className="w-3 h-3" />
@@ -625,7 +631,7 @@ export function FormAnalyticsSection() {
       {answersLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {[1, 2].map(i => (
-            <div key={i} className="bg-card border border-border rounded-xl p-5 h-64 animate-pulse">
+            <div key={i} className="bg-card rounded-xl border border-border shadow-sm p-5 h-64 animate-pulse">
               <div className="h-4 bg-muted rounded w-40 mb-4" />
               <div className="h-48 bg-muted rounded" />
             </div>
@@ -634,7 +640,7 @@ export function FormAnalyticsSection() {
       ) : answersData && selectedField ? (
         <>
           {answersData.distribution.length === 0 ? (
-            <div className="bg-card border border-border rounded-xl p-10 text-center text-sm text-muted-foreground">
+            <div className="bg-card rounded-xl border border-border shadow-sm p-10 text-center text-sm text-muted-foreground">
               No responses recorded for this field yet.
             </div>
           ) : (
@@ -653,7 +659,7 @@ export function FormAnalyticsSection() {
                   onSegmentClick={handleSectorClick}
                 />
               ) : (
-                <div className="bg-card border border-border rounded-xl p-5 flex items-center justify-center text-sm text-muted-foreground">
+                <div className="bg-card rounded-xl border border-border shadow-sm p-5 flex items-center justify-center text-sm text-muted-foreground">
                   No sector data available.
                 </div>
               )}
@@ -661,7 +667,7 @@ export function FormAnalyticsSection() {
           )}
         </>
       ) : selectedFormId && fields.length === 0 ? (
-        <div className="bg-card border border-border rounded-xl p-10 text-center text-sm text-muted-foreground">
+        <div className="bg-card rounded-xl border border-border shadow-sm p-10 text-center text-sm text-muted-foreground">
           This form has no questions configured.
         </div>
       ) : null}
@@ -784,7 +790,7 @@ export function FormAnalyticsSection() {
 
           {/* Export success */}
           {exportSuccess && (
-            <div className="mt-2 px-3 py-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 text-xs font-medium rounded-lg">
+            <div className="mt-2 px-3 py-2 bg-green-50 border border-green-200 text-green-700 text-xs font-medium rounded-lg">
               Exported successfully.
             </div>
           )}
@@ -808,21 +814,29 @@ export function FormAnalyticsSection() {
                     <thead>
                       <tr className="border-b border-border bg-muted/30">
                         <th
-                          className="sticky left-0 z-10 bg-muted/50 px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap w-[112px] border-r border-border cursor-pointer select-none hover:bg-muted/70 transition-colors"
-                          onClick={() => handleSort('its_no')}
+                          className={`sticky left-0 z-10 bg-muted/50 ${TH} ${STICKY_COL} border-r border-border select-none`}
                         >
-                          <span className="flex items-center gap-1.5">ITS No. <SortIcon col="its_no" /></span>
-                        </th>
-                        <th
-                          className="sticky left-[112px] z-10 bg-muted/50 px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap min-w-[160px] border-r border-border cursor-pointer select-none hover:bg-muted/70 transition-colors"
-                          onClick={() => handleSort('name')}
-                        >
-                          <span className="flex items-center gap-1.5">Name <SortIcon col="name" /></span>
+                          <span className="flex items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={() => handleSort('name')}
+                              className="flex items-center gap-1.5 hover:text-foreground transition-colors"
+                            >
+                              Name <SortIcon col="name" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleSort('its_no')}
+                              className="flex items-center gap-1.5 hover:text-foreground transition-colors"
+                            >
+                              ITS <SortIcon col="its_no" />
+                            </button>
+                          </span>
                         </th>
                         {visibleColumns.map(q => (
                           <th
                             key={q.field_id}
-                            className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap min-w-[140px] cursor-pointer select-none hover:bg-muted/70 transition-colors"
+                            className={`${TH} min-w-[140px] cursor-pointer select-none hover:bg-muted/70 transition-colors`}
                             onClick={() => handleSort(q.caption)}
                           >
                             <span className="flex items-center gap-1.5">{q.caption} <SortIcon col={q.caption} /></span>
@@ -833,8 +847,9 @@ export function FormAnalyticsSection() {
                     <tbody className="divide-y divide-border">
                       {pagedRows.map(row => (
                         <tr key={row.its_no} className="hover:bg-muted/20 transition-colors">
-                          <td className="sticky left-0 z-10 bg-card px-4 py-2.5 text-xs text-muted-foreground font-mono whitespace-nowrap w-[112px] border-r border-border">{row.its_no}</td>
-                          <td className="sticky left-[112px] z-10 bg-card px-4 py-2.5 text-sm font-medium text-foreground whitespace-nowrap min-w-[160px] border-r border-border">{row.name}</td>
+                          <td className={`sticky left-0 z-10 bg-card px-4 py-2.5 ${STICKY_COL} border-r border-border`}>
+                            <MemberIdentity name={String(row.name ?? '')} itsNo={row.its_no} size="sm" />
+                          </td>
                           {visibleColumns.map(q => (
                             <td key={q.field_id} className="px-4 py-2.5 text-sm text-foreground whitespace-nowrap min-w-[140px] max-w-[300px] truncate">
                               {String(row[q.caption] ?? '')}

@@ -32,11 +32,11 @@ export function ImportForm() {
     const file = e.target.files?.[0]
     if (!file) return
     const Papa = (await import('papaparse')).default
-    const text = await file.text()
+    const text = (await file.text()).replace(/^﻿/, '').replace(/^#.*\r?\n/, '')
     const parsed = Papa.parse<Record<string, string>>(text, {
       header: true,
       skipEmptyLines: true,
-      transformHeader: (h) => h.trim().replace(/^#.*\n/, ''),
+      transformHeader: (h) => h.trim(),
       transform: (v) => v.trim(),
     })
     const config = IMPORT_TABLES[table]

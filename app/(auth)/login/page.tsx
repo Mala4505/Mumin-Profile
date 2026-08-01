@@ -1,14 +1,17 @@
 import { LoginForm } from '@/components/auth/LoginForm'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export const revalidate = 3600 // revalidate at most once per hour
 
-export default function LoginPage() {
-  const umoor = [
-    'Deeniyah', 'Talimiyah', 'Kharejiyah', 'Dakheliyah',
-    'Sehhat', 'Faizul Mawaidil Burhaniyah',
-    'Mawarid Bashariyah', 'Iqtesaadiyah',
-    'Maliyah', 'Amlaak', 'Marafiq Burhaniyah', 'Qaza',
-  ]
+export default async function LoginPage() {
+  // Public/unauthenticated route — RLS blocks anon reads on profile_category,
+  // so the admin client is used to fetch this non-sensitive, purely decorative list.
+  const admin = createAdminClient()
+  const { data: categories } = await admin
+    .from('profile_category')
+    .select('name')
+    .order('sort_order')
+  const umoor = (categories ?? []).map((c) => c.name)
 
   return (
     <div className="min-h-screen bg-background flex">

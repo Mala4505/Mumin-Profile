@@ -8,6 +8,13 @@ import {
 } from 'lucide-react'
 import type { MemberListItem, Role } from '@/lib/types/app'
 import { EditMemberModal } from './EditMemberModal'
+import {
+  BaligPill,
+  GenderPill,
+  HeadBadge,
+  MemberIdentity,
+  MemberStatusBadge,
+} from './MemberPrimitives'
 
 
 interface MemberTableProps {
@@ -18,66 +25,27 @@ interface MemberTableProps {
 
 const PAGE_SIZE = 25
 
-// ─── Badges ────────────────────────────────────────────────────────────────
+/**
+ * Sticky first column on the wide member table. The `before:` layer reproduces
+ * the row tint *behind* the cell content while `bg-card` keeps the cell opaque
+ * so horizontally-scrolled columns never bleed through.
+ */
+const STICKY_TH =
+  'sticky left-0 z-20 bg-card border-r border-border before:absolute before:inset-0 before:-z-10 before:bg-muted/40'
+const STICKY_TD =
+  'sticky left-0 z-10 bg-card border-r border-border before:absolute before:inset-0 before:-z-10 group-hover:before:bg-muted/30'
 
-function StatusBadge({ status }: { status: string }) {
-  const styles: Record<string, string> = {
-    active: 'bg-green-100 text-green-700 border border-green-200',
-    deceased: 'bg-gray-100 text-gray-500 border border-gray-200',
-    relocated: 'bg-blue-100 text-blue-700 border border-blue-200',
-    left_community: 'bg-red-100 text-red-700 border border-red-200',
-    inactive: 'bg-yellow-100 text-yellow-700 border border-yellow-200',
-  }
-  const labels: Record<string, string> = {
-    active: 'Active',
-    deceased: 'Deceased',
-    relocated: 'Relocated',
-    left_community: 'Left Community',
-    inactive: 'Inactive',
-  }
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${styles[status] ?? 'bg-gray-100 text-gray-500 border border-gray-200'}`}>
-      {labels[status] ?? status}
-    </span>
-  )
-}
+/** Row action button/link chrome — visible on touch, hover-revealed on desktop. */
+const ROW_ACTION =
+  'opacity-100 lg:opacity-0 lg:group-hover:opacity-100 lg:focus-visible:opacity-100 transition-opacity px-2.5 py-1 rounded-md border border-border text-xs font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground'
 
-function BaligBadge({ status }: { status: string }) {
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${status === 'Balig' ? 'bg-orange-100 text-orange-700 border border-orange-200' : 'bg-yellow-100 text-yellow-700 border border-yellow-200'}`}>
-      {status}
-    </span>
-  )
-}
+/** Same chrome for the mobile cards, where nothing is hover-revealed. */
+const CARD_ACTION =
+  'inline-flex items-center justify-center min-h-11 sm:min-h-9 px-4 rounded-md border border-border text-sm sm:text-xs font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors'
 
-function GenderPill({ gender }: { gender: 'M' | 'F' }) {
-  if (gender === 'M') {
-    return (
-      <span className="inline-flex items-center gap-1 text-xs text-blue-600 font-medium">
-        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="10" cy="14" r="5" /><line x1="19" y1="5" x2="14.14" y2="9.86" /><polyline points="15 5 19 5 19 9" />
-        </svg>
-        Male
-      </span>
-    )
-  }
-  return (
-    <span className="inline-flex items-center gap-1 text-xs text-pink-600 font-medium">
-      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="12" cy="9" r="5" /><line x1="12" y1="14" x2="12" y2="22" /><line x1="9" y1="19" x2="15" y2="19" />
-      </svg>
-      Female
-    </span>
-  )
-}
-
-function HeadBadge() {
-  return (
-    <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-orange-100 text-orange-600 border border-orange-200">
-      Head
-    </span>
-  )
-}
+/** Touch-sized inline "View" link used on the mobile cards. */
+const MOBILE_VIEW_LINK =
+  'shrink-0 inline-flex items-center min-h-11 px-3 py-2 -mr-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors'
 
 // ─── Sort helpers ──────────────────────────────────────────────────────────
 
@@ -115,6 +83,10 @@ function sortMembers(members: MemberListItem[], col: string, dir: SortDir): Memb
 
 // ─── Pagination ────────────────────────────────────────────────────────────
 
+/** 44px touch target on phones, compact 36px from `sm:` upward. */
+const PAGE_BTN =
+  'inline-flex items-center justify-center h-11 min-w-11 sm:h-9 sm:min-w-9 text-sm rounded border border-border text-muted-foreground hover:bg-muted/40 disabled:opacity-40 disabled:cursor-not-allowed transition-colors'
+
 function Pagination({ page, total, pageSize, onPage }: {
   page: number; total: number; pageSize: number; onPage: (p: number) => void
 }) {
@@ -123,21 +95,21 @@ function Pagination({ page, total, pageSize, onPage }: {
   const to = Math.min(page * pageSize, total)
 
   return (
-    <div className="flex items-center justify-between px-4 py-3 border-t border-border bg-muted/10">
-      <span className="text-xs text-muted-foreground">
+    <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-t border-border bg-muted/10">
+      <span className="text-sm text-muted-foreground">
         Showing {from}–{to} of {total}
       </span>
-      <div className="flex items-center gap-1">
-        <button onClick={() => onPage(1)} disabled={page === 1}
-          className="px-2 py-1 text-xs rounded border border-border text-muted-foreground hover:bg-muted/40 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">«</button>
+      <div className="flex flex-wrap items-center gap-1">
+        <button onClick={() => onPage(1)} disabled={page === 1} aria-label="First page"
+          className={PAGE_BTN}>«</button>
         <button onClick={() => onPage(page - 1)} disabled={page === 1}
-          className="px-2.5 py-1 text-xs rounded border border-border text-muted-foreground hover:bg-muted/40 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Prev</button>
-        <span className="px-3 py-1 text-xs font-medium bg-primary text-primary-foreground rounded">{page}</span>
-        <span className="text-xs text-muted-foreground">/ {totalPages}</span>
+          className={`${PAGE_BTN} px-3`}>Prev</button>
+        <span className="inline-flex items-center justify-center h-11 min-w-11 sm:h-9 sm:min-w-9 px-3 text-sm font-medium bg-primary text-primary-foreground rounded">{page}</span>
+        <span className="text-sm text-muted-foreground px-1">/ {totalPages}</span>
         <button onClick={() => onPage(page + 1)} disabled={page === totalPages}
-          className="px-2.5 py-1 text-xs rounded border border-border text-muted-foreground hover:bg-muted/40 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Next</button>
-        <button onClick={() => onPage(totalPages)} disabled={page === totalPages}
-          className="px-2 py-1 text-xs rounded border border-border text-muted-foreground hover:bg-muted/40 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">»</button>
+          className={`${PAGE_BTN} px-3`}>Next</button>
+        <button onClick={() => onPage(totalPages)} disabled={page === totalPages} aria-label="Last page"
+          className={PAGE_BTN}>»</button>
       </div>
     </div>
   )
@@ -266,7 +238,9 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
   }
 
   const totalItems = viewMode === 'paci' ? paciGroups.length : members.length
-  const paciColSpan = showSector ? 10 : 9
+  // PACI header columns: paci_no, sabeel_no, floor, flat, building, Head of
+  // Family, Count, [Sector], Subsector, Request, chevron → 11 with sector, 10 without.
+  const paciColSpan = showSector ? 11 : 10
 
   return (
     <div className="bg-card rounded-xl border border-border overflow-hidden shadow-sm">
@@ -300,7 +274,7 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
       {/* ── PACI View ────────────────────────────────────────────────────── */}
       {viewMode === 'paci' && isStaff && (
         <>
-          <div className="hidden md:block overflow-x-auto">
+          <div className="hidden lg:block overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-muted/40 border-b border-border">
@@ -421,15 +395,17 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
                                     <tr key={m.its_no} className="border-t border-border/50">
                                       <td className="py-1.5 pr-4 font-mono text-muted-foreground">{m.its_no}</td>
                                       <td className="py-1.5 pr-4 font-medium">
-                                        {m.name}
-                                        {m.its_no === group.head_its_no && <HeadBadge />}
+                                        <span className="inline-flex items-center gap-1.5">
+                                          {m.name}
+                                          {m.its_no === group.head_its_no && <HeadBadge />}
+                                        </span>
                                       </td>
                                       <td className="py-1.5 pr-4"><GenderPill gender={m.gender} /></td>
-                                      <td className="py-1.5 pr-4"><BaligBadge status={m.balig_status} /></td>
+                                      <td className="py-1.5 pr-4"><BaligPill status={m.balig_status} /></td>
                                       <td className="py-1.5 text-right">
                                         <Link
                                           href={`/members/${m.its_no}`}
-                                          className="font-medium text-orange-600 hover:text-orange-700 transition-colors"
+                                          className="font-medium text-primary hover:text-primary/80 transition-colors"
                                           onClick={e => e.stopPropagation()}
                                         >
                                           View
@@ -450,8 +426,8 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
             </table>
           </div>
 
-          {/* Mobile PACI cards */}
-          <div className="md:hidden divide-y divide-border">
+          {/* Mobile / tablet PACI cards */}
+          <div className="lg:hidden divide-y divide-border">
             {paciPage.map((group, idx) => {
               const rowKey = group.paci_no ?? group.sabeel_no
               const isExpanded = expandedPaci.has(rowKey)
@@ -465,7 +441,7 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-sm truncate">{group.hof_name ?? '—'}</span>
-                          <span className="flex-shrink-0 inline-flex items-center justify-center min-w-[1.25rem] px-1.5 py-0.5 rounded-full text-xs font-semibold bg-muted text-foreground border border-border">
+                          <span className="shrink-0 inline-flex items-center justify-center min-w-[1.25rem] px-1.5 py-0.5 rounded-full text-xs font-semibold bg-muted text-foreground border border-border">
                             {group.members.length}
                           </span>
                         </div>
@@ -478,8 +454,8 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
                         </p>
                       </div>
                       {isExpanded
-                        ? <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                        : <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />}
+                        ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
+                        : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />}
                     </div>
                   </button>
                   {isExpanded && (
@@ -492,7 +468,7 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
                           </div>
                           <Link
                             href={`/members/${m.its_no}`}
-                            className="flex-shrink-0 text-xs font-medium text-orange-600 hover:text-orange-700 transition-colors"
+                            className={MOBILE_VIEW_LINK}
                             onClick={e => e.stopPropagation()}
                           >
                             View
@@ -512,12 +488,31 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
       {
         (viewMode === 'member' || isMumin) && (
           <>
-            <div className="hidden md:block overflow-x-auto">
+            <div className="hidden lg:block overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-muted/40 border-b border-border">
-                    <SortTh col="its_no" label="ITS No" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
-                    <SortTh col="name" label="Name" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
+                    <th
+                      className={`text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3 whitespace-nowrap ${STICKY_TH}`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleSort('name')}
+                        className="uppercase tracking-wider hover:text-foreground transition-colors cursor-pointer"
+                      >
+                        Name
+                        <SortIcon col="name" sortCol={sortCol} sortDir={sortDir} />
+                      </button>
+                      <span className="mx-1.5 text-muted-foreground/40">/</span>
+                      <button
+                        type="button"
+                        onClick={() => handleSort('its_no')}
+                        className="uppercase tracking-wider hover:text-foreground transition-colors cursor-pointer"
+                      >
+                        ITS
+                        <SortIcon col="its_no" sortCol={sortCol} sortDir={sortDir} />
+                      </button>
+                    </th>
                     {isStaff && (
                       <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3 whitespace-nowrap">
                         Head of Family
@@ -547,12 +542,11 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
                     const isHead = member.its_no === member.head_its_no
                     return (
                       <tr key={member.its_no} className="group hover:bg-muted/30 transition-colors border-b border-border last:border-0">
-                        <td className="px-4 py-3">
-                          <span className="font-mono text-xs text-muted-foreground">{member.its_no}</span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="font-medium text-foreground">{member.name}</span>
-                          {isHead && <HeadBadge />}
+                        <td className={`px-4 py-3 ${STICKY_TD}`}>
+                          <div className="flex items-center gap-1.5">
+                            <MemberIdentity name={member.name} itsNo={member.its_no} size="sm" />
+                            {isHead && <HeadBadge />}
+                          </div>
                         </td>
                         {isStaff && (
                           <td className="px-4 py-3">
@@ -574,7 +568,7 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
                           </td>
                         )}
                         <td className="px-4 py-3"><GenderPill gender={member.gender} /></td>
-                        <td className="px-4 py-3"><BaligBadge status={member.balig_status} /></td>
+                        <td className="px-4 py-3"><BaligPill status={member.balig_status} /></td>
                         {isStaff && <td className="px-4 py-3"><span className="text-sm">{member.phone ?? '—'}</span></td>}
                         {isStaff && <td className="px-4 py-3"><span className="font-mono text-xs text-muted-foreground">{member.paci_no ?? '—'}</span></td>}
                         {isStaff && <td className="px-4 py-3"><span className="text-sm">{member.floor_no ?? '—'}</span></td>}
@@ -584,28 +578,22 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
                         {isStaff && <td className="px-4 py-3"><span className="text-sm">{member.subsector_name}</span></td>}
                         {showMasool && <td className="px-4 py-3"><span className="text-sm text-muted-foreground">{member.masool_name ?? '—'}</span></td>}
                         {showMusaid && <td className="px-4 py-3"><span className="text-sm text-muted-foreground">{member.musaid_names ?? '—'}</span></td>}
-                        <td className="px-4 py-3"><StatusBadge status={member.status} /></td>
+                        <td className="px-4 py-3"><MemberStatusBadge status={member.status} /></td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-1.5">
                             {canEdit && (
-                              <button
-                                onClick={() => setEditMember(member)}
-                                className="opacity-0 group-hover:opacity-100 transition-opacity px-2.5 py-1 rounded-md border border-border text-xs font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-                              >
+                              <button onClick={() => setEditMember(member)} className={ROW_ACTION}>
                                 Edit
                               </button>
                             )}
                             {isStaff && (
-                              <Link
-                                href={`/requests?search=${member.sabeel_no}`}
-                                className="opacity-0 group-hover:opacity-100 transition-opacity px-2.5 py-1 rounded-md border border-border text-xs font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-                              >
+                              <Link href={`/requests?search=${member.sabeel_no}`} className={ROW_ACTION}>
                                 Request
                               </Link>
                             )}
                             <Link
                               href={`/members/${member.its_no}`}
-                              className="px-2.5 py-1 rounded-md bg-orange-500 text-white text-xs font-medium hover:bg-orange-600 transition-colors"
+                              className="px-2.5 py-1 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors"
                             >
                               View
                             </Link>
@@ -618,25 +606,24 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
               </table>
             </div>
 
-            {/* Mobile member cards */}
-            <div className="md:hidden divide-y divide-border">
+            {/* Mobile / tablet member cards */}
+            <div className="lg:hidden divide-y divide-border">
               {memberPage.map(member => {
                 const isHead = member.its_no === member.head_its_no
                 return (
                   <div key={member.its_no} className="p-4 hover:bg-muted/30 transition-colors">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-foreground truncate">
-                          {member.name}
+                        <div className="flex items-start gap-1.5">
+                          <MemberIdentity name={member.name} itsNo={member.its_no} size="sm" />
                           {isHead && <HeadBadge />}
-                        </p>
-                        <p className="font-mono text-xs text-muted-foreground mt-0.5">{member.its_no}</p>
+                        </div>
                         {isStaff && !isHead && member.hof_name && (
                           <p className="text-xs text-muted-foreground mt-0.5">HoF: {member.hof_name}</p>
                         )}
                         <div className="flex flex-wrap items-center gap-2 mt-2">
-                          <StatusBadge status={member.status} />
-                          <BaligBadge status={member.balig_status} />
+                          <MemberStatusBadge status={member.status} />
+                          <BaligPill status={member.balig_status} />
                           <GenderPill gender={member.gender} />
                         </div>
                         {isStaff && (
@@ -651,11 +638,25 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
                           <p className="text-xs text-muted-foreground mt-0.5">Musaid: {member.musaid_names}</p>
                         )}
                       </div>
-                      <Link href={`/members/${member.its_no}`}
-                        className="flex-shrink-0 text-sm font-medium text-orange-600 hover:text-orange-700 transition-colors mt-0.5">
+                      <Link href={`/members/${member.its_no}`} className={MOBILE_VIEW_LINK}>
                         View
                       </Link>
                     </div>
+
+                    {(canEdit || isStaff) && (
+                      <div className="flex flex-wrap items-center gap-2 mt-3">
+                        {canEdit && (
+                          <button onClick={() => setEditMember(member)} className={CARD_ACTION}>
+                            Edit
+                          </button>
+                        )}
+                        {isStaff && (
+                          <Link href={`/requests?search=${member.sabeel_no}`} className={CARD_ACTION}>
+                            Request
+                          </Link>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )
               })}

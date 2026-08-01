@@ -8,8 +8,12 @@ export async function POST() {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const admin = createAdminClient()
-  await admin.from('mumin').update({ must_change_password: false })
-    .eq('supabase_auth_id', user.id)
+  // `has_custom_password: true` is what makes the change stick — the login
+  // route reads it and stops re-deriving/overwriting the password on sign-in.
+  await admin.from('auth_accounts').update({
+    must_change_password: false,
+    has_custom_password: true,
+  }).eq('supabase_auth_id', user.id)
 
   // Update app_metadata in Supabase Auth
   await admin.auth.admin.updateUserById(user.id, {

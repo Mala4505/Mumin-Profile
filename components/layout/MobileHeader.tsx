@@ -38,7 +38,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { MemberAvatar } from '@/components/members/MemberPrimitives'
+import { TOUCH_TARGET } from '@/lib/members/display'
 
 interface NavItem {
   label: string
@@ -130,62 +131,69 @@ export function MobileHeader({ role, userName, loginMode }: MobileHeaderProps) {
     router.push(ROUTES.LOGIN)
   }
 
-  const initials = userName
-    ? userName
-        .split(' ')
-        .map((n) => n[0])
-        .join('')
-        .toUpperCase()
-        .slice(0, 2)
-    : 'U'
-
   return (
-    <header className="fixed top-0 left-0 right-0 z-40 flex h-14 items-center justify-between bg-white border-b border-border shadow-sm px-4">
-      {/* Left: Menu button */}
-      <button
-        onClick={() => setSheetOpen(true)}
-        className="flex h-9 w-9 items-center justify-center rounded-lg text-foreground hover:bg-muted transition-colors"
-        aria-label="Open navigation menu"
-      >
-        <Menu className="h-5 w-5" />
-      </button>
-
-      {/* Center: App name */}
-      <div className="flex flex-col items-center">
-        <span className="text-foreground font-bold text-base tracking-tight">Masool/Musaid System</span>
-        {role !== 'Mumin' && loginMode === 'user' && (
-          <span className="text-[9px] font-semibold text-amber-500 tracking-wide uppercase">User View</span>
-        )}
-      </div>
-
-      {/* Right: User avatar dropdown */}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button className="outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-full">
-            <Avatar className="h-8 w-8 cursor-pointer">
-              <AvatarFallback className="text-xs">{initials}</AvatarFallback>
-            </Avatar>
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-44">
-          {userName && (
-            <>
-              <div className="px-2 py-1.5">
-                <p className="text-sm font-medium text-foreground truncate">{userName}</p>
-                <p className="text-xs text-muted-foreground">{role}</p>
-              </div>
-              <DropdownMenuSeparator />
-            </>
+    // The safe-area inset lives on the header padding, not the bar height, so the
+    // 56px content row survives notched/PWA installs. The dashboard layout
+    // compensates with pt-[calc(3.5rem+env(safe-area-inset-top))].
+    <header className="fixed top-0 left-0 right-0 z-40 bg-card border-b border-border shadow-sm pt-[env(safe-area-inset-top)]">
+      <div className="flex h-14 items-center justify-between gap-2 px-4">
+        {/* Left: Menu button */}
+        <button
+          onClick={() => setSheetOpen(true)}
+          className={cn(
+            TOUCH_TARGET,
+            'shrink-0 rounded-lg text-foreground hover:bg-muted transition-colors'
           )}
-          <DropdownMenuItem
-            onClick={handleLogout}
-            className="text-destructive focus:text-destructive focus:bg-destructive/10"
-          >
-            <LogOut className="mr-2 h-4 w-4" />
-            Logout
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+          aria-label="Open navigation menu"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+
+        {/* Center: App name */}
+        <div className="flex min-w-0 flex-col items-center">
+          <span className="truncate text-foreground font-bold text-base tracking-tight">
+            Masool/Musaid System
+          </span>
+          {role !== 'Mumin' && loginMode === 'user' && (
+            <span className="text-[11px] font-semibold leading-tight tracking-wide text-amber-500 uppercase">
+              User View
+            </span>
+          )}
+        </div>
+
+        {/* Right: User avatar dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              aria-label="Open user menu"
+              className={cn(
+                TOUCH_TARGET,
+                'shrink-0 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring'
+              )}
+            >
+              <MemberAvatar name={userName ?? ''} size="xs" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            {userName && (
+              <>
+                <div className="px-2 py-1.5">
+                  <p className="truncate text-sm font-medium text-foreground">{userName}</p>
+                  <p className="text-xs text-muted-foreground">{role}</p>
+                </div>
+                <DropdownMenuSeparator />
+              </>
+            )}
+            <DropdownMenuItem
+              onClick={handleLogout}
+              className="min-h-11 text-destructive focus:text-destructive focus:bg-destructive/10"
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              Logout
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
 
       {/* Mobile nav sheet */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
@@ -230,7 +238,7 @@ export function MobileHeader({ role, userName, loginMode }: MobileHeaderProps) {
             <div className="border-t border-border px-3 py-3">
               {loginMode === 'user' ? (
                 <div className="rounded-lg bg-amber-400/10 border border-amber-400/20 px-3 py-2">
-                  <p className="text-[9px] font-semibold tracking-widest uppercase text-amber-500 mb-1.5">
+                  <p className="text-[11px] font-semibold tracking-widest uppercase text-amber-500 mb-1.5">
                     User View Active
                   </p>
                   <form action={switchToAdminView} onSubmit={() => setSheetOpen(false)}>

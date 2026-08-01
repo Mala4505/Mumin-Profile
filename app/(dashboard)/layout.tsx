@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import type { Role, LoginMode } from '@/lib/types/app'
+import { createClient } from '@/lib/supabase/server'
 import { AppSidebar } from '@/components/layout/AppSidebar'
 import { MobileHeader } from '@/components/layout/MobileHeader'
 import { TopBar } from '@/components/layout/TopBar'
@@ -17,12 +18,22 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const loginMode = (headersList.get('x-login-mode') ?? 'admin') as LoginMode
   const isUserViewMode = role !== 'Mumin' && loginMode === 'user'
 
+  // Resolved once here and shared by both chrome components — MobileHeader used
+  // to receive no name at all, so its avatar was permanently the literal "U".
+  const supabase = await createClient()
+  const { data: muminData } = await supabase
+    .from('mumin')
+    .select('name')
+    .eq('its_no', its_no)
+    .single()
+  const userName = muminData?.name ?? `#${its_no}`
+
   if (role === 'Mumin' || isUserViewMode) {
     return (
       <div className="min-h-screen bg-background">
-        <MobileHeader role={role} loginMode={loginMode} />
-        <TopBar role={role} its_no={its_no} loginMode={loginMode} />
-        <main className="max-w-2xl mx-auto px-4 pt-20 pb-6">
+        <MobileHeader role={role} userName={userName} loginMode={loginMode} />
+        <TopBar role={role} its_no={its_no} userName={userName} loginMode={loginMode} />
+        <main className="pt-[calc(5rem+env(safe-area-inset-top))] pb-6">
           {children}
         </main>
       </div>
@@ -39,11 +50,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <div className="flex flex-col flex-1 min-w-0">
         {/* Mobile header — shown only on mobile */}
         <div className="md:hidden">
-          <MobileHeader role={role} loginMode={loginMode} />
+          <MobileHeader role={role} userName={userName} loginMode={loginMode} />
         </div>
         {/* Desktop top bar now uses TopBar */}
-        <TopBar role={role} its_no={its_no} loginMode={loginMode} />
-        <main className="flex-1 overflow-y-auto pt-14 md:pt-0">
+        <TopBar role={role} its_no={its_no} userName={userName} loginMode={loginMode} />
+        <main className="flex-1 overflow-y-auto pt-[calc(3.5rem+env(safe-area-inset-top))] md:pt-0">
           {children}
         </main>
       </div>

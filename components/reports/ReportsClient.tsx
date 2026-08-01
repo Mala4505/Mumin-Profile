@@ -18,6 +18,12 @@ import {
 } from 'lucide-react'
 import type { Role } from '@/lib/types/app'
 import { RespondentDetailSheet } from './RespondentDetailSheet'
+import { GenderPill, MemberIdentity } from '@/components/members/MemberPrimitives'
+
+/** Canonical table-header typography, shared with every other table in the app. */
+const TH = 'px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap'
+/** Width of the sticky identity column. Kept in sync with FormAnalyticsSection. */
+const STICKY_COL = 'w-56 min-w-56'
 
 const ReportsDistributionCharts = dynamic(
   () => import('./ReportsDistributionCharts').then(m => ({ default: m.ReportsDistributionCharts })),
@@ -840,7 +846,7 @@ export function ReportsClient({ sectors, categories, role }: ReportsClientProps)
           </div>
 
           {exportSuccess && (
-            <div className="px-5 py-2 bg-green-50 dark:bg-green-900/20 border-b border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 text-xs font-medium">
+            <div className="px-5 py-2 bg-green-50 border-b border-green-200 text-green-700 text-xs font-medium">
               CSV exported successfully.
             </div>
           )}
@@ -858,23 +864,17 @@ export function ReportsClient({ sectors, categories, role }: ReportsClientProps)
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border bg-muted/30">
-                    <th className="sticky left-0 z-10 bg-muted/50 px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap w-28">
-                      ITS No.
+                    <th className={`sticky left-0 z-10 bg-muted/50 ${TH} ${STICKY_COL}`}>
+                      Member
                     </th>
-                    <th className="sticky left-28 z-10 bg-muted/50 px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap min-w-[160px]">
-                      Name
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
+                    <th className={TH}>
                       Gender
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
+                    <th className={TH}>
                       Age
                     </th>
                     {visibleColumns.map((q) => (
-                      <th
-                        key={q.field_id}
-                        className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap"
-                      >
+                      <th key={q.field_id} className={TH}>
                         {q.caption}
                       </th>
                     ))}
@@ -898,14 +898,11 @@ export function ReportsClient({ sectors, categories, role }: ReportsClientProps)
                         aria-label={`View all answers from ${row.name}`}
                         className="cursor-pointer hover:bg-muted/20 focus-visible:bg-muted/20 focus-visible:outline-none transition-colors"
                       >
-                        <td className="sticky left-0 z-10 bg-card px-4 py-2.5 text-xs text-muted-foreground font-mono whitespace-nowrap">
-                          {itsNo}
-                        </td>
-                        <td className="sticky left-28 z-10 bg-card px-4 py-2.5 text-sm font-medium text-foreground whitespace-nowrap">
-                          {row.name}
+                        <td className={`sticky left-0 z-10 bg-card px-4 py-2.5 ${STICKY_COL}`}>
+                          <MemberIdentity name={String(row.name ?? '')} itsNo={itsNo} size="sm" />
                         </td>
                         <td className="px-4 py-2.5 text-sm text-foreground whitespace-nowrap">
-                          {respondent?.gender === 'M' ? 'Male' : respondent?.gender === 'F' ? 'Female' : ''}
+                          {respondent?.gender ? <GenderPill gender={respondent.gender} size="sm" /> : null}
                         </td>
                         <td className="px-4 py-2.5 text-sm text-foreground whitespace-nowrap">
                           {respondent?.age ?? ''}

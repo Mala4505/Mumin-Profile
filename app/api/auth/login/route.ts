@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
 import { createHmac, createHash } from "crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 
 const admin = createAdminClient();
 
-function derivePassword(itsNo: string, paciNo: string): string {
+function derivePassword(itsNo: string, credential: string): string {
   const secret = process.env.MUMIN_AUTH_SECRET;
   if (!secret) throw new Error("MUMIN_AUTH_SECRET is not set");
   return createHmac("sha256", secret)
-    .update(`${itsNo}:${paciNo}`)
+    .update(`${itsNo}:${credential}`)
     .digest("hex");
 }
 
@@ -25,7 +26,7 @@ async function provisionAuthUser(
 
   if (!error && created.user) {
     await admin
-      .from("mumin")
+      .from("auth_accounts")
       .update({ supabase_auth_id: created.user.id })
       .eq("its_no", its_no_num);
     return created.user;
@@ -54,7 +55,7 @@ async function provisionAuthUser(
     }
 
     await admin
-      .from("mumin")
+      .from("auth_accounts")
       .update({ supabase_auth_id: existing.id })
       .eq("its_no", its_no_num);
     return existing;
@@ -89,35 +90,6 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const its_no_raw: string = String(body.its_no ?? "").trim();
-    const paci_no: string = String(body.paci_no ?? "").trim();
-
-    if (!its_no_raw || !paci_no) {
-      return NextResponse.json(
-        { error: "ITS No and Password are required" },
-        { status: 400 },
-      );
-    }
-
-    const its_no_num = Number(its_no_raw);
-    if (isNaN(its_no_num)) {
-      return NextResponse.json({ error: "Invalid ITS No" }, { status: 400 });
-    }
-
-    // Single query — replaces mumin lookup + family lookup
-    const { data: row, error: rowError } = await admin
-      .from("mumin_auth")
-      .select("its_no, sabeel_no, supabase_auth_id, is_active, paci_no")
-      .eq("its_no", its_no_num)
-      .maybeSingle();
-
-    if (rowError) {
-      console.error("[login] mumin_auth lookup error:", rowError);
-      return NextResponse.json(
-        { error: "Database error. Please try again." },
-        { status: 500 },
-      );
-    }
 
     // Record failed attempt helper (fire-and-forget)
     const recordFailedAttempt = () => {
@@ -133,6 +105,38 @@ export async function POST(request: Request) {
         });
     };
 
+    const its_no_raw: string = String(body.its_no ?? "").trim();
+    const paci_no: string = String(body.paci_no ?? "").trim();
+
+    if (!its_no_raw || !paci_no) {
+      return NextResponse.json(
+        { error: "ITS No and Password are required" },
+        { status: 400 },
+      );
+    }
+
+    const its_no_num = Number(its_no_raw);
+    if (isNaN(its_no_num)) {
+      return NextResponse.json({ error: "Invalid ITS No" }, { status: 400 });
+    }
+
+    // Single query straight against auth_accounts — no join, no view.
+    const { data: row, error: rowError } = await admin
+      .from("auth_accounts")
+      .select(
+        "its_no, sabeel_no, paci_no, default_credential, login_credential, has_custom_password, supabase_auth_id, role, is_active",
+      )
+      .eq("its_no", its_no_num)
+      .maybeSingle();
+
+    if (rowError) {
+      console.error("[login] auth_accounts lookup error:", rowError);
+      return NextResponse.json(
+        { error: "Database error. Please try again." },
+        { status: 500 },
+      );
+    }
+
     // User not found — return generic message (prevents ITS enumeration)
     if (!row) {
       recordFailedAttempt();
@@ -146,17 +150,49 @@ export async function POST(request: Request) {
       );
     }
 
-    // Wrong PACI number (including missing paci_no) — same generic message
-    if (!row.paci_no || row.paci_no !== paci_no) {
+    const email = `${its_no_raw}@mumin.local`;
+    const supabase = await createClient();
+
+    // --- Supabase Auth is the first and, for custom-password users, the only
+    // authority. This covers both a user's self-chosen password and an
+    // unchanged default one, since the managed flow below keeps the Auth-side
+    // password in sync with the default credential.
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password: paci_no,
+    });
+
+    if (!signInError) {
+      admin
+        .from("auth_accounts")
+        .update({ last_login_at: new Date().toISOString() })
+        .eq("its_no", its_no_num)
+        .then(() => {});
+      return NextResponse.json({ success: true });
+    }
+
+    // A custom password means Supabase Auth is the sole authority for this
+    // user — no default-credential comparison, no password resync. A failed
+    // sign-in here is a genuine wrong password (or a missing auth account).
+    if (row.has_custom_password) {
       recordFailedAttempt();
       return NextResponse.json(INVALID_CREDENTIALS_RESPONSE, { status: 401 });
     }
 
-    const email = `${its_no_raw}@mumin.local`;
-    const password = derivePassword(its_no_raw, paci_no);
+    // Still on the managed/default credential: the Auth-side password may
+    // simply be stale (sabeel/paci changed, or never provisioned). Fall back
+    // to comparing the typed value against the computed default_credential —
+    // this is the only place a wrong-password 401 is decided for these users.
+    const expected = (row.default_credential ?? "").trim();
+    if (!expected || expected !== paci_no) {
+      recordFailedAttempt();
+      return NextResponse.json(INVALID_CREDENTIALS_RESPONSE, { status: 401 });
+    }
+
+    const derivedPassword = derivePassword(its_no_raw, expected);
 
     if (!row.supabase_auth_id) {
-      const user = await provisionAuthUser(email, password, its_no_num);
+      const user = await provisionAuthUser(email, derivedPassword, its_no_num);
       if (!user) {
         return NextResponse.json(
           { error: "Account setup failed. Contact your Masool." },
@@ -166,7 +202,7 @@ export async function POST(request: Request) {
     } else {
       const { error: updateError } = await admin.auth.admin.updateUserById(
         row.supabase_auth_id,
-        { password },
+        { password: derivedPassword },
       );
       if (updateError) {
         console.warn(
@@ -174,10 +210,10 @@ export async function POST(request: Request) {
           updateError.message,
         );
         await admin
-          .from("mumin")
+          .from("auth_accounts")
           .update({ supabase_auth_id: null })
           .eq("its_no", its_no_num);
-        const user = await provisionAuthUser(email, password, its_no_num);
+        const user = await provisionAuthUser(email, derivedPassword, its_no_num);
         if (!user) {
           return NextResponse.json(
             { error: "Account setup failed. Contact your Masool." },
@@ -187,7 +223,27 @@ export async function POST(request: Request) {
       }
     }
 
-    return NextResponse.json({ email, password });
+    // Retry on the same SSR client so cookies get set on this response.
+    const { error: retryError } = await supabase.auth.signInWithPassword({
+      email,
+      password: derivedPassword,
+    });
+
+    if (retryError) {
+      console.error("[login] retry sign-in failed after resync:", retryError);
+      return NextResponse.json(
+        { error: "Account setup failed. Contact your Masool." },
+        { status: 500 },
+      );
+    }
+
+    admin
+      .from("auth_accounts")
+      .update({ last_login_at: new Date().toISOString() })
+      .eq("its_no", its_no_num)
+      .then(() => {});
+
+    return NextResponse.json({ success: true });
   } catch (err) {
     console.error("[login] unexpected error:", err);
     return NextResponse.json(

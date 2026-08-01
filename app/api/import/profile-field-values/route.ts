@@ -16,28 +16,6 @@ export async function POST(req: NextRequest) {
 
   const admin = createAdminClient()
 
-  // ── Step 0: Resolve or create a default "Imported" profile_category ──────
-  let defaultCategoryId: number
-  const { data: existingCat } = await admin
-    .from('profile_category')
-    .select('id')
-    .eq('name', 'Imported')
-    .maybeSingle()
-
-  if (existingCat?.id) {
-    defaultCategoryId = existingCat.id
-  } else {
-    const { data: newCat, error: catErr } = await admin
-      .from('profile_category')
-      .insert({ name: 'Imported' })
-      .select('id')
-      .single()
-    if (catErr || !newCat) {
-      return NextResponse.json({ error: catErr?.message ?? 'Could not create default category' }, { status: 500 })
-    }
-    defaultCategoryId = newCat.id
-  }
-
   // ── Step 1: Collect unique field captions ────
   const allKeys = new Set<string>()
   for (const row of rows) {
@@ -48,17 +26,51 @@ export async function POST(req: NextRequest) {
   const captions = Array.from(allKeys)
 
   // ── Step 2: Upsert profile_field rows ──────────────────
-  const { data: existingFields } = await admin
+  // Matched case-insensitively and trimmed, so a CSV header that differs from
+  // the stored caption only by case/whitespace reuses the existing field
+  // instead of silently creating a duplicate.
+  const normalize = (s: string) => s.trim().toLowerCase()
+
+  const { data: allFields } = await admin
     .from('profile_field')
     .select('id, caption')
-    .in('caption', captions)
 
-  const captionToFieldId = new Map<string, number>(
-    (existingFields ?? []).map((f) => [f.caption, f.id])
+  const normalizedToField = new Map<string, { id: number; caption: string }>(
+    (allFields ?? []).map((f) => [normalize(f.caption), f])
   )
+
+  const captionToFieldId = new Map<string, number>()
+  for (const caption of captions) {
+    const match = normalizedToField.get(normalize(caption))
+    if (match) captionToFieldId.set(caption, match.id)
+  }
 
   const missingCaptions = captions.filter((c) => !captionToFieldId.has(c))
   if (missingCaptions.length > 0) {
+    // Only resolve/create the fallback "Imported" profile_category when a new
+    // field actually needs one — avoids leaving orphan categories behind when
+    // every caption in the import already matches an existing field.
+    const { data: existingCat } = await admin
+      .from('profile_category')
+      .select('id')
+      .eq('name', 'Imported')
+      .maybeSingle()
+
+    let defaultCategoryId: number
+    if (existingCat?.id) {
+      defaultCategoryId = existingCat.id
+    } else {
+      const { data: newCat, error: catErr } = await admin
+        .from('profile_category')
+        .insert({ name: 'Imported' })
+        .select('id')
+        .single()
+      if (catErr || !newCat) {
+        return NextResponse.json({ error: catErr?.message ?? 'Could not create default category' }, { status: 500 })
+      }
+      defaultCategoryId = newCat.id
+    }
+
     const newFields = missingCaptions.map((caption) => ({
       caption,
       category_id: defaultCategoryId,

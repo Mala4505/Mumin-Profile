@@ -10,20 +10,30 @@ export async function GET() {
 
   const admin = createAdminClient()
 
-  let query = admin
-    .from('user_sector')
-    .select('its_no, mumin!inner(name, role)')
-    .eq('mumin.role', 'Masool')
+  const { data: masoolAuth } = await admin
+    .from('auth_accounts')
+    .select('its_no')
+    .eq('role', 'Masool')
 
-  if (session.role === 'Masool' && session.sector_ids?.length) {
-    query = query.in('sector_id', session.sector_ids)
-  }
-
-  const { data } = await query
+  const masoolItsNos = (masoolAuth ?? []).map((r) => r.its_no)
 
   const masoolMap = new Map<number, string>()
-  for (const row of (data ?? []) as any[]) {
-    if (!masoolMap.has(row.its_no)) masoolMap.set(row.its_no, row.mumin?.name ?? '')
+
+  if (masoolItsNos.length > 0) {
+    let query = admin
+      .from('user_sector')
+      .select('its_no, sector_id, mumin!inner(name)')
+      .in('its_no', masoolItsNos)
+
+    if (session.role === 'Masool' && session.sector_ids?.length) {
+      query = query.in('sector_id', session.sector_ids)
+    }
+
+    const { data } = await query
+
+    for (const row of (data ?? []) as any[]) {
+      if (!masoolMap.has(row.its_no)) masoolMap.set(row.its_no, row.mumin?.name ?? '')
+    }
   }
 
   const masools = Array.from(masoolMap.entries())

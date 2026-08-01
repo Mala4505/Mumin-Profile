@@ -60,8 +60,10 @@ export default async function MembersPage({ searchParams }: PageProps) {
   const members = await (hasActiveFilter ? getMembers(filters) : Promise.resolve([]))
   const mode: 'idle' | 'loaded' = hasActiveFilter ? 'loaded' : 'idle'
 
+  // Wider cap than the shared PAGE_SHELL (max-w-6xl) — this page holds an
+  // 18-column table — but still stops the layout stretching on 4K displays.
   return (
-    <div className="p-4 md:p-6 lg:p-8">
+    <div className="p-4 md:p-6 lg:p-8 max-w-[1600px] mx-auto w-full">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Members</h1>

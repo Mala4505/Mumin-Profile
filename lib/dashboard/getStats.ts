@@ -291,7 +291,7 @@ const _fetchUmoorCoordinatorStats = unstable_cache(
 
     const [muminCountRes, categoriesRes, fieldsRes, formsRes] = await Promise.all([
       supabase
-        .from('mumin')
+        .from('auth_accounts')
         .select('its_no', { count: 'exact', head: true })
         .eq('is_active', true),
       supabase

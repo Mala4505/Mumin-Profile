@@ -1,4 +1,4 @@
-﻿﻿'use client'
+﻿'use client'
 
 import * as React from 'react'
 import dynamic from 'next/dynamic'
@@ -17,9 +17,15 @@ import {
 } from '@/components/ui/select'
 import { FormAnalyticsSection } from './FormAnalyticsSection'
 import { SectorPerformanceSection } from './SectorPerformanceSection'
+import { MemberIdentity } from '@/components/members/MemberPrimitives'
+import { statusLabel } from '@/lib/members/display'
+import { GENDER_LABELS } from '@/lib/constants'
+
+/** Canonical table-header typography, shared with every other table in the app. */
+const TH = 'px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground'
 
 
-// â"€â"€â"€ Types â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface OverviewData {
   activeForms: number
@@ -56,7 +62,7 @@ interface MemberRow {
   last_profile_update: string | null
 }
 
-// â"€â"€â"€ Helpers â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function timeAgo(dateStr: string): string {
   const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000)
@@ -72,11 +78,11 @@ function formatDate(d: string) {
 
 const CHART_COLORS = ['#F59E0B', '#3B82F6', '#10B981', '#8B5CF6', '#EC4899', '#EF4444', '#6366F1', '#14B8A6']
 
-// â"€â"€â"€ Widget Card â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+// ─── Widget Card ─────────────────────────────────────────────────────────────
 
 function WidgetCard({ title, value, sub }: { title: string; value: React.ReactNode; sub?: string }) {
   return (
-    <div className="bg-card border border-border rounded-lg p-5">
+    <div className="bg-card rounded-xl border border-border shadow-sm p-5">
       <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">{title}</p>
       <p className="text-3xl font-bold text-foreground tabular-nums">{value}</p>
       {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
@@ -84,11 +90,11 @@ function WidgetCard({ title, value, sub }: { title: string; value: React.ReactNo
   )
 }
 
-// â"€â"€â"€ Form Response Rates â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+// ─── Form Response Rates ────────────────────────────────────────────────
 function FormResponseRates({ rates }: { rates: FormRate[] }) {
   if (rates.length === 0) return null
   return (
-    <div className="bg-card border border-border rounded-lg p-5">
+    <div className="bg-card rounded-xl border border-border shadow-sm p-5">
       <h2 className="text-base font-semibold text-foreground mb-4">Form Response Rates</h2>
       <div className="space-y-3">
         {rates.map((form) => {
@@ -107,7 +113,7 @@ function FormResponseRates({ rates }: { rates: FormRate[] }) {
                   style={{ width: `${form.pct}%`, backgroundColor: color }}
                 />
               </div>
-              <p className="text-[10px] text-muted-foreground mt-0.5">
+              <p className="text-[11px] sm:text-[10px] text-muted-foreground mt-0.5">
                 {form.responses} of {form.total} members responded
               </p>
             </div>
@@ -118,13 +124,13 @@ function FormResponseRates({ rates }: { rates: FormRate[] }) {
   )
 }
 
-// â"€â"€â"€ Activity Feed â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+// ─── Activity Feed ──────────────────────────────────────────────────────
 
 
-// â"€â"€â"€ Main Component â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 export function AnalyticsDashboard({ role }: { role: Role }) {
-  // â"€â"€ State â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+  // ── State ──────────────────────────────────────────────────────────────────
   const [overview, setOverview] = React.useState<OverviewData | null>(null)
   const [overviewLoading, setOverviewLoading] = React.useState(true)
 
@@ -171,7 +177,7 @@ export function AnalyticsDashboard({ role }: { role: Role }) {
     [drillMembers]
   )
 
-  // â"€â"€ Fetch overview (SuperAdmin only) â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+  // ── Fetch overview (SuperAdmin only) ───────────────────────────────────────
   React.useEffect(() => {
     if (!isManagement) return
     fetch('/api/analytics/dashboard?type=overview')
@@ -181,7 +187,7 @@ export function AnalyticsDashboard({ role }: { role: Role }) {
       .finally(() => setOverviewLoading(false))
   }, [isSuperAdmin])
 
-  // â"€â"€ Fetch group data (SuperAdmin only) â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+  // ── Fetch group data (SuperAdmin only) ────────────────────────────────────
   React.useEffect(() => {
     if (!isManagement) return
     setGroupLoading(true)
@@ -200,7 +206,7 @@ export function AnalyticsDashboard({ role }: { role: Role }) {
       .finally(() => setGroupLoading(false))
   }, [groupBy, isSuperAdmin])
 
-  // â"€â"€ Drill-down (SuperAdmin only) â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+  // ── Drill-down (SuperAdmin only) ──────────────────────────────────────────
   React.useEffect(() => {
     if (!isManagement) return
     if (!selectedGroup) { setDrillMembers([]); return }
@@ -212,7 +218,7 @@ export function AnalyticsDashboard({ role }: { role: Role }) {
       .finally(() => setDrillLoading(false))
   }, [selectedGroup, groupBy, isSuperAdmin])
 
-  // â"€â"€ Form rates (all roles) + activity (SuperAdmin only) â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+  // ── Form rates (all roles) + activity (SuperAdmin only) ───────────────────
   React.useEffect(() => {
     fetch('/api/analytics/forms/all?section=rates')
       .then(r => r.json())
@@ -223,19 +229,19 @@ export function AnalyticsDashboard({ role }: { role: Role }) {
 
 
 
-  // â"€â"€ Bar click handler â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+  // ── Bar click handler ──────────────────────────────────────────────────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function handleBarClick(data: any) {
     const name = data?.activePayload?.[0]?.payload?.name
     if (name) setSelectedGroup((prev: string | null) => prev === name ? null : name)
   }
 
-  // â"€â"€ Non-management: degraded view (page.tsx redirects Mumin, so this shouldn't fire) â"€
+  // ── Non-management: degraded view (page.tsx redirects Mumin, so this shouldn't fire) ─
   if (!isManagement) {
     return (
       <div className="space-y-8">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">
+          <p className="text-[11px] sm:text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">
             {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }).toUpperCase()}
           </p>
           <h1 className="text-[28px] font-bold text-foreground leading-tight">Analytics</h1>
@@ -249,25 +255,25 @@ export function AnalyticsDashboard({ role }: { role: Role }) {
     )
   }
 
-  // â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+  // ─────────────────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-8">
 
       {/* Header */}
       <div>
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">
+        <p className="text-[11px] sm:text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">
           {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }).toUpperCase()}
         </p>
         <h1 className="text-[28px] font-bold text-foreground leading-tight">Analytics</h1>
         <p className="text-sm text-muted-foreground mt-1">{isSuperAdmin ? 'System-wide analytics' : 'Analytics for your assigned Mumineen'}</p>
       </div>
 
-      {/* â"€â"€ Widget Row â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */}
+      {/* ── Widget Row ─────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {overviewLoading ? (
           Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="bg-card border border-border rounded-lg p-5 animate-pulse">
+            <div key={i} className="bg-card rounded-xl border border-border shadow-sm p-5 animate-pulse">
               <div className="h-3 bg-muted rounded w-24 mb-3" />
               <div className="h-8 bg-muted rounded w-16" />
             </div>
@@ -289,7 +295,7 @@ export function AnalyticsDashboard({ role }: { role: Role }) {
               value={overview?.overdueForms ?? 0}
               sub="Published & past expiry"
             />
-            <div className="bg-card border border-border rounded-lg p-5">
+            <div className="bg-card rounded-xl border border-border shadow-sm p-5">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">Recent Imports</p>
               {(overview?.recentImports ?? []).length === 0 ? (
                 <p className="text-xs text-muted-foreground">No imports yet</p>
@@ -300,7 +306,7 @@ export function AnalyticsDashboard({ role }: { role: Role }) {
                       <span className="text-xs text-foreground truncate max-w-[110px]">
                         {imp.filename ?? imp.table_name ?? 'Import'}
                       </span>
-                      <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                      <span className="text-[11px] sm:text-[10px] text-muted-foreground whitespace-nowrap">
                         {timeAgo(imp.created_at)}
                       </span>
                     </li>
@@ -313,7 +319,7 @@ export function AnalyticsDashboard({ role }: { role: Role }) {
       </div>
 
 
-      {/* â"€â"€ Charts Section â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */}
+      {/* ── Charts Section ────────────────────────────────────────────────── */}
       <div className="space-y-6">
 
         {/* Grouping toggle */}
@@ -340,7 +346,7 @@ export function AnalyticsDashboard({ role }: { role: Role }) {
           {selectedGroup && (
             <button
               onClick={() => setSelectedGroup(null)}
-              className="ml-auto text-xs text-muted-foreground hover:text-foreground underline"
+              className="ml-auto inline-flex items-center min-h-11 sm:min-h-0 text-xs text-muted-foreground hover:text-foreground underline"
             >
               Clear filter: {selectedGroup}
             </button>
@@ -348,8 +354,8 @@ export function AnalyticsDashboard({ role }: { role: Role }) {
         </div>
 
 
-        {/* Bar chart â€" members per group */}
-        <div className="bg-card border border-border rounded-lg p-5">
+        {/* Bar chart — members per group */}
+        <div className="bg-card rounded-xl border border-border shadow-sm p-5">
           <h2 className="text-base font-semibold text-foreground mb-4">
             Members by {groupBy.charAt(0).toUpperCase() + groupBy.slice(1)}
           </h2>
@@ -370,43 +376,43 @@ export function AnalyticsDashboard({ role }: { role: Role }) {
 
 
 
-      {/* â"€â"€ Drill-down Table â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */}
+      {/* ── Drill-down Table ──────────────────────────────────────────────── */}
       <div>
         <h2 className="text-base font-semibold text-foreground mb-3">
-          {selectedGroup ? `Members â€" ${selectedGroup}` : 'Member Detail Table'}
+          {selectedGroup ? `Members — ${selectedGroup}` : 'Member Detail Table'}
         </h2>
         {!selectedGroup ? (
-          <div className="bg-card border border-border rounded-lg p-8 text-center text-muted-foreground text-sm">
+          <div className="bg-card rounded-xl border border-border shadow-sm p-8 text-center text-muted-foreground text-sm">
             Click a chart segment to filter members by group.
           </div>
         ) : drillLoading ? (
-          <div className="bg-card border border-border rounded-lg p-8 text-center text-muted-foreground text-sm animate-pulse">
+          <div className="bg-card rounded-xl border border-border shadow-sm p-8 text-center text-muted-foreground text-sm animate-pulse">
             Loading members...
           </div>
         ) : drillMembers.length === 0 ? (
-          <div className="bg-card border border-border rounded-lg p-8 text-center text-muted-foreground text-sm">
+          <div className="bg-card rounded-xl border border-border shadow-sm p-8 text-center text-muted-foreground text-sm">
             No members found for this group.
           </div>
         ) : (
-          <div className="bg-card border border-border rounded-lg overflow-hidden">
+          <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
             {/* Filter bar */}
             <div className="px-4 py-3 border-b border-border flex flex-wrap items-center gap-2">
-              <span className="bg-blue-50 border border-blue-200 text-blue-700 text-xs px-2 py-0.5 rounded-full dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300">
+              <span className="bg-blue-50 border border-blue-200 text-blue-700 text-xs px-2 py-0.5 rounded-full">
                 {selectedGroup}
               </span>
-              <div className="ml-auto flex flex-wrap items-center gap-2">
+              <div className="w-full sm:w-auto sm:ml-auto flex flex-wrap items-center gap-2">
                 {drillGenders.length > 0 && (
                   <div className="flex items-center gap-1">
                     {drillGenders.map(g => (
                       <button
                         key={g}
                         onClick={() => setDrillGender(prev => prev === g ? '__all__' : g)}
-                        className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${drillGender === g
+                        className={`min-h-11 sm:min-h-0 px-3 py-1 text-xs font-medium rounded-full border transition-colors ${drillGender === g
                           ? 'bg-primary text-primary-foreground border-primary'
                           : 'bg-card text-foreground border-border hover:border-primary/50'
                           }`}
                       >
-                        {g === 'M' ? 'Male' : g === 'F' ? 'Female' : g}
+                        {GENDER_LABELS[g] ?? g}
                       </button>
                     ))}
                   </div>
@@ -439,15 +445,15 @@ export function AnalyticsDashboard({ role }: { role: Role }) {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="__all__">All Statuses</SelectItem>
-                      {drillStatuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                      {drillStatuses.map(s => <SelectItem key={s} value={s}>{statusLabel(s)}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 )}
-                <div className="relative">
+                <div className="relative flex-1 sm:flex-none">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                   <Input
-                    placeholder="Name or ITSâ€¦"
-                    className="pl-7 h-7 text-xs w-36"
+                    placeholder="Name or ITS…"
+                    className="pl-7 h-7 text-xs w-full sm:w-36"
                     value={drillSearch}
                     onChange={e => setDrillSearch(e.target.value)}
                   />
@@ -462,26 +468,26 @@ export function AnalyticsDashboard({ role }: { role: Role }) {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-border bg-muted/30">
-                        <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">ITS No</th>
-                        <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Name</th>
-                        <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Age</th>
-                        <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hidden sm:table-cell">Mobile No</th>
-                        <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hidden sm:table-cell">Sector</th>
-                        <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hidden md:table-cell">Subsector</th>
-                        <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hidden lg:table-cell">Last Profile Update</th>
+                        <th className={TH}>Member</th>
+                        <th className={TH}>Age</th>
+                        <th className={`${TH} hidden sm:table-cell`}>Mobile No</th>
+                        <th className={`${TH} hidden sm:table-cell`}>Sector</th>
+                        <th className={`${TH} hidden md:table-cell`}>Subsector</th>
+                        <th className={`${TH} hidden lg:table-cell`}>Last Profile Update</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredDrillMembers.map((m) => (
                         <tr key={m.its_no} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
-                          <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">{m.its_no}</td>
-                          <td className="px-4 py-2.5 font-medium text-foreground">{m.name}</td>
-                          <td className="px-4 py-2.5 text-muted-foreground tabular-nums">{m.age ?? '-'}</td>
-                          <td className="px-4 py-2.5 text-muted-foreground hidden sm:table-cell">{m.phone ?? 'â€"'}</td>
-                          <td className="px-4 py-2.5 text-muted-foreground hidden sm:table-cell">{m.sector_name ?? 'â€"'}</td>
-                          <td className="px-4 py-2.5 text-muted-foreground hidden md:table-cell">{m.subsector_name ?? 'â€"'}</td>
+                          <td className="px-4 py-2.5">
+                            <MemberIdentity name={m.name} itsNo={m.its_no} size="sm" />
+                          </td>
+                          <td className="px-4 py-2.5 text-muted-foreground tabular-nums">{m.age ?? '—'}</td>
+                          <td className="px-4 py-2.5 text-muted-foreground hidden sm:table-cell">{m.phone ?? '—'}</td>
+                          <td className="px-4 py-2.5 text-muted-foreground hidden sm:table-cell">{m.sector_name ?? '—'}</td>
+                          <td className="px-4 py-2.5 text-muted-foreground hidden md:table-cell">{m.subsector_name ?? '—'}</td>
                           <td className="px-4 py-2.5 text-muted-foreground text-xs hidden lg:table-cell">
-                            {m.last_profile_update ? formatDate(m.last_profile_update) : 'â€"'}
+                            {m.last_profile_update ? formatDate(m.last_profile_update) : '—'}
                           </td>
                         </tr>
                       ))}

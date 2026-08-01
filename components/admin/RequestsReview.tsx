@@ -3,6 +3,11 @@
 import { useState } from 'react'
 import { Loader2, CheckCheck, X, ChevronDown, ChevronUp } from 'lucide-react'
 import { toast } from 'sonner'
+import { Chip, MemberIdentity } from '@/components/members/MemberPrimitives'
+import { TOUCH_TARGET } from '@/lib/members/display'
+
+/** Canonical table-header typography, shared with every other table in the app. */
+const TH = 'px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground'
 
 interface RequestedChange {
   its_no: number
@@ -164,25 +169,15 @@ export function RequestsReview({ initialRequests }: Props) {
   }
 
   function statusBadge(status: ReviewRequest['status']) {
-    if (status === 'done') {
-      return (
-        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
-          Done
-        </span>
-      )
-    }
-    if (status === 'rejected') {
-      return (
-        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">
-          Rejected
-        </span>
-      )
-    }
-    return (
-      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
-        Pending
-      </span>
-    )
+    // Request status is its own semantic domain, so it keeps its own colours —
+    // but it renders through the shared `Chip` so the geometry matches.
+    const tone = status === 'done'
+      ? 'bg-green-100 text-green-700 border-green-200'
+      : status === 'rejected'
+        ? 'bg-red-100 text-red-700 border-red-200'
+        : 'bg-amber-100 text-amber-700 border-amber-200'
+    const label = status === 'done' ? 'Done' : status === 'rejected' ? 'Rejected' : 'Pending'
+    return <Chip size="md" tone={tone}>{label}</Chip>
   }
 
   return (
@@ -223,21 +218,20 @@ export function RequestsReview({ initialRequests }: Props) {
 
       {/* Table */}
       {filtered.length === 0 ? (
-        <div className="bg-card border border-border rounded-lg p-8 text-center text-sm text-muted-foreground">
+        <div className="bg-card rounded-xl border border-border shadow-sm p-8 text-center text-sm text-muted-foreground">
           No requests found.
         </div>
       ) : (
-        <div className="bg-card border border-border rounded-lg overflow-hidden">
+        <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-muted/40">
                 <tr>
-                  <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Requested By</th>
-                  <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Timestamp</th>
-                  <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">HOF Name</th>
-                  <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Sabeel</th>
-                  <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Remark / Changes</th>
-                  <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Status / Action</th>
+                  <th className={TH}>Requested By</th>
+                  <th className={TH}>Timestamp</th>
+                  <th className={TH}>Head of Family</th>
+                  <th className={TH}>Remark / Changes</th>
+                  <th className={TH}>Status / Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -250,20 +244,27 @@ export function RequestsReview({ initialRequests }: Props) {
                   return (
                     <tr key={r.id} className="hover:bg-muted/20 transition-colors align-top">
                       <td className="px-4 py-3">
-                        <p className="font-medium text-foreground">{r.requester?.name ?? '—'}</p>
-                        <p className="text-xs text-muted-foreground font-mono">{r.requester?.its_no}</p>
+                        <MemberIdentity
+                          name={r.requester?.name}
+                          itsNo={r.requester?.its_no ?? null}
+                          size="sm"
+                        />
                         {r.requester?.phone && (
-                          <p className="text-xs text-muted-foreground">{r.requester.phone}</p>
+                          <p className="mt-0.5 text-xs text-muted-foreground">{r.requester.phone}</p>
                         )}
                       </td>
                       <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
                         {new Date(r.created_at).toLocaleDateString()}<br />
-                        <span className="text-[10px]">{new Date(r.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        <span className="text-[11px] sm:text-[10px]">{new Date(r.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                       </td>
-                      <td className="px-4 py-3 font-medium text-foreground">
-                        {r.hof?.mumin?.name ?? '—'}
+                      <td className="px-4 py-3">
+                        <MemberIdentity
+                          name={r.hof?.mumin?.name}
+                          itsNo={r.hof?.mumin?.its_no ?? null}
+                          sabeelNo={r.sabeel_no}
+                          size="sm"
+                        />
                       </td>
-                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{r.sabeel_no}</td>
 
                       {/* Remark + diff panel */}
                       <td className="px-4 py-3 max-w-xs">
@@ -284,9 +285,9 @@ export function RequestsReview({ initialRequests }: Props) {
                                 <table className="w-full">
                                   <thead className="bg-muted/60">
                                     <tr>
-                                      <th className="text-left px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Field</th>
-                                      <th className="text-left px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Before</th>
-                                      <th className="text-left px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">After</th>
+                                      <th className="text-left px-2 py-1.5 text-[11px] sm:text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Field</th>
+                                      <th className="text-left px-2 py-1.5 text-[11px] sm:text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Before</th>
+                                      <th className="text-left px-2 py-1.5 text-[11px] sm:text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">After</th>
                                     </tr>
                                   </thead>
                                   <tbody className="divide-y divide-border bg-card">
@@ -385,14 +386,15 @@ export function RequestsReview({ initialRequests }: Props) {
       {showMarkAllModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40" onClick={() => !markingAll && setShowMarkAllModal(false)} />
-          <div className="relative bg-card rounded-2xl border border-border shadow-2xl w-full max-w-sm p-6">
+          <div className="relative bg-card rounded-xl border border-border shadow-xl w-full max-w-sm p-4 sm:p-6 max-h-[calc(100dvh-2rem)] overflow-y-auto">
             <div className="flex items-start justify-between mb-4">
               <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
                 <CheckCheck className="w-5 h-5 text-green-600" />
               </div>
               <button
                 onClick={() => !markingAll && setShowMarkAllModal(false)}
-                className="p-1.5 rounded-lg hover:bg-muted/40 text-muted-foreground transition-colors"
+                aria-label="Close"
+                className={`${TOUCH_TARGET} rounded-lg hover:bg-muted/40 text-muted-foreground transition-colors`}
               >
                 <X className="w-4 h-4" />
               </button>

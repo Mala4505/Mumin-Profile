@@ -8,7 +8,11 @@ import { Button } from '@/components/ui/button'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
+import { MemberIdentity } from '@/components/members/MemberPrimitives'
+import { TOUCH_TARGET } from '@/lib/members/display'
 import type { RespondentRow } from '@/app/api/analytics/forms/[id]/route'
+
+const TH = 'px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground'
 
 export function filterRespondents(
   respondents: RespondentRow[],
@@ -44,12 +48,15 @@ function CopyPhone({ phone }: { phone: string | null }) {
     <button
       onClick={handleCopy}
       title={copied ? 'Copied!' : 'Copy number'}
-      className="flex items-center gap-1.5 font-mono text-xs text-foreground hover:text-primary transition-colors group"
+      className="group flex min-h-11 items-center gap-1.5 font-mono text-xs text-foreground transition-colors hover:text-primary sm:min-h-0"
     >
       {phone}
       {copied
         ? <Check className="w-3 h-3 text-green-500 shrink-0" />
-        : <Copy className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+        : (
+          // Always visible on touch — `group-hover` alone is unreachable there.
+          <Copy className="w-3 h-3 shrink-0 text-muted-foreground transition-opacity lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-visible:opacity-100" />
+        )
       }
     </button>
   )
@@ -103,27 +110,35 @@ export function RespondentsTable({
   React.useEffect(() => { setPage(0) }, [selectedAnswer, selectedSector, search])
 
   return (
-    <div className="bg-card border border-border rounded-xl overflow-hidden">
+    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       {/* Filter bar */}
       <div className="px-4 py-3 border-b border-border flex flex-wrap items-center gap-2">
         <span className="text-sm font-semibold text-foreground mr-1">Respondents</span>
         {selectedAnswer && (
-          <span className="inline-flex items-center gap-1 bg-blue-50 border border-blue-200 text-blue-700 text-xs px-2 py-0.5 rounded-full dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300">
+          <span className="inline-flex items-center gap-1 bg-blue-50 border border-blue-200 text-blue-700 text-xs px-2 py-0.5 rounded-full">
             Answer: {selectedAnswer}
-            <button onClick={onAnswerClear} className="hover:text-blue-900 dark:hover:text-blue-100">
+            <button
+              onClick={onAnswerClear}
+              aria-label="Clear answer filter"
+              className="inline-flex items-center justify-center min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 hover:text-blue-900"
+            >
               <X className="w-3 h-3" />
             </button>
           </span>
         )}
         {selectedSector && (
-          <span className="inline-flex items-center gap-1 bg-green-50 border border-green-200 text-green-700 text-xs px-2 py-0.5 rounded-full dark:bg-green-900/20 dark:border-green-800 dark:text-green-300">
+          <span className="inline-flex items-center gap-1 bg-green-50 border border-green-200 text-green-700 text-xs px-2 py-0.5 rounded-full">
             Sector: {selectedSector}
-            <button onClick={onSectorClear} className="hover:text-green-900 dark:hover:text-green-100">
+            <button
+              onClick={onSectorClear}
+              aria-label="Clear sector filter"
+              className="inline-flex items-center justify-center min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 hover:text-green-900"
+            >
               <X className="w-3 h-3" />
             </button>
           </span>
         )}
-        <div className="ml-auto flex items-center gap-2">
+        <div className="w-full sm:w-auto sm:ml-auto flex items-center gap-2">
           {availableSectors.length > 0 && (
             <Select
               value={selectedSector ?? '__all__'}
@@ -140,11 +155,11 @@ export function RespondentsTable({
               </SelectContent>
             </Select>
           )}
-          <div className="relative">
+          <div className="relative flex-1 sm:flex-none">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
             <Input
               placeholder="Search name / ITS…"
-              className="pl-7 h-7 text-xs w-36"
+              className="pl-7 h-7 text-xs w-full sm:w-36"
               value={searchInput}
               onChange={e => setSearchInput(e.target.value)}
             />
@@ -169,23 +184,23 @@ export function RespondentsTable({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/30">
-                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground w-28">ITS No</th>
-                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Name</th>
-                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Answer</th>
-                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hidden sm:table-cell">Mobile</th>
-                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hidden md:table-cell">Sector</th>
-                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hidden lg:table-cell">Subsector</th>
-                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hidden xl:table-cell w-28">Submitted</th>
+                  <th className={TH}>Member</th>
+                  <th className={TH}>Answer</th>
+                  <th className={`${TH} hidden sm:table-cell`}>Mobile</th>
+                  <th className={`${TH} hidden md:table-cell`}>Sector</th>
+                  <th className={`${TH} hidden lg:table-cell`}>Subsector</th>
+                  <th className={`${TH} hidden xl:table-cell w-28`}>Submitted</th>
                   <th className="px-4 py-2.5 w-16" />
                 </tr>
               </thead>
               <tbody>
                 {visible.map((r, i) => (
                   <tr key={i} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
-                    <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">{r.its_no}</td>
-                    <td className="px-4 py-2.5 font-medium text-foreground">{r.name}</td>
                     <td className="px-4 py-2.5">
-                      <span className="bg-amber-50 border border-amber-200 text-amber-800 text-xs px-1.5 py-0.5 rounded dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-300">
+                      <MemberIdentity name={r.name} itsNo={r.its_no} size="sm" />
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <span className="bg-amber-50 border border-amber-200 text-amber-800 text-xs px-1.5 py-0.5 rounded">
                         {r.answer}
                       </span>
                     </td>
@@ -201,7 +216,7 @@ export function RespondentsTable({
                       <Link
                         // href={`/members?search=${r.its_no}`}
                         href={`/members/${r.its_no}`}
-                        className="text-xs font-medium text-orange-600 hover:text-orange-700"
+                        className={`${TOUCH_TARGET} text-xs font-medium text-orange-600 hover:text-orange-700`}
                       >
                         View →
                       </Link>

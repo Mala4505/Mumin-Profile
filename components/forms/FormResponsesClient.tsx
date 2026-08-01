@@ -9,6 +9,10 @@ import { Progress } from '@/components/ui/progress'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import type { Form, FormQuestion } from '@/lib/types/forms'
 import type { Role } from '@/lib/types/app'
+import { Chip, MemberIdentity } from '@/components/members/MemberPrimitives'
+
+/** Canonical table-header typography, shared with every other table in the app. */
+const TH = 'px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground'
 
 const FormResponsesChartsTab = dynamic(
   () => import('./FormResponsesChartsTab').then(m => ({ default: m.FormResponsesChartsTab })),
@@ -48,12 +52,16 @@ function formatDate(iso: string) {
   return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
 }
 
+/**
+ * Form status is its own semantic domain, so it keeps its own colours — but it
+ * renders through the shared `Chip` so the geometry matches every other badge.
+ */
 const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
-  draft:            { label: 'Draft',            className: 'bg-gray-100 text-gray-600' },
-  pending_approval: { label: 'Pending Approval', className: 'bg-amber-100 text-amber-700' },
-  published:        { label: 'Published',        className: 'bg-green-100 text-green-700' },
-  closed:           { label: 'Closed',           className: 'bg-gray-100 text-gray-500' },
-  expired:          { label: 'Expired',          className: 'bg-red-100 text-red-600' },
+  draft:            { label: 'Draft',            className: 'bg-gray-100 text-gray-600 border-gray-200' },
+  pending_approval: { label: 'Pending Approval', className: 'bg-amber-100 text-amber-700 border-amber-200' },
+  published:        { label: 'Published',        className: 'bg-green-100 text-green-700 border-green-200' },
+  closed:           { label: 'Closed',           className: 'bg-gray-100 text-gray-500 border-gray-200' },
+  expired:          { label: 'Expired',          className: 'bg-red-100 text-red-600 border-red-200' },
 }
 
 export function FormResponsesClient({ form, formFields, responses, audience, role }: Props) {
@@ -80,7 +88,7 @@ export function FormResponsesClient({ form, formFields, responses, audience, rol
       </button>
 
       {/* Stats header */}
-      <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
+      <div className="bg-card rounded-xl border border-border shadow-sm p-5">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
           <div>
             <h1 className="text-xl font-bold text-foreground">{form.title}</h1>
@@ -89,9 +97,9 @@ export function FormResponsesClient({ form, formFields, responses, audience, rol
             )}
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${statusCfg.className}`}>
+            <Chip size="md" tone={statusCfg.className} className="font-semibold">
               {statusCfg.label}
-            </span>
+            </Chip>
             {form.expires_at && (
               <span className="text-xs text-muted-foreground">
                 Expires {new Date(form.expires_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
@@ -151,18 +159,18 @@ export function FormResponsesClient({ form, formFields, responses, audience, rol
         {/* All Responses tab */}
         <TabsContent value="responses" className="mt-4">
           {responses.length === 0 ? (
-            <div className="bg-card border border-border rounded-xl px-5 py-12 text-center">
+            <div className="bg-card rounded-xl border border-border shadow-sm px-5 py-12 text-center">
               <p className="text-sm text-muted-foreground">No responses yet.</p>
             </div>
           ) : (
-            <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
+            <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+              <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border bg-muted/40">
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Name</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">ITS</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Answer</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Submitted</th>
+                    <th className={TH}>Member</th>
+                    <th className={TH}>Answer</th>
+                    <th className={TH}>Submitted</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -171,20 +179,23 @@ export function FormResponsesClient({ form, formFields, responses, audience, rol
                     const isMulti = (r.responses?.length ?? 0) > 1
                     return (
                       <tr key={r.id} className="hover:bg-muted/20 transition-colors">
-                        <td className="px-4 py-3 font-medium text-foreground">
+                        <td className="px-4 py-3">
                           <button
                             onClick={() => router.push(`/members/${r.filled_for}`)}
-                            className="hover:text-primary hover:underline transition-colors text-left"
+                            className="min-h-11 sm:min-h-0 text-left hover:text-primary transition-colors"
                           >
-                            {r.mumin?.name ?? r.filled_for}
+                            <MemberIdentity
+                              name={r.mumin?.name ?? String(r.filled_for)}
+                              itsNo={r.filled_for}
+                              size="sm"
+                            />
                           </button>
                         </td>
-                        <td className="px-4 py-3 text-muted-foreground font-mono text-xs">{r.filled_for}</td>
                         <td className="px-4 py-3 text-foreground">
                           {isMulti ? (
                             <button
                               onClick={() => setDetailResponse(r)}
-                              className="text-primary text-xs underline hover:no-underline"
+                              className="inline-flex items-center min-h-11 sm:min-h-0 text-primary text-xs underline hover:no-underline"
                             >
                               View {r.responses.length} answers
                             </button>
@@ -196,6 +207,7 @@ export function FormResponsesClient({ form, formFields, responses, audience, rol
                   })}
                 </tbody>
               </table>
+              </div>
             </div>
           )}
         </TabsContent>
@@ -203,30 +215,36 @@ export function FormResponsesClient({ form, formFields, responses, audience, rol
         {/* Pending tab */}
         <TabsContent value="pending" className="mt-4">
           {pending.length === 0 ? (
-            <div className="bg-card border border-border rounded-xl px-5 py-12 text-center">
+            <div className="bg-card rounded-xl border border-border shadow-sm px-5 py-12 text-center">
               <CheckCircle className="w-8 h-8 text-green-500 mx-auto mb-2" />
               <p className="text-sm font-medium text-foreground">All members have responded!</p>
             </div>
           ) : (
-            <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
+            <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+              <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border bg-muted/40">
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Name</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">ITS</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Subsector</th>
+                    <th className={TH}>Member</th>
+                    <th className={TH}>Subsector</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
                   {pending.map((a) => (
                     <tr key={a.its_no} className="hover:bg-muted/20 transition-colors">
-                      <td className="px-4 py-3 font-medium text-foreground">{a.mumin?.name ?? a.its_no}</td>
-                      <td className="px-4 py-3 text-muted-foreground font-mono text-xs">{a.its_no}</td>
+                      <td className="px-4 py-3">
+                        <MemberIdentity
+                          name={a.mumin?.name ?? String(a.its_no)}
+                          itsNo={a.its_no}
+                          size="sm"
+                        />
+                      </td>
                       <td className="px-4 py-3 text-muted-foreground">{a.mumin?.subsector?.name ?? '—'}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
           )}
         </TabsContent>

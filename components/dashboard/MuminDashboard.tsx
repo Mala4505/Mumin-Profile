@@ -1,113 +1,82 @@
 import Link from 'next/link'
 import type { MuminStats } from '@/lib/dashboard/getStats'
 import { MuminPortalTabs } from './MuminPortalTabs'
+import {
+  BaligPill,
+  GenderPill,
+  InfoField,
+  INFO_GRID,
+  MemberAvatar,
+  MemberIdentity,
+  MemberStatusBadge,
+  SectionCard,
+  SectionHeader,
+} from '@/components/members/MemberPrimitives'
+import { PAGE_SHELL } from '@/lib/members/display'
+import { cn } from '@/lib/utils'
 
 interface Props {
   stats: MuminStats
 }
 
-function getInitials(name: string): string {
-  return name
-    .split(' ')
-    .slice(0, 2)
-    .map((n) => n[0]?.toUpperCase() ?? '')
-    .join('')
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const isActive = status === 'active'
-  return (
-    <span
-      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-        isActive ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground'
-      }`}
-    >
-      <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${isActive ? 'bg-green-500' : 'bg-muted-foreground'}`} />
-      {status.charAt(0).toUpperCase() + status.slice(1)}
-    </span>
-  )
-}
-
 export default function MuminDashboard({ stats }: Props) {
-  const initials = getInitials(stats.name)
-
   return (
-    <div className="max-w-2xl mx-auto space-y-6 p-4 md:p-6">
-      {/* Hero Card */}
-      <div className="bg-card border border-border rounded-2xl p-6 text-center shadow-sm">
-        {/* Avatar with status ring */}
-        <div className="relative inline-block mx-auto mb-4">
-          <div className="w-20 h-20 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-2xl font-bold">
-            {initials}
-          </div>
-          <span className={`absolute bottom-1 right-1 w-4 h-4 rounded-full border-2 border-card ${stats.status === 'active' ? 'bg-green-500' : 'bg-gray-400'}`} />
-        </div>
-        <h1 className="text-2xl font-bold text-foreground">{stats.name}</h1>
-        <div className="flex items-center justify-center gap-4 mt-2 text-sm text-muted-foreground">
-          <span>ITS: {stats.its_no}</span>
-          <span className="text-border">·</span>
-          <span>Sabeel: {stats.sabeel_no}</span>
-        </div>
-        <div className="mt-3 flex items-center justify-center gap-3">
-          <StatusBadge status={stats.status} />
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">
-            {stats.gender === 'M' ? 'Male' : 'Female'}
-          </span>
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-secondary/20 text-secondary-foreground">
-            {stats.balig_status}
-          </span>
-        </div>
-      </div>
+    <div className={cn(PAGE_SHELL, 'space-y-5')}>
+      {/* Hero Card — mirrors the canonical profile hero (MemberProfileView) */}
+      <SectionCard className="p-5">
+        <div className="flex items-start gap-3 sm:gap-4">
+          <MemberAvatar name={stats.name} status={stats.status} size="lg" />
 
-      {/* Info Grid */}
-      <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
-        <div className="px-5 py-3.5 border-b border-border bg-muted/40">
-          <h2 className="text-sm font-semibold text-foreground">Location Info</h2>
-        </div>
-        <div className="grid grid-cols-2 divide-x divide-y divide-border">
-          <div className="p-4">
-            <p className="text-xs text-muted-foreground mb-0.5">Sector</p>
-            <p className="text-sm font-medium text-foreground">{stats.sectorName}</p>
-          </div>
-          <div className="p-4">
-            <p className="text-xs text-muted-foreground mb-0.5">Subsector</p>
-            <p className="text-sm font-medium text-foreground">{stats.subsectorName}</p>
-          </div>
-          <div className="p-4">
-            <p className="text-xs text-muted-foreground mb-0.5">Building</p>
-            <p className="text-sm font-medium text-foreground">{stats.buildingName}</p>
-          </div>
-          <div className="p-4">
-            <p className="text-xs text-muted-foreground mb-0.5">Status</p>
-            <StatusBadge status={stats.status} />
-          </div>
-          {stats.paciNo && (
-            <div className="p-4">
-              <p className="text-xs text-muted-foreground mb-0.5">PACI No</p>
-              <p className="text-sm font-medium font-mono text-foreground">{stats.paciNo}</p>
+          <div className="min-w-0 flex-1">
+            <MemberIdentity
+              name={stats.name}
+              itsNo={stats.its_no}
+              sabeelNo={stats.sabeel_no}
+              size="lg"
+            />
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <MemberStatusBadge status={stats.status} size="md" withDot />
+              <GenderPill gender={stats.gender} size="md" />
+              <BaligPill status={stats.balig_status} size="md" />
             </div>
+          </div>
+        </div>
+      </SectionCard>
+
+      {/* Location Info */}
+      <SectionCard className="p-5">
+        <SectionHeader title="Location Info" className="mb-4" />
+        <div className={INFO_GRID}>
+          <InfoField label="Sector" value={stats.sectorName} />
+          <InfoField label="Subsector" value={stats.subsectorName} />
+          <InfoField label="Building" value={stats.buildingName} />
+          <InfoField
+            label="Status"
+            value={<MemberStatusBadge status={stats.status} withDot />}
+          />
+          {stats.paciNo && (
+            <InfoField
+              label="PACI No"
+              value={<span className="font-mono">{stats.paciNo}</span>}
+            />
           )}
           {(stats.floorNo || stats.flatNo) && (
-            <div className="p-4">
-              <p className="text-xs text-muted-foreground mb-0.5">Floor / Flat</p>
-              <p className="text-sm font-medium text-foreground">
-                {stats.floorNo ? `Floor ${stats.floorNo}` : '—'}
-                {stats.flatNo ? ` / Flat ${stats.flatNo}` : ''}
-              </p>
-            </div>
+            <InfoField
+              label="Floor / Flat"
+              value={`${stats.floorNo ? `Floor ${stats.floorNo}` : '—'}${
+                stats.flatNo ? ` / Flat ${stats.flatNo}` : ''
+              }`}
+            />
           )}
           {stats.landmarkName && (
-            <div className="p-4 col-span-2">
-              <p className="text-xs text-muted-foreground mb-0.5">Landmark</p>
-              <p className="text-sm font-medium text-foreground">{stats.landmarkName}</p>
-            </div>
+            <InfoField label="Landmark" value={stats.landmarkName} />
           )}
-          <div className="p-4">
-            <p className="text-xs text-muted-foreground mb-0.5">Family Members</p>
-            <p className="text-sm font-medium text-foreground">{stats.totalFamilyMembers} member{stats.totalFamilyMembers !== 1 ? 's' : ''}</p>
-          </div>
+          <InfoField
+            label="Family Members"
+            value={`${stats.totalFamilyMembers} member${stats.totalFamilyMembers !== 1 ? 's' : ''}`}
+          />
         </div>
-      </div>
+      </SectionCard>
 
       {/* My Profile & My Forms tabs */}
       <MuminPortalTabs itsNo={stats.its_no} />
@@ -116,7 +85,7 @@ export default function MuminDashboard({ stats }: Props) {
       <div className="flex justify-center">
         <Link
           href={`/members/${stats.its_no}`}
-          className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-6 py-2.5 rounded-lg font-medium hover:bg-primary/90 transition-colors shadow-sm"
+          className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-6 py-2.5 font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
         >
           View Full Profile
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

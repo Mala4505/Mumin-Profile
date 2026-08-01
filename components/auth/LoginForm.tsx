@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { flushSync } from 'react-dom'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import {
   Hash,
   Lock,
@@ -12,22 +11,17 @@ import {
   AlertCircle,
   LogIn,
   ShieldCheck,
-  KeyRound,
   ArrowRightCircle,
   Clock,
 } from 'lucide-react'
 import { LoadingDots } from '@/components/ui/loading-dots'
 
-type Step = 'verifying' | 'signing-in' | 'redirecting' | null
+type Step = 'verifying' | 'redirecting' | null
 
 const STEP_LABELS: Record<NonNullable<Step>, { icon: React.ReactNode; text: string }> = {
   verifying: {
     icon: <ShieldCheck className="w-3.5 h-3.5" />,
     text: 'Verifying credentials...',
-  },
-  'signing-in': {
-    icon: <KeyRound className="w-3.5 h-3.5" />,
-    text: 'Signing in...',
   },
   redirecting: {
     icon: <ArrowRightCircle className="w-3.5 h-3.5" />,
@@ -54,7 +48,10 @@ export function LoginForm() {
     })
 
     try {
-      // Step 1 — validate ITS + PACI server-side
+      // Sign-in happens entirely server-side in one round trip: the route
+      // verifies the credential against Supabase Auth (and, for managed
+      // default-credential accounts, auth_accounts as a fallback/resync
+      // path) and writes session cookies directly onto this response.
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -74,21 +71,7 @@ export function LoginForm() {
         return
       }
 
-      // Step 2 — sign in with derived credentials
-      setStep('signing-in')
-      const supabase = createClient()
-      const { error: authError } = await supabase.auth.signInWithPassword({
-        email: data.email,
-        password: data.password,
-      })
-
-      if (authError) {
-        setError('Sign in failed. Please try again.')
-        setStep(null)
-        return
-      }
-
-      // Step 3 — redirect
+      // Cookies are already set — just redirect.
       setStep('redirecting')
       router.push('/dashboard')
     } catch {
@@ -206,12 +189,11 @@ export function LoginForm() {
             <input
               id="paci_no"
               type={showPaci ? 'text' : 'password'}
-              inputMode="numeric"
               value={paciNo}
               onChange={e => setPaciNo(e.target.value)}
               disabled={loading}
               className="w-full border border-border rounded-lg h-11 px-3 pr-11 bg-white text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
-              placeholder="Enter your PACI number"
+              placeholder="Enter your password"
               required
               autoComplete="current-password"
             />
@@ -230,7 +212,8 @@ export function LoginForm() {
             </button>
           </div>
           <p className="text-xs text-muted-foreground mt-1.5 italic">
-            Use your house PACI number as your password
+            If you have not set a password, use the one issued to you. Contact
+            your Masool if you are unsure.
           </p>
         </div>
 

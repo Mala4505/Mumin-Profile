@@ -13,6 +13,16 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 
+/**
+ * Raw <select>s were `h-9` while the sibling `<Input>`s were `h-10` and both sat
+ * under the 44px touch minimum. `INPUT_CLASS` re-heights the shadcn Input so the
+ * whole form is one row height: 44px on phones, 40px from `sm:` up.
+ */
+const SELECT_CLASS =
+  'w-full border border-border rounded-lg h-11 sm:h-10 px-3 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary'
+
+const INPUT_CLASS = 'h-11 sm:h-10'
+
 // Tier-1 fields only — structural fields go through change request
 interface Tier1Fields {
   name: string
@@ -206,16 +216,17 @@ export function EditMemberModal({
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!saving) onOpenChange(v) }}>
-      <DialogContent className="sm:max-w-lg" aria-describedby={undefined}>
+      <DialogContent className="sm:max-w-xl" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>Edit Member — ITS {itsNo}</DialogTitle>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-1 max-h-[60vh] overflow-y-auto pr-1">
+        {/* No inner scroll cap — DialogContent already caps at 100dvh-2rem and scrolls. */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-1">
           {/* Name */}
           <div className="sm:col-span-2 space-y-1.5">
             <Label htmlFor="em-name">Full Name</Label>
-            <Input id="em-name" value={form.name} onChange={(e) => set('name', e.target.value)} />
+            <Input id="em-name" className={INPUT_CLASS} value={form.name} onChange={(e) => set('name', e.target.value)} />
           </div>
 
           {/* Gender */}
@@ -225,7 +236,7 @@ export function EditMemberModal({
               id="em-gender"
               value={form.gender}
               onChange={(e) => set('gender', e.target.value as 'M' | 'F')}
-              className="w-full border border-border rounded-lg h-9 px-3 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+              className={SELECT_CLASS}
             >
               <option value="">— select —</option>
               <option value="M">Male</option>
@@ -240,7 +251,7 @@ export function EditMemberModal({
               id="em-balig"
               value={form.balig_status}
               onChange={(e) => set('balig_status', e.target.value as 'Balig' | 'Ghair Balig')}
-              className="w-full border border-border rounded-lg h-9 px-3 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+              className={SELECT_CLASS}
             >
               <option value="">— select —</option>
               <option value="Balig">Balig</option>
@@ -251,7 +262,7 @@ export function EditMemberModal({
           {/* Date of Birth */}
           <div className="space-y-1.5">
             <Label htmlFor="em-dob">Date of Birth</Label>
-            <Input id="em-dob" type="date" value={form.date_of_birth} onChange={(e) => set('date_of_birth', e.target.value)} />
+            <Input id="em-dob" className={INPUT_CLASS} type="date" value={form.date_of_birth} onChange={(e) => set('date_of_birth', e.target.value)} />
           </div>
 
           {/* Status */}
@@ -261,7 +272,7 @@ export function EditMemberModal({
               id="em-status"
               value={form.status}
               onChange={(e) => set('status', e.target.value)}
-              className="w-full border border-border rounded-lg h-9 px-3 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+              className={SELECT_CLASS}
             >
               <option value="active">Active</option>
               <option value="deceased">Deceased</option>
@@ -274,19 +285,19 @@ export function EditMemberModal({
           {/* Phone */}
           <div className="space-y-1.5">
             <Label htmlFor="em-phone">Phone</Label>
-            <Input id="em-phone" type="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)} />
+            <Input id="em-phone" className={INPUT_CLASS} type="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)} />
           </div>
 
           {/* Alt Phone */}
           <div className="space-y-1.5">
             <Label htmlFor="em-altphone">Alt. Phone</Label>
-            <Input id="em-altphone" type="tel" value={form.alternate_phone} onChange={(e) => set('alternate_phone', e.target.value)} />
+            <Input id="em-altphone" className={INPUT_CLASS} type="tel" value={form.alternate_phone} onChange={(e) => set('alternate_phone', e.target.value)} />
           </div>
 
           {/* Email */}
           <div className="sm:col-span-2 space-y-1.5">
             <Label htmlFor="em-email">Email</Label>
-            <Input id="em-email" type="email" value={form.email} onChange={(e) => set('email', e.target.value)} />
+            <Input id="em-email" className={INPUT_CLASS} type="email" value={form.email} onChange={(e) => set('email', e.target.value)} />
           </div>
 
           {/* Notes */}
@@ -315,7 +326,7 @@ export function EditMemberModal({
                   id="em-subsector"
                   value={address.subsector_id}
                   onChange={(e) => setAddr('subsector_id', e.target.value)}
-                  className="w-full border border-border rounded-lg h-9 px-3 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                  className={SELECT_CLASS}
                 >
                   <option value="">— select subsector —</option>
                   {subsectors.map((s) => (
@@ -331,6 +342,7 @@ export function EditMemberModal({
                 <Label htmlFor="em-building">Building</Label>
                 <Input
                   id="em-building"
+                  className={INPUT_CLASS}
                   value={address.building_name}
                   onChange={(e) => onBuildingInput(e.target.value)}
                   onFocus={() => address.building_name && setShowSuggestions(true)}
@@ -362,11 +374,11 @@ export function EditMemberModal({
               {/* Floor & Flat */}
               <div className="space-y-1.5">
                 <Label htmlFor="em-floor">Floor No</Label>
-                <Input id="em-floor" value={address.floor_no} onChange={(e) => setAddr('floor_no', e.target.value)} placeholder="e.g. 3" />
+                <Input id="em-floor" className={INPUT_CLASS} value={address.floor_no} onChange={(e) => setAddr('floor_no', e.target.value)} placeholder="e.g. 3" />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="em-flat">Flat No</Label>
-                <Input id="em-flat" value={address.flat_no} onChange={(e) => setAddr('flat_no', e.target.value)} placeholder="e.g. 12" />
+                <Input id="em-flat" className={INPUT_CLASS} value={address.flat_no} onChange={(e) => setAddr('flat_no', e.target.value)} placeholder="e.g. 12" />
               </div>
 
               {/* PACI No — read-only, cannot be changed via this form */}
