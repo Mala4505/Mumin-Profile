@@ -31,9 +31,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (role === 'Mumin' || isUserViewMode) {
     return (
       <div className="min-h-screen bg-background">
-        <MobileHeader role={role} userName={userName} loginMode={loginMode} />
+        {/* MobileHeader is the phone/tablet bar, TopBar is the desktop one —
+            each must hide where the other takes over, or both render at once. */}
+        <div className="md:hidden">
+          <MobileHeader role={role} userName={userName} loginMode={loginMode} />
+        </div>
         <TopBar role={role} its_no={its_no} userName={userName} loginMode={loginMode} />
-        <main className="pt-[calc(5rem+env(safe-area-inset-top))] pb-6">
+        <main className="pt-[calc(3.5rem+env(safe-area-inset-top))] pb-6 md:pt-0">
           {children}
         </main>
       </div>

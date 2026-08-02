@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   MapPin,
@@ -243,12 +243,16 @@ function UmoorSection({
   canEditField,
   onSaveField,
   onViewAllHistory,
+  /** `wide` for a full-width tab panel (coordinator view); `stacked` for a
+   * single narrow card in the per-category grid (everyone else). */
+  layout = 'wide',
 }: {
   fields: MemberProfile['values']
   historicalData: Record<number, HistoryEntry[]>
   canEditField: (field: MemberProfile['values'][number]) => boolean
   onSaveField: (fieldId: number, value: string) => Promise<void>
   onViewAllHistory: (fieldId: number, caption: string) => void
+  layout?: 'wide' | 'stacked'
 }) {
   if (fields.length === 0) {
     return (
@@ -262,7 +266,13 @@ function UmoorSection({
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+    <div
+      className={
+        layout === 'wide'
+          ? 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3'
+          : 'flex flex-col gap-3'
+      }
+    >
       {fields.map((f) => {
         if (f.behavior === 'historical') {
           return (
@@ -315,6 +325,12 @@ export function MemberProfileView({ profile, session, initialResponses = [], log
   const [displayProfile, setDisplayProfile] = useState(profile)
   const [activeTab, setActiveTab] = useState<string>(allCategories[0] ?? '')
   const [openAccordion, setOpenAccordion] = useState<string | null>(null)
+
+  // Jump-nav for the full-access category grid (desktop/tablet only) — lets
+  // someone who knows exactly which umoor they want skip straight to its
+  // card without hiding any of the others, unlike the tab strip it replaces.
+  const categoryCardRefs = useRef<Record<string, HTMLElement | null>>({})
+  const [visibleCategory, setVisibleCategory] = useState<string>('')
 
   // Historical data
   const [historicalData, setHistoricalData] = useState<Record<number, HistoryEntry[]>>({})
@@ -465,6 +481,38 @@ export function MemberProfileView({ profile, session, initialResponses = [], log
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderedCategories.join('|')])
+
+  // Track which category card is currently in view so the jump-nav strip can
+  // highlight it. Coordinators don't use the grid, so skip entirely for them.
+  useEffect(() => {
+    if (isCoordinator || orderedCategories.length === 0) return
+    const cards = orderedCategories
+      .map((cat) => categoryCardRefs.current[cat])
+      .filter((el): el is HTMLElement => el != null)
+    if (cards.length === 0) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const intersecting = entries.filter((e) => e.isIntersecting)
+        if (intersecting.length === 0) return
+        const topmost = intersecting.reduce((a, b) =>
+          a.boundingClientRect.top < b.boundingClientRect.top ? a : b
+        )
+        const cat = topmost.target.getAttribute('data-category')
+        if (cat) setVisibleCategory(cat)
+      },
+      // Treat a card as "current" once it's within the top ~30% of the
+      // scroll container, so the strip updates before the card is fully in view.
+      { rootMargin: '-96px 0px -70% 0px', threshold: 0 }
+    )
+    cards.forEach((el) => observer.observe(el))
+    return () => observer.disconnect()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCoordinator, orderedCategories.join('|')])
+
+  function jumpToCategory(cat: string) {
+    categoryCardRefs.current[cat]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 
   return (
     <div className="space-y-5">
@@ -847,75 +895,156 @@ export function MemberProfileView({ profile, session, initialResponses = [], log
       )}
 
       {/* 12 Umoor Section */}
-      <SectionCard className="overflow-hidden">
-        <SectionHeader
-          icon={<BookOpen className="w-4 h-4 shrink-0 text-primary" />}
-          title="12 Umoor Profile"
-          className="px-4 sm:px-5 pt-5 pb-4 border-b border-border"
-        />
+      {isCoordinator ? (
+        // Coordinators only ever see their own assigned subset of umoors —
+        // a small enough set that a tab strip / accordion stays quick to
+        // navigate, unlike the full 12-card wall shown to everyone else.
+        <SectionCard className="overflow-hidden">
+          <SectionHeader
+            icon={<BookOpen className="w-4 h-4 shrink-0 text-primary" />}
+            title="12 Umoor Profile"
+            className="px-4 sm:px-5 pt-5 pb-4 border-b border-border"
+          />
 
-        {/* Desktop Tabs */}
-        <div className="hidden lg:block">
-          <div className="px-4 pt-4 pb-0">
-            <div className="flex gap-1 overflow-x-auto scroll-smooth snap-x bg-muted rounded-xl p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {orderedCategories.map((cat) => {
-                const hasData = (categoriesMap[cat]?.length ?? 0) > 0
-                const isActive = activeTab === cat
-                return (
-                  <button
-                    key={cat}
-                    onClick={() => setActiveTab(cat)}
-                    className={`relative flex-shrink-0 snap-start inline-flex items-center min-h-11 sm:min-h-9 px-3 py-1.5 text-sm rounded-lg transition-all whitespace-nowrap ${
-                      isActive
-                        ? 'bg-card shadow-sm text-primary font-semibold'
-                        : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    {cat}
-                    {hasData && !isActive && (
-                      <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-primary" />
-                    )}
-                  </button>
-                )
-              })}
+          {/* Desktop Tabs */}
+          <div className="hidden lg:block">
+            <div className="px-4 pt-4 pb-0">
+              <div className="flex gap-1 overflow-x-auto scroll-smooth snap-x bg-muted rounded-xl p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {orderedCategories.map((cat) => {
+                  const hasData = (categoriesMap[cat]?.length ?? 0) > 0
+                  const isActive = activeTab === cat
+                  return (
+                    <button
+                      key={cat}
+                      onClick={() => setActiveTab(cat)}
+                      className={`relative flex-shrink-0 snap-start inline-flex items-center min-h-11 sm:min-h-9 px-3 py-1.5 text-sm rounded-lg transition-all whitespace-nowrap ${
+                        isActive
+                          ? 'bg-card shadow-sm text-primary font-semibold'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      {cat}
+                      {hasData && !isActive && (
+                        <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-primary" />
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+            <div className="p-4 sm:p-5">
+              <UmoorSection
+                fields={categoriesMap[activeTab] ?? []}
+                historicalData={historicalData}
+                canEditField={canEditField}
+                onSaveField={saveProfileField}
+                onViewAllHistory={(fieldId, caption) => setHistoryModal({ fieldId, caption })}
+              />
             </div>
           </div>
-          <div className="p-4 sm:p-5">
-            <UmoorSection
-              fields={categoriesMap[activeTab] ?? []}
-              historicalData={historicalData}
-              canEditField={canEditField}
-              onSaveField={saveProfileField}
-              onViewAllHistory={(fieldId, caption) => setHistoryModal({ fieldId, caption })}
-            />
-          </div>
-        </div>
 
-        {/* Mobile / tablet Accordion */}
-        <div className="lg:hidden divide-y divide-border">
-          {orderedCategories.map((cat) => {
-            const hasData = (categoriesMap[cat]?.length ?? 0) > 0
-            const isOpen = openAccordion === cat
-            return (
-              <div key={cat}>
-                <button
-                  onClick={() => setOpenAccordion(isOpen ? null : cat)}
-                  className="w-full flex items-center justify-between gap-2 min-h-11 px-4 py-3.5 text-left hover:bg-muted/30 transition-colors"
+          {/* Mobile / tablet Accordion */}
+          <div className="lg:hidden divide-y divide-border">
+            {orderedCategories.map((cat) => {
+              const hasData = (categoriesMap[cat]?.length ?? 0) > 0
+              const isOpen = openAccordion === cat
+              return (
+                <div key={cat}>
+                  <button
+                    onClick={() => setOpenAccordion(isOpen ? null : cat)}
+                    className="w-full flex items-center justify-between gap-2 min-h-11 px-4 py-3.5 text-left hover:bg-muted/30 transition-colors"
+                  >
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span className="text-sm font-medium text-foreground break-words">{cat}</span>
+                      {hasData && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
+                      )}
+                    </span>
+                    <ChevronDown
+                      className={`w-4 h-4 shrink-0 text-muted-foreground transition-transform ${
+                        isOpen ? 'rotate-180' : ''
+                      }`}
+                    />
+                  </button>
+                  {isOpen && (
+                    <div className="px-4 pb-4 pt-1">
+                      <UmoorSection
+                        fields={categoriesMap[cat] ?? []}
+                        historicalData={historicalData}
+                        canEditField={canEditField}
+                        onSaveField={saveProfileField}
+                        onViewAllHistory={(fieldId, caption) =>
+                          setHistoryModal({ fieldId, caption })
+                        }
+                      />
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </SectionCard>
+      ) : (
+        // Full access (staff / own profile): every category visible at once
+        // as its own card — no tab click needed to see what's there. 12
+        // categories lay out 4x3 on desktop, 3x4 on a laptop, 2x6 on tablet.
+        <div>
+          <SectionHeader
+            icon={<BookOpen className="w-4 h-4 shrink-0 text-primary" />}
+            title="12 Umoor Profile"
+            className="mb-3"
+          />
+
+          {/* Jump-nav — desktop/tablet only. Every card is already on the
+              page; this is a shortcut for people who know where they're
+              going, not a second gate in front of the content. */}
+          {orderedCategories.length > 1 && (
+            <div className="sticky top-0 z-10 mb-3 hidden lg:block">
+              <div className="flex flex-wrap gap-1 rounded-xl border border-border bg-card/95 p-2 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/85">
+                {orderedCategories.map((cat) => {
+                  const hasData = (categoriesMap[cat]?.length ?? 0) > 0
+                  const isActive = visibleCategory === cat
+                  return (
+                    <button
+                      key={cat}
+                      onClick={() => jumpToCategory(cat)}
+                      aria-current={isActive ? 'true' : undefined}
+                      className={`relative inline-flex items-center whitespace-nowrap rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
+                        isActive
+                          ? 'bg-primary/10 text-primary'
+                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                      }`}
+                    >
+                      {cat}
+                      {hasData && !isActive && (
+                        <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-primary" />
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            {orderedCategories.map((cat) => {
+              const hasData = (categoriesMap[cat]?.length ?? 0) > 0
+              return (
+                <SectionCard
+                  key={cat}
+                  ref={(el) => { categoryCardRefs.current[cat] = el }}
+                  data-category={cat}
+                  className="flex flex-col overflow-hidden scroll-mt-28"
                 >
-                  <span className="flex min-w-0 items-center gap-2">
-                    <span className="text-sm font-medium text-foreground break-words">{cat}</span>
+                  <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
+                    <h3 className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">
+                      {cat}
+                    </h3>
                     {hasData && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
                     )}
-                  </span>
-                  <ChevronDown
-                    className={`w-4 h-4 shrink-0 text-muted-foreground transition-transform ${
-                      isOpen ? 'rotate-180' : ''
-                    }`}
-                  />
-                </button>
-                {isOpen && (
-                  <div className="px-4 pb-4 pt-1">
+                  </div>
+                  <div className="flex-1 p-3">
                     <UmoorSection
                       fields={categoriesMap[cat] ?? []}
                       historicalData={historicalData}
@@ -924,14 +1053,15 @@ export function MemberProfileView({ profile, session, initialResponses = [], log
                       onViewAllHistory={(fieldId, caption) =>
                         setHistoryModal({ fieldId, caption })
                       }
+                      layout="stacked"
                     />
                   </div>
-                )}
-              </div>
-            )
-          })}
+                </SectionCard>
+              )
+            })}
+          </div>
         </div>
-      </SectionCard>
+      )}
     </div>
   )
 }

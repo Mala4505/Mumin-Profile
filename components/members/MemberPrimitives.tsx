@@ -8,7 +8,7 @@
  * Server-component safe: no hooks, no event handlers, no 'use client'.
  */
 
-import type { ReactNode } from 'react'
+import { forwardRef, type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 import {
   CHIP_BASE,
@@ -280,21 +280,20 @@ export const INFO_GRID =
 
 // ── Card chrome ──────────────────────────────────────────────────────────────
 
-export function SectionCard({
-  className,
-  children,
-}: {
-  className?: string
-  children: ReactNode
-}) {
+export const SectionCard = forwardRef<
+  HTMLElement,
+  React.HTMLAttributes<HTMLElement> & { className?: string; children: ReactNode }
+>(function SectionCard({ className, children, ...rest }, ref) {
   return (
     <section
+      ref={ref}
       className={cn('bg-card rounded-xl border border-border shadow-sm', className)}
+      {...rest}
     >
       {children}
     </section>
   )
-}
+})
 
 export function SectionHeader({
   icon,

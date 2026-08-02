@@ -7,14 +7,12 @@ import {
   getAdminStats,
   getMasoolStats,
   getMusaidStats,
-  getMuminStats,
   getUmoorCoordinatorStats,
 } from '@/lib/dashboard/getStats'
 import SuperAdminDashboard from '@/components/dashboard/SuperAdminDashboard'
 import AdminDashboard from '@/components/dashboard/AdminDashboard'
 import MasoolDashboard from '@/components/dashboard/MasoolDashboard'
 import MusaidDashboard from '@/components/dashboard/MusaidDashboard'
-import MuminDashboard from '@/components/dashboard/MuminDashboard'
 import UmoorCoordinatorDashboard from '@/components/dashboard/UmoorCoordinatorDashboard'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { SessionUser } from '@/lib/types/app'
@@ -114,12 +112,6 @@ async function UmoorCoordinatorContent({ session }: { session: SessionUser }) {
   )
 }
 
-async function MuminContent({ itsNo }: { itsNo: number }) {
-  const stats = await getMuminStats(itsNo)
-  if (!stats) redirect('/members')
-  return <MuminDashboard stats={stats} />
-}
-
 export default async function DashboardPage() {
   const session = await getSession()
   if (!session) redirect('/login')
@@ -127,12 +119,11 @@ export default async function DashboardPage() {
   const headersList = await headers()
   const loginMode = headersList.get('x-login-mode') ?? 'admin'
 
-  if (loginMode === 'user') {
-    return (
-      <Suspense fallback={<DashboardSkeleton />}>
-        <MuminContent itsNo={session.its_no} />
-      </Suspense>
-    )
+  // A Mumin's "dashboard" is their own full profile — no separate summary
+  // page to keep in sync with it, and no risk of the two chrome bars
+  // (MobileHeader + TopBar) ever double-rendering on one screen.
+  if (loginMode === 'user' || session.role === 'Mumin') {
+    redirect(`/members/${session.its_no}`)
   }
 
   if (session.role === 'SuperAdmin') {
@@ -175,9 +166,6 @@ export default async function DashboardPage() {
     )
   }
 
-  return (
-    <Suspense fallback={<DashboardSkeleton />}>
-      <MuminContent itsNo={session.its_no} />
-    </Suspense>
-  )
+  // Any other/unknown role falls back to their own profile too.
+  redirect(`/members/${session.its_no}`)
 }
