@@ -58,7 +58,7 @@ export async function PATCH(
   // supabase_auth_id/role moved to `auth_accounts` in migration 018.
   const [{ data: muminRow }, { data: authRow }] = await Promise.all([
     admin.from('mumin').select('sabeel_no').eq('its_no', itsNo).single(),
-    admin.from('auth_accounts').select('supabase_auth_id, role').eq('its_no', itsNo).maybeSingle(),
+    admin.from('auth_accounts').select('supabase_auth_id, role, login_credential').eq('its_no', itsNo).maybeSingle(),
   ])
 
   if (!muminRow) return NextResponse.json({ error: 'Member not found' }, { status: 404 })
@@ -130,15 +130,19 @@ export async function PATCH(
   let newAuthId: string | null = authRow?.supabase_auth_id ?? null
 
   if (!newAuthId) {
-    // Resolve password: use PACI no from family table if available
+    // Resolve password from the account's configured login credential (defaults to
+    // sabeel, matching auth_accounts.login_credential's default) — not hardcoded to PACI.
+    const credential = body.login_credential ?? authRow?.login_credential ?? 'sabeel'
     let password = `ITS${itsNo}` // fallback
-    if (muminRow.sabeel_no) {
+    if (credential === 'paci') {
       const { data: familyRow } = await admin
         .from('family')
         .select('paci_no')
         .eq('sabeel_no', muminRow.sabeel_no)
         .maybeSingle()
       if (familyRow?.paci_no) password = familyRow.paci_no
+    } else if (muminRow.sabeel_no) {
+      password = muminRow.sabeel_no
     }
 
     const { data: authUser, error: authErr } = await admin.auth.admin.createUser({

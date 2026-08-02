@@ -252,19 +252,42 @@ export const GET = withAuth(
           }
         }
 
-        let q = supabase
-          .from('form_responses')
-          .select('answer, filled_for, submitted_at')
-          .eq('form_id', formId)
-          .eq('profile_field_id', fieldId)
-          .not('filled_for', 'is', null)
+        // Static fields are upserted to profile_value (source of truth, one row per
+        // member). Historical fields only ever accumulate in form_responses.
+        let responses: { answer: string | null; filled_for: number | null; submitted_at: string }[]
 
-        if (itsNoFilter !== null) q = q.in('filled_for', itsNoFilter)
+        if (field.behavior === 'static') {
+          let pvq = supabase
+            .from('profile_value')
+            .select('value, its_no, updated_at')
+            .eq('field_id', fieldId)
+            .eq('data_active', true)
 
-        const { data: responses, error: rError } = await q
-        if (rError) throw rError
+          if (itsNoFilter !== null) pvq = pvq.in('its_no', itsNoFilter)
 
-        if (!responses || responses.length === 0) {
+          const { data: pvRows, error: pvError } = await pvq
+          if (pvError) throw pvError
+          responses = (pvRows ?? []).map((r: any) => ({
+            answer: r.value,
+            filled_for: r.its_no,
+            submitted_at: r.updated_at,
+          }))
+        } else {
+          let q = supabase
+            .from('form_responses')
+            .select('answer, filled_for, submitted_at')
+            .eq('form_id', formId)
+            .eq('profile_field_id', fieldId)
+            .not('filled_for', 'is', null)
+
+          if (itsNoFilter !== null) q = q.in('filled_for', itsNoFilter)
+
+          const { data: frRows, error: rError } = await q
+          if (rError) throw rError
+          responses = (frRows ?? []) as any
+        }
+
+        if (responses.length === 0) {
           return NextResponse.json({ fields, field, distribution: [], bySector: [], textEntries: [] })
         }
 
@@ -344,6 +367,13 @@ export const GET = withAuth(
         if (!fieldIdStr) return NextResponse.json({ error: 'field_id required' }, { status: 400 })
         const fieldId = parseInt(fieldIdStr)
 
+        const { data: fieldRow } = await supabase
+          .from('profile_field')
+          .select('behavior')
+          .eq('id', fieldId)
+          .single()
+        const behavior = fieldRow?.behavior ?? 'static'
+
         let itsNoFilter: number[] | null = null
 
         if (scopedSubsectorIds !== null) {
@@ -356,19 +386,44 @@ export const GET = withAuth(
           if (itsNoFilter.length === 0) return NextResponse.json([])
         }
 
-        let q = supabase
-          .from('form_responses')
-          .select('answer, filled_for, submitted_at')
-          .eq('form_id', formId)
-          .eq('profile_field_id', fieldId)
-          .not('filled_for', 'is', null)
-          .limit(2000)
+        // Static fields are upserted to profile_value (source of truth, one row per
+        // member). Historical fields only ever accumulate in form_responses.
+        let responses: { answer: string | null; filled_for: number | null; submitted_at: string }[]
 
-        if (itsNoFilter !== null) q = q.in('filled_for', itsNoFilter)
+        if (behavior === 'static') {
+          let pvq = supabase
+            .from('profile_value')
+            .select('value, its_no, updated_at')
+            .eq('field_id', fieldId)
+            .eq('data_active', true)
+            .limit(2000)
 
-        const { data: responses, error: respError } = await q
-        if (respError) throw respError
-        if (!responses || responses.length === 0) return NextResponse.json([])
+          if (itsNoFilter !== null) pvq = pvq.in('its_no', itsNoFilter)
+
+          const { data: pvRows, error: pvError } = await pvq
+          if (pvError) throw pvError
+          responses = (pvRows ?? []).map((r: any) => ({
+            answer: r.value,
+            filled_for: r.its_no,
+            submitted_at: r.updated_at,
+          }))
+        } else {
+          let q = supabase
+            .from('form_responses')
+            .select('answer, filled_for, submitted_at')
+            .eq('form_id', formId)
+            .eq('profile_field_id', fieldId)
+            .not('filled_for', 'is', null)
+            .limit(2000)
+
+          if (itsNoFilter !== null) q = q.in('filled_for', itsNoFilter)
+
+          const { data: frRows, error: respError } = await q
+          if (respError) throw respError
+          responses = (frRows ?? []) as any
+        }
+
+        if (responses.length === 0) return NextResponse.json([])
 
         const uniqueIds = [...new Set(responses.map((r: any) => r.filled_for).filter(Boolean))]
         const memberMap = new Map<number, any>()

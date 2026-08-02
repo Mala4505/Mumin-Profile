@@ -65,8 +65,11 @@ async function provisionAuthUser(
   return null;
 }
 
-// Generic credential failure message — same for all 401 cases to prevent user enumeration
-const INVALID_CREDENTIALS_RESPONSE = { error: "Invalid ITS number or PACI number" } as const;
+// Generic credential failure message — same for all 401 cases to prevent user enumeration.
+// Deliberately doesn't name a specific credential (PACI/Sabeel): which one an account
+// uses is per-account (auth_accounts.login_credential) and naming the wrong one here
+// would also leak which credential type an unknown/nonexistent ITS number would use.
+const INVALID_CREDENTIALS_RESPONSE = { error: "Invalid ITS number or password" } as const;
 
 export async function POST(request: Request) {
   try {

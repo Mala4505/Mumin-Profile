@@ -60,7 +60,7 @@ const CREDENTIAL_HINT: Record<Credential, string> = {
 }
 
 function toCredential(value: string | null | undefined): Credential {
-  return value === 'sabeel' ? 'sabeel' : 'paci'
+  return value === 'paci' ? 'paci' : 'sabeel'
 }
 
 const nf = new Intl.NumberFormat('en-US')
@@ -362,7 +362,7 @@ export function UsersClient({ initialUsers, sectors, subsectors, categories, mod
   const [editing, setEditing] = useState<SystemUser | null>(null)
   const [editRole, setEditRole] = useState<Role>('Mumin')
   const [editActive, setEditActive] = useState(true)
-  const [editCredential, setEditCredential] = useState<Credential>('paci')
+  const [editCredential, setEditCredential] = useState<Credential>('sabeel')
   const [editSectorIds, setEditSectorIds] = useState<number[]>([])
   const [editSubsectorIds, setEditSubsectorIds] = useState<number[]>([])
   const [editUmoorIds, setEditUmoorIds] = useState<number[]>([])

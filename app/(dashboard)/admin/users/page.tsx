@@ -124,7 +124,7 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
         is_active: auth?.is_active ?? true,
         last_login_at: auth?.last_login_at ?? null,
         supabase_auth_id: auth?.supabase_auth_id ?? null,
-        login_credential: auth?.login_credential ?? 'paci',
+        login_credential: auth?.login_credential ?? 'sabeel',
         has_custom_password: auth?.has_custom_password ?? false,
         sector: (sectorMap.get(m.its_no) ?? []).map((id: number) => ({ sector_id: id })),
         subsector: (subsectorMap.get(m.its_no) ?? []).map((id: number) => ({ subsector_id: id })),
