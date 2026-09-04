@@ -19,16 +19,13 @@
  * internal state (query → PACI lookup or building search → flat pick or
  * manual floor/flat/PACI entry) that a single `value` prop can't express.
  *
- * One interface gap worth flagging: `BuildingCombobox` only accepts a
- * `SelectedBuilding | null` as `value` — there's no way to seed its internal
- * text input with characters the user already typed into *our* front-door
- * field. So the swap from "typing into our input" to "typing into
- * BuildingCombobox" happens on the first non-digit keystroke (shape flips to
- * 'building' immediately), which in practice loses nothing for names that
- * start with a letter — the overwhelming majority — but a building name that
- * starts with digits (e.g. "221B") would lose those leading characters on
- * swap. Not fixable without changing BuildingCombobox's interface, which is
- * out of scope here; documented rather than silently accepted.
+ * The swap from "typing into our input" to "typing into BuildingCombobox"
+ * happens on the first non-digit keystroke (shape flips to 'building'
+ * immediately). Whatever was already typed into the front-door field at that
+ * instant is handed to BuildingCombobox via its `initialQuery` prop (read
+ * once, on mount) so the keystroke that triggered the swap isn't dropped —
+ * this also covers a building name starting with digits (e.g. "221B"), since
+ * the full string typed so far survives the swap, not just the first char.
  */
 
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -430,6 +427,7 @@ function DestinationResolver({ subsectorHint, initialBuilding, onResolved, disab
               <BuildingCombobox
                 subsectorId={subsectorHint}
                 value={chosenBuilding}
+                initialQuery={shape === 'building' ? query : undefined}
                 onChange={(b) => {
                   setChosenBuilding(b)
                   setChosenFlat(null)

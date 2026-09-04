@@ -53,6 +53,14 @@ export interface BuildingComboboxProps {
   ariaLabel?: string
   id?: string
   className?: string
+  /**
+   * Seeds the search text on mount — for a caller that swaps its own text
+   * input for this combobox mid-typing (e.g. DestinationResolver, which
+   * hands off after the first non-digit keystroke) so that keystroke isn't
+   * silently dropped. Read once, on mount, like `value` is; not synced on
+   * every keystroke.
+   */
+  initialQuery?: string
 }
 
 const MIN_QUERY_LENGTH = 2
@@ -70,9 +78,10 @@ export function BuildingCombobox({
   ariaLabel,
   id,
   className,
+  initialQuery,
 }: BuildingComboboxProps) {
-  const [query, setQuery] = useState(value?.building_name ?? '')
-  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState(value?.building_name ?? initialQuery ?? '')
+  const [open, setOpen] = useState(() => Boolean(initialQuery?.trim()))
   const [results, setResults] = useState<ExistingBuilding[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -89,8 +98,15 @@ export function BuildingCombobox({
 
   // Keep the input text in sync when the parent changes `value` out from
   // under us (e.g. resetting the form, or the destination subsector changing
-  // and invalidating a prior pick).
+  // and invalidating a prior pick). Skipped on mount — otherwise this stomps
+  // `initialQuery` right back to '' the instant a caller seeds it, since
+  // `value` starts null for a fresh pick.
+  const mountedRef = useRef(false)
   useEffect(() => {
+    if (!mountedRef.current) {
+      mountedRef.current = true
+      return
+    }
     setQuery(value?.building_name ?? '')
   }, [value?.building_id, value?.building_name])
 
