@@ -31,15 +31,18 @@ export function Chip({
   size = 'sm',
   tone,
   className,
+  title,
   children,
 }: {
   size?: ChipSize
   tone: string
   className?: string
+  /** Native tooltip — e.g. explaining what a status/badge chip means. */
+  title?: string
   children: ReactNode
 }) {
   return (
-    <span className={cn(CHIP_BASE, CHIP_SIZE[size], tone, className)}>{children}</span>
+    <span className={cn(CHIP_BASE, CHIP_SIZE[size], tone, className)} title={title}>{children}</span>
   )
 }
 

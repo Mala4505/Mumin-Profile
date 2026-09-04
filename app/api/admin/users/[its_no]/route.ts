@@ -37,18 +37,10 @@ export async function PATCH(
         const body = await request.json() as {
           role?: 'SuperAdmin' | 'Admin' | 'Masool' | 'Musaid' | 'Mumin' | 'UmoorCoordinator'
           is_active?: boolean
-          login_credential?: 'paci' | 'sabeel'
           reset_to_default_credential?: boolean
           sector_ids?: number[]
           subsector_ids?: number[]
           umoor_ids?: number[]
-        }
-
-        if (body.login_credential !== undefined && body.login_credential !== 'paci' && body.login_credential !== 'sabeel') {
-          return NextResponse.json(
-            { error: "login_credential must be 'paci' or 'sabeel'" },
-            { status: 400 }
-          )
         }
 
         const admin = createAdminClient()
@@ -58,7 +50,7 @@ export async function PATCH(
   // supabase_auth_id/role moved to `auth_accounts` in migration 018.
   const [{ data: muminRow }, { data: authRow }] = await Promise.all([
     admin.from('mumin').select('sabeel_no').eq('its_no', itsNo).single(),
-    admin.from('auth_accounts').select('supabase_auth_id, role, login_credential').eq('its_no', itsNo).maybeSingle(),
+    admin.from('auth_accounts').select('supabase_auth_id, role').eq('its_no', itsNo).maybeSingle(),
   ])
 
   if (!muminRow) return NextResponse.json({ error: 'Member not found' }, { status: 404 })
@@ -75,10 +67,9 @@ export async function PATCH(
 
   const authAccountsUpdate: Database['public']['Tables']['auth_accounts']['Update'] = {}
 
-  // Update role, active status, and credential preference on auth_accounts.
+  // Update role and active status on auth_accounts.
   if (body.role !== undefined) authAccountsUpdate.role = body.role
   if (body.is_active !== undefined) authAccountsUpdate.is_active = body.is_active
-  if (body.login_credential !== undefined) authAccountsUpdate.login_credential = body.login_credential
 
   // "Reset to default credential" is the only recovery path once a member sets
   // a custom password: @mumin.local addresses mean there's no email-based
@@ -130,20 +121,8 @@ export async function PATCH(
   let newAuthId: string | null = authRow?.supabase_auth_id ?? null
 
   if (!newAuthId) {
-    // Resolve password from the account's configured login credential (defaults to
-    // sabeel, matching auth_accounts.login_credential's default) — not hardcoded to PACI.
-    const credential = body.login_credential ?? authRow?.login_credential ?? 'sabeel'
-    let password = `ITS${itsNo}` // fallback
-    if (credential === 'paci') {
-      const { data: familyRow } = await admin
-        .from('family')
-        .select('paci_no')
-        .eq('sabeel_no', muminRow.sabeel_no)
-        .maybeSingle()
-      if (familyRow?.paci_no) password = familyRow.paci_no
-    } else if (muminRow.sabeel_no) {
-      password = muminRow.sabeel_no
-    }
+    // Login credential is always the Sabeel number (021 retired the PACI mode).
+    const password = muminRow.sabeel_no ? muminRow.sabeel_no : `ITS${itsNo}` // fallback
 
     const { data: authUser, error: authErr } = await admin.auth.admin.createUser({
       email: `${itsNo}@mumin.local`,

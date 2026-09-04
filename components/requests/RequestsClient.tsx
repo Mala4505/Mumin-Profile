@@ -14,6 +14,7 @@ import {
   DialogClose,
 } from '@/components/ui/dialog'
 import { Chip, MemberIdentity } from '@/components/members/MemberPrimitives'
+import { BuildingCombobox, type SelectedBuilding } from '@/components/members/BuildingCombobox'
 import { TOUCH_TARGET } from '@/lib/members/display'
 
 /** Canonical table-header typography, shared with every other table in the app. */
@@ -27,6 +28,7 @@ const REQUEST_STATUS_TONE: Record<string, string> = {
   done: 'bg-green-100 text-green-700 border-green-200',
   rejected: 'bg-red-100 text-red-700 border-red-200',
   pending: 'bg-amber-100 text-amber-700 border-amber-200',
+  awaiting_address: 'bg-blue-100 text-blue-700 border-blue-200',
 }
 
 
@@ -43,7 +45,7 @@ interface ChangeRequest {
   id: number
   sabeel_no: string
   remark: string
-  status: 'pending' | 'done' | 'rejected'
+  status: 'pending' | 'awaiting_address' | 'done' | 'rejected'
   created_at: string
 }
 
@@ -81,13 +83,44 @@ const FIELD_OPTIONS = [
 ] as const
 
 const PRESET_REMARKS = [
-  'Address Changed',
-  'Left Building',
   'Phone Number Changed',
-  'Member Relocated',
   'Member Deceased',
   'New Member Added',
 ]
+
+/** The 4 tiers of "how much do you know" for an address-change report. */
+const KNOWN_TIERS = [
+  { value: 'flag', label: "Just that it's wrong" },
+  { value: 'area', label: 'The area they moved to' },
+  { value: 'building', label: 'The building' },
+  { value: 'full', label: 'The full address' },
+] as const
+
+type KnownTier = (typeof KNOWN_TIERS)[number]['value']
+
+interface Sector {
+  sector_id: number
+  sector_name: string
+}
+
+interface Subsector {
+  subsector_id: number
+  subsector_name: string
+  sector_id: number
+}
+
+interface AddressChangeRequest {
+  type: 'address_change'
+  known: KnownTier
+  note?: string
+  reported_sector_id?: number
+  reported_subsector_id?: number
+  reported_building_id?: number
+  reported_building_name?: string
+  paci_no?: string
+  floor_no?: string
+  flat_no?: string
+}
 
 export function RequestsClient({ families, initialRequests, mode, currentSearch, showAll }: Props) {
   const router = useRouter()
@@ -113,6 +146,21 @@ export function RequestsClient({ families, initialRequests, mode, currentSearch,
   const [editNewValue, setEditNewValue] = useState('')
   const [editSubmitting, setEditSubmitting] = useState(false)
   const [editSubmitError, setEditSubmitError] = useState('')
+
+  // ── Report Address Change modal state ──────────────────────────────────────
+  const [addressModalOpen, setAddressModalOpen] = useState(false)
+  const [addressKnown, setAddressKnown] = useState<KnownTier | ''>('')
+  const [addressNote, setAddressNote] = useState('')
+  const [sectors, setSectors] = useState<Sector[]>([])
+  const [allSubsectors, setAllSubsectors] = useState<Subsector[]>([])
+  const [addressSectorId, setAddressSectorId] = useState<number | ''>('')
+  const [addressSubsectorId, setAddressSubsectorId] = useState<number | ''>('')
+  const [addressBuilding, setAddressBuilding] = useState<SelectedBuilding | null>(null)
+  const [addressPaciNo, setAddressPaciNo] = useState('')
+  const [addressFloorNo, setAddressFloorNo] = useState('')
+  const [addressFlatNo, setAddressFlatNo] = useState('')
+  const [addressSubmitting, setAddressSubmitting] = useState(false)
+  const [addressSubmitError, setAddressSubmitError] = useState('')
 
   const updateParam = useCallback((key: string, value: string) => {
     const params = new URLSearchParams(searchParams.toString())
@@ -274,6 +322,115 @@ export function RequestsClient({ families, initialRequests, mode, currentSearch,
       setEditSubmitError('Network error. Please try again.')
     } finally {
       setEditSubmitting(false)
+    }
+  }
+
+  // ── Report Address Change modal helpers ────────────────────────────────────
+
+  // Reset all address-report state (called by DialogTrigger onClick before modal opens)
+  function openAddressModal() {
+    setAddressKnown('')
+    setAddressNote('')
+    setAddressSectorId('')
+    setAddressSubsectorId('')
+    setAddressBuilding(null)
+    setAddressPaciNo('')
+    setAddressFloorNo('')
+    setAddressFlatNo('')
+    setAddressSubmitError('')
+  }
+
+  // Fetch sector/subsector vocab once, the same way MemberFiltersBar does.
+  useEffect(() => {
+    fetch('/api/members/filters')
+      .then(r => r.json())
+      .then(({ sectors: s, subsectors: ss }) => {
+        setSectors(s ?? [])
+        setAllSubsectors(ss ?? [])
+      })
+      .catch(() => {})
+  }, [])
+
+  const filteredAddressSubsectors = addressSectorId
+    ? allSubsectors.filter(ss => ss.sector_id === addressSectorId)
+    : allSubsectors
+
+  function addressRemarkFor(known: KnownTier): string {
+    switch (known) {
+      case 'full': return 'Reported move — full address known'
+      case 'building': return addressFlatNo.trim()
+        ? 'Reported move — building known'
+        : 'Reported move — building known, no flat yet'
+      case 'area': return 'Reported move — area known'
+      case 'flag':
+      default: return 'Reported the family has moved'
+    }
+  }
+
+  const addressCanSubmit = !!(
+    selected &&
+    addressKnown &&
+    !addressSubmitting &&
+    (addressKnown !== 'full' || addressPaciNo.trim())
+  )
+
+  async function handleAddressSubmit() {
+    if (!selected || !addressKnown) return
+    if (addressKnown === 'full' && !addressPaciNo.trim()) return
+    setAddressSubmitting(true)
+    setAddressSubmitError('')
+
+    const requestedChanges: AddressChangeRequest = { type: 'address_change', known: addressKnown }
+    if (addressNote.trim()) requestedChanges.note = addressNote.trim()
+
+    if (addressKnown === 'area' || addressKnown === 'building' || addressKnown === 'full') {
+      if (addressSectorId) requestedChanges.reported_sector_id = addressSectorId
+      if (addressSubsectorId) requestedChanges.reported_subsector_id = addressSubsectorId
+    }
+
+    if (addressKnown === 'building' || addressKnown === 'full') {
+      if (addressBuilding) {
+        if (addressBuilding.building_id) {
+          requestedChanges.reported_building_id = addressBuilding.building_id
+        } else {
+          requestedChanges.reported_building_name = addressBuilding.building_name
+        }
+      }
+    }
+
+    if (addressKnown === 'full') {
+      requestedChanges.paci_no = addressPaciNo.trim()
+      if (addressFloorNo.trim()) requestedChanges.floor_no = addressFloorNo.trim()
+      if (addressFlatNo.trim()) requestedChanges.flat_no = addressFlatNo.trim()
+    }
+
+    const body = {
+      sabeel_no: selected.sabeel_no,
+      remark: addressRemarkFor(addressKnown),
+      requested_changes: requestedChanges,
+    }
+
+    try {
+      const res = await fetch('/api/requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        setAddressSubmitError(d.error ?? 'Failed to submit')
+        setAddressSubmitting(false)
+        return
+      }
+
+      const newReq = await res.json()
+      setRequests(prev => [newReq, ...prev])
+      setAddressModalOpen(false)
+    } catch {
+      setAddressSubmitError('Network error. Please try again.')
+    } finally {
+      setAddressSubmitting(false)
     }
   }
 
@@ -648,6 +805,197 @@ export function RequestsClient({ families, initialRequests, mode, currentSearch,
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
+
+              {/* Report Address Change button — opens the tiered address-report modal */}
+              <Dialog open={addressModalOpen} onOpenChange={open => {
+                if (!open) {
+                  setAddressModalOpen(false)
+                  openAddressModal()
+                }
+              }}>
+                <DialogTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={openAddressModal}
+                    className="w-full py-2.5 rounded-xl border border-border bg-background text-foreground text-sm font-medium hover:bg-muted/40 transition-colors"
+                  >
+                    Report Address Change
+                  </button>
+                </DialogTrigger>
+
+                <DialogContent className="max-w-lg" aria-describedby={undefined}>
+                  <DialogHeader>
+                    <DialogTitle>Report Address Change</DialogTitle>
+                    <DialogDescription>
+                      Tell us the family has moved — even partial information helps. Add more detail
+                      if you have it. Your report will be reviewed by an admin.
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  <div className="space-y-4 py-2">
+                    {/* Step 1 — How much do you know? */}
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+                        1. How much do you know?
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {KNOWN_TIERS.map(tier => (
+                          <button
+                            key={tier.value}
+                            type="button"
+                            onClick={() => setAddressKnown(tier.value)}
+                            className={`px-2.5 py-1.5 rounded-full text-xs border transition-colors ${
+                              addressKnown === tier.value
+                                ? 'border-primary bg-primary/10 text-primary'
+                                : 'border-border text-foreground bg-background hover:bg-muted/40 hover:border-primary/50'
+                            }`}
+                          >
+                            {tier.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Note — always shown once a tier is picked */}
+                    {addressKnown && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+                          Note {addressKnown === 'flag' ? '' : '(optional)'}
+                        </p>
+                        <textarea
+                          value={addressNote}
+                          onChange={e => setAddressNote(e.target.value)}
+                          placeholder={
+                            addressKnown === 'flag'
+                              ? 'Describe what you know, e.g. who told you and when…'
+                              : 'Any extra detail that might help locate the family…'
+                          }
+                          rows={2}
+                          className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
+                        />
+                      </div>
+                    )}
+
+                    {/* Area — sector/subsector, for 'area' tier and up */}
+                    {(addressKnown === 'area' || addressKnown === 'building' || addressKnown === 'full') && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+                            Sector
+                          </p>
+                          <select
+                            value={addressSectorId}
+                            onChange={e => {
+                              setAddressSectorId(e.target.value ? Number(e.target.value) : '')
+                              setAddressSubsectorId('')
+                            }}
+                            className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                          >
+                            <option value="">— Choose a sector —</option>
+                            {sectors.map(s => (
+                              <option key={s.sector_id} value={s.sector_id}>{s.sector_name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+                            Subsector
+                          </p>
+                          <select
+                            value={addressSubsectorId}
+                            onChange={e => setAddressSubsectorId(e.target.value ? Number(e.target.value) : '')}
+                            className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                          >
+                            <option value="">— Choose a subsector —</option>
+                            {filteredAddressSubsectors.map(ss => (
+                              <option key={ss.subsector_id} value={ss.subsector_id}>{ss.subsector_name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Building — for 'building' tier and up */}
+                    {(addressKnown === 'building' || addressKnown === 'full') && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+                          Building
+                        </p>
+                        <BuildingCombobox
+                          subsectorId={addressSubsectorId ? addressSubsectorId : undefined}
+                          value={addressBuilding}
+                          onChange={setAddressBuilding}
+                          placeholder="Search buildings, or type a new name…"
+                        />
+                      </div>
+                    )}
+
+                    {/* Full address — PACI/floor/flat, 'full' tier only */}
+                    {addressKnown === 'full' && (
+                      <div className="grid grid-cols-3 gap-3">
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+                            PACI No
+                          </p>
+                          <input
+                            type="text"
+                            value={addressPaciNo}
+                            onChange={e => setAddressPaciNo(e.target.value)}
+                            placeholder="Required"
+                            className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                          />
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+                            Floor No
+                          </p>
+                          <input
+                            type="text"
+                            value={addressFloorNo}
+                            onChange={e => setAddressFloorNo(e.target.value)}
+                            placeholder="Optional"
+                            className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                          />
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+                            Flat No
+                          </p>
+                          <input
+                            type="text"
+                            value={addressFlatNo}
+                            onChange={e => setAddressFlatNo(e.target.value)}
+                            placeholder="Optional"
+                            className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {addressSubmitError && (
+                      <p className="text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2">
+                        {addressSubmitError}
+                      </p>
+                    )}
+                  </div>
+
+                  <DialogFooter>
+                    <DialogClose asChild>
+                      <button className="px-3 py-1.5 rounded border border-border text-sm hover:bg-muted/40">
+                        Cancel
+                      </button>
+                    </DialogClose>
+                    <button
+                      type="button"
+                      onClick={handleAddressSubmit}
+                      disabled={!addressCanSubmit}
+                      className="px-4 py-1.5 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center gap-2"
+                    >
+                      {addressSubmitting ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Submitting…</> : 'Submit Report'}
+                    </button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center py-12 text-center">
@@ -699,7 +1047,13 @@ function RequestsTable({ requests, onDelete }: { requests: ChangeRequest[], onDe
               </td>
               <td className="px-4 py-3">
                 <Chip tone={REQUEST_STATUS_TONE[r.status] ?? REQUEST_STATUS_TONE.pending}>
-                  {r.status === 'done' ? 'Done' : r.status === 'rejected' ? 'Rejected' : 'Pending'}
+                  {r.status === 'done'
+                    ? 'Done'
+                    : r.status === 'rejected'
+                    ? 'Rejected'
+                    : r.status === 'awaiting_address'
+                    ? 'Awaiting Address'
+                    : 'Pending'}
                 </Chip>
               </td>
               <td className="px-4 py-3">

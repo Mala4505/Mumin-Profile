@@ -100,9 +100,7 @@ export type Database = {
           is_active: boolean
           its_no: number
           last_login_at: string | null
-          login_credential: string
           must_change_password: boolean
-          paci_no: string | null
           role: string
           sabeel_no: string
           supabase_auth_id: string | null
@@ -116,9 +114,7 @@ export type Database = {
           is_active?: boolean
           its_no: number
           last_login_at?: string | null
-          login_credential?: string
           must_change_password?: boolean
-          paci_no?: string | null
           role?: string
           sabeel_no: string
           supabase_auth_id?: string | null
@@ -132,9 +128,7 @@ export type Database = {
           is_active?: boolean
           its_no?: number
           last_login_at?: string | null
-          login_credential?: string
           must_change_password?: boolean
-          paci_no?: string | null
           role?: string
           sabeel_no?: string
           supabase_auth_id?: string | null
@@ -1603,6 +1597,14 @@ export type Database = {
         Returns: undefined
       }
       resolve_form_audience: { Args: { p_form_id: string }; Returns: undefined }
+      rpc_merge_buildings: {
+        Args: { p_merged_by: number; p_source_building_id: number; p_target_building_id: number }
+        Returns: Json
+      }
+      rpc_move_household: {
+        Args: { p_moved_by: number; p_payload: Json }
+        Returns: Json
+      }
       submit_form_responses:
         | {
             Args: { filled_by: number; form_id: string; responses: Json }

@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
-import { Pencil, X, Loader2, Shield, Search, ChevronLeft, ChevronRight, ChevronDown, Users, KeyRound, Ban, TriangleAlert, Check, RotateCcw } from 'lucide-react'
+import { Pencil, X, Loader2, Shield, Search, ChevronLeft, ChevronRight, ChevronDown, Users, KeyRound, Ban, RotateCcw } from 'lucide-react'
 import { Chip, MemberIdentity } from '@/components/members/MemberPrimitives'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { TOUCH_TARGET } from '@/lib/members/display'
@@ -17,7 +17,6 @@ interface SystemUser {
   is_active: boolean
   last_login_at: string | null
   supabase_auth_id: string | null
-  login_credential: string
   has_custom_password: boolean
   sector: Array<{ sector_id: number }>
   subsector: Array<{ subsector_id: number }>
@@ -46,49 +45,7 @@ const ALL_ROLES = ['', ...ROLES] as const
 
 const PAGE_SIZE = 50
 
-const CREDENTIALS = ['paci', 'sabeel'] as const
-type Credential = typeof CREDENTIALS[number]
-
-const CREDENTIAL_LABEL: Record<Credential, string> = {
-  paci: 'PACI No',
-  sabeel: 'Sabeel No',
-}
-
-const CREDENTIAL_HINT: Record<Credential, string> = {
-  paci: 'Signs in with the family PACI number.',
-  sabeel: 'Signs in with their own Sabeel number.',
-}
-
-function toCredential(value: string | null | undefined): Credential {
-  return value === 'paci' ? 'paci' : 'sabeel'
-}
-
 const nf = new Intl.NumberFormat('en-US')
-
-/**
- * Runs `worker` over `items` with at most `limit` requests in flight. Bulk
- * updates can cover 2000 rows and each one hits the per-user PATCH endpoint,
- * so firing them all at once would bury the API and the Supabase auth admin.
- */
-async function runPool<T>(
-  items: T[],
-  limit: number,
-  worker: (item: T) => Promise<void>,
-  shouldStop: () => boolean
-): Promise<void> {
-  let cursor = 0
-  const lanes = Array.from({ length: Math.min(limit, items.length) }, async () => {
-    for (;;) {
-      if (shouldStop()) return
-      const index = cursor++
-      if (index >= items.length) return
-      await worker(items[index])
-    }
-  })
-  await Promise.all(lanes)
-}
-
-const BULK_CONCURRENCY = 5
 
 /**
  * Roles are a different semantic domain from member status, so they keep their
@@ -110,247 +67,6 @@ function RoleBadge({ role }: { role: string }) {
   return <Chip tone={ROLE_COLORS[role] ?? ROLE_FALLBACK}>{role}</Chip>
 }
 
-// ── Bulk credential rollout over the current filtered set ─────────────────────
-
-interface BulkResult {
-  updated: number
-  failures: Array<{ its_no: number; name: string; reason: string }>
-  stoppedEarly: boolean
-}
-
-function BulkCredentialPanel({
-  users,
-  onApplied,
-}: {
-  users: SystemUser[]
-  onApplied: (itsNos: number[], credential: Credential) => void
-}) {
-  const [open, setOpen] = useState(false)
-  const [target, setTarget] = useState<Credential>('sabeel')
-  const [running, setRunning] = useState(false)
-  const [progress, setProgress] = useState(0)
-  const [result, setResult] = useState<BulkResult | null>(null)
-  const stopRef = useRef(false)
-
-  // Only rows that would actually change are sent. Announcing "1,204" when 900
-  // are already correct would overstate the blast radius.
-  const pending = useMemo(
-    () => users.filter(u => toCredential(u.login_credential) !== target),
-    [users, target]
-  )
-  const alreadySet = users.length - pending.length
-  const needsProvisioning = useMemo(() => pending.filter(u => !u.supabase_auth_id).length, [pending])
-
-  async function run() {
-    stopRef.current = false
-    setRunning(true)
-    setProgress(0)
-    setResult(null)
-
-    const failures: BulkResult['failures'] = []
-    const succeeded: number[] = []
-    let completed = 0
-
-    await runPool(
-      pending,
-      BULK_CONCURRENCY,
-      async (u) => {
-        try {
-          const res = await fetch(`/api/admin/users/${u.its_no}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ login_credential: target }),
-          })
-          if (res.ok) {
-            succeeded.push(u.its_no)
-          } else {
-            const data = await res.json().catch(() => ({}))
-            failures.push({ its_no: u.its_no, name: u.name, reason: data.error ?? `HTTP ${res.status}` })
-          }
-        } catch {
-          failures.push({ its_no: u.its_no, name: u.name, reason: 'Network error' })
-        } finally {
-          completed++
-          setProgress(completed)
-        }
-      },
-      () => stopRef.current
-    )
-
-    onApplied(succeeded, target)
-    setResult({ updated: succeeded.length, failures, stoppedEarly: stopRef.current })
-    setRunning(false)
-  }
-
-  function reset() {
-    setOpen(false)
-    setResult(null)
-    setProgress(0)
-    stopRef.current = false
-  }
-
-  if (!open) {
-    return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-border rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
-      >
-        <KeyRound className="w-3.5 h-3.5" />
-        Set credential in bulk
-      </button>
-    )
-  }
-
-  return (
-    // Full-bleed drawer under the header row rather than a card nested in a card.
-    <div className="w-full basis-full -mx-4 -mb-3 border-t border-border bg-muted/20 px-4 py-4">
-      {!result ? (
-        <>
-          <p className="text-sm font-semibold text-foreground">
-            Set login credential for the {nf.format(users.length)} member{users.length !== 1 ? 's' : ''} in this view
-          </p>
-
-          <div className="flex gap-2 mt-3 max-w-xs">
-            {CREDENTIALS.map(c => (
-              <button
-                key={c}
-                type="button"
-                disabled={running}
-                onClick={() => setTarget(c)}
-                className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium border transition-colors disabled:opacity-60 ${
-                  target === c
-                    ? 'bg-primary/15 text-foreground border-primary'
-                    : 'bg-background border-border text-foreground hover:bg-muted/40'
-                }`}
-              >
-                {CREDENTIAL_LABEL[c]}
-              </button>
-            ))}
-          </div>
-
-          <div className="mt-3 space-y-1 text-sm text-muted-foreground max-w-prose">
-            <p>
-              <span className="font-semibold text-foreground">{nf.format(pending.length)}</span> will change to {CREDENTIAL_LABEL[target]}.
-              {alreadySet > 0 && <> {nf.format(alreadySet)} already use it and will be skipped.</>}
-            </p>
-            {needsProvisioning > 0 && (
-              <p className="text-amber-600">
-                {nf.format(needsProvisioning)} of them have no login account yet. One will be created for each as part of this run.
-              </p>
-            )}
-          </div>
-
-          {running && (
-            <div className="mt-4">
-              <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
-                <span>Updating {nf.format(progress)} of {nf.format(pending.length)}</span>
-                <span>{Math.round((progress / Math.max(1, pending.length)) * 100)}%</span>
-              </div>
-              <div
-                role="progressbar"
-                aria-valuemin={0}
-                aria-valuemax={pending.length}
-                aria-valuenow={progress}
-                aria-label={`Updating login credential for ${nf.format(pending.length)} members`}
-                className="h-1.5 w-full rounded-full bg-muted overflow-hidden"
-              >
-                <div
-                  className="h-full w-full origin-left rounded-full bg-primary transition-transform duration-200 ease-out"
-                  style={{ transform: `scaleX(${progress / Math.max(1, pending.length)})` }}
-                />
-              </div>
-            </div>
-          )}
-
-          <div className="flex gap-2 mt-4">
-            {running ? (
-              <button
-                type="button"
-                onClick={() => { stopRef.current = true }}
-                className="px-4 py-2 rounded-lg border border-border bg-background text-sm font-medium text-foreground hover:bg-muted/40 transition-colors"
-              >
-                Stop after in-flight updates
-              </button>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={reset}
-                  className="px-4 py-2 rounded-lg border border-border bg-background text-sm font-medium text-foreground hover:bg-muted/40 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={run}
-                  disabled={pending.length === 0}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
-                >
-                  {pending.length === 0
-                    ? 'Nothing to change'
-                    : `Update ${nf.format(pending.length)} member${pending.length !== 1 ? 's' : ''}`}
-                </button>
-              </>
-            )}
-          </div>
-        </>
-      ) : (
-        <>
-          <div className="flex items-start gap-2.5">
-            <span className={`mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md ${
-              result.failures.length === 0 ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
-            }`}>
-              {result.failures.length === 0 ? <Check className="w-3.5 h-3.5" /> : <TriangleAlert className="w-3.5 h-3.5" />}
-            </span>
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-foreground">
-                {nf.format(result.updated)} updated to {CREDENTIAL_LABEL[target]}
-                {result.failures.length > 0 && <>, {nf.format(result.failures.length)} failed</>}
-              </p>
-              {result.stoppedEarly && (
-                <p className="text-sm text-muted-foreground mt-0.5">
-                  Stopped early. The remaining members keep their previous credential.
-                </p>
-              )}
-              {result.failures.length > 0 && (
-                <div className="mt-2 max-h-40 overflow-y-auto rounded-lg border border-border bg-background divide-y divide-border">
-                  {result.failures.map(f => (
-                    <div key={f.its_no} className="px-3 py-2 text-xs">
-                      <span className="font-mono text-muted-foreground">{f.its_no}</span>
-                      <span className="text-foreground"> {f.name}</span>
-                      <span className="text-destructive">: {f.reason}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="flex gap-2 mt-4">
-            <button
-              type="button"
-              onClick={reset}
-              className="px-4 py-2 rounded-lg border border-border bg-background text-sm font-medium text-foreground hover:bg-muted/40 transition-colors"
-            >
-              Done
-            </button>
-            {result.failures.length > 0 && (
-              <button
-                type="button"
-                onClick={() => { setResult(null); setProgress(0) }}
-                className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
-              >
-                Retry the {nf.format(result.failures.length)} that failed
-              </button>
-            )}
-          </div>
-        </>
-      )}
-    </div>
-  )
-}
-
 export function UsersClient({ initialUsers, sectors, subsectors, categories, mode, currentSearch, currentRole, showAll }: Props) {
   const router = useRouter()
   const pathname = usePathname()
@@ -362,7 +78,6 @@ export function UsersClient({ initialUsers, sectors, subsectors, categories, mod
   const [editing, setEditing] = useState<SystemUser | null>(null)
   const [editRole, setEditRole] = useState<Role>('Mumin')
   const [editActive, setEditActive] = useState(true)
-  const [editCredential, setEditCredential] = useState<Credential>('sabeel')
   const [editSectorIds, setEditSectorIds] = useState<number[]>([])
   const [editSubsectorIds, setEditSubsectorIds] = useState<number[]>([])
   const [editUmoorIds, setEditUmoorIds] = useState<number[]>([])
@@ -409,7 +124,6 @@ export function UsersClient({ initialUsers, sectors, subsectors, categories, mod
     setEditing(u)
     setEditRole(u.role as Role)
     setEditActive(u.is_active)
-    setEditCredential(toCredential(u.login_credential))
     setEditSectorIds(u.sector.map(s => s.sector_id))
     setEditSubsectorIds(u.subsector.map(s => s.subsector_id))
     setEditUmoorIds((u.umoor ?? []).map(s => s.category_id))
@@ -470,7 +184,6 @@ export function UsersClient({ initialUsers, sectors, subsectors, categories, mod
     const body: Record<string, unknown> = {
       role: editRole,
       is_active: editActive,
-      login_credential: editCredential,
     }
 
     if (editRole === 'Admin' || editRole === 'Masool') {
@@ -507,7 +220,6 @@ export function UsersClient({ initialUsers, sectors, subsectors, categories, mod
             ...u,
             role: editRole,
             is_active: editActive,
-            login_credential: editCredential,
             supabase_auth_id: responseData.supabase_auth_id ?? u.supabase_auth_id,
             sector: (editRole === 'Admin' || editRole === 'Masool') ? editSectorIds.map(id => ({ sector_id: id })) : [],
             subsector: editRole === 'Musaid' ? editSubsectorIds.map(id => ({ subsector_id: id })) : [],
@@ -520,12 +232,6 @@ export function UsersClient({ initialUsers, sectors, subsectors, categories, mod
     closeEdit()
     router.refresh()
   }
-
-  const handleBulkApplied = useCallback((itsNos: number[], credential: Credential) => {
-    if (itsNos.length === 0) return
-    const changed = new Set(itsNos)
-    setUsers(prev => prev.map(u => changed.has(u.its_no) ? { ...u, login_credential: credential } : u))
-  }, [])
 
   // ── Idle state ──────────────────────────────────────────────────────────────
   if (mode === 'idle') {
@@ -631,7 +337,6 @@ export function UsersClient({ initialUsers, sectors, subsectors, categories, mod
           <h2 className="font-semibold text-foreground text-sm">
             {nf.format(users.length)} member{users.length !== 1 ? 's' : ''} found
           </h2>
-          {users.length > 0 && <BulkCredentialPanel users={users} onApplied={handleBulkApplied} />}
         </div>
 
         <div className="overflow-x-auto">
@@ -641,7 +346,7 @@ export function UsersClient({ initialUsers, sectors, subsectors, categories, mod
                 <th className={TH}>Member</th>
                 <th className={TH}>Role</th>
                 <th className={TH}>Sector / Subsector</th>
-                <th className={TH}>Credential</th>
+                <th className={TH}>Password</th>
                 <th className={TH}>Sign-in</th>
                 <th className={`${TH} hidden md:table-cell`}>Last Login</th>
                 <th className="px-4 py-3" />
@@ -665,7 +370,6 @@ export function UsersClient({ initialUsers, sectors, subsectors, categories, mod
                   : subsectorNames.length > 0
                   ? subsectorNames.join(', ')
                   : '—'
-                const credential = toCredential(u.login_credential)
 
                 return (
                   <tr key={u.its_no} className={`transition-colors ${u.is_active ? 'hover:bg-muted/20' : 'bg-muted/25 hover:bg-muted/40'}`}>
@@ -687,29 +391,19 @@ export function UsersClient({ initialUsers, sectors, subsectors, categories, mod
                     <td className="px-4 py-3 text-sm text-muted-foreground">{assignment}</td>
                     <td className="px-4 py-3">
                       {!u.is_active ? (
-                        <span className="text-xs text-muted-foreground" title="Account is disabled, so no credential applies.">
+                        <span className="text-xs text-muted-foreground" title="Account is disabled.">
                           Not applicable
                         </span>
+                      ) : u.has_custom_password ? (
+                        <span
+                          className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[11px] sm:text-[10px] font-medium text-amber-700"
+                          title="This member set their own password."
+                        >
+                          <KeyRound className="w-2.5 h-2.5" />
+                          own password
+                        </span>
                       ) : (
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span
-                            className={`text-[11px] font-mono uppercase tracking-wider ${
-                              credential === 'sabeel' ? 'text-foreground font-semibold' : 'text-muted-foreground'
-                            }`}
-                            title={CREDENTIAL_HINT[credential]}
-                          >
-                            {credential === 'sabeel' ? 'Sabeel' : 'PACI'}
-                          </span>
-                          {u.has_custom_password && (
-                            <span
-                              className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[11px] sm:text-[10px] font-medium text-amber-700"
-                              title="This member set their own password. The credential above no longer affects how they sign in."
-                            >
-                              <KeyRound className="w-2.5 h-2.5" />
-                              own password
-                            </span>
-                          )}
-                        </div>
+                        <span className="text-xs text-muted-foreground">Default</span>
                       )}
                     </td>
                     <td className="px-4 py-3">
@@ -829,35 +523,7 @@ export function UsersClient({ initialUsers, sectors, subsectors, categories, mod
                 </div>
                 {!editActive && (
                   <p className="text-xs text-destructive mt-1.5">
-                    Inactive members cannot sign in, whichever credential is set below.
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Login Credential</label>
-                <div className="flex gap-2">
-                  {CREDENTIALS.map(c => (
-                    <button
-                      key={c}
-                      type="button"
-                      onClick={() => setEditCredential(c)}
-                      className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
-                        editCredential === c
-                          ? 'bg-primary/15 text-foreground border-primary'
-                          : 'bg-background border-border text-foreground hover:bg-muted/40'
-                      }`}
-                    >
-                      {CREDENTIAL_LABEL[c]}
-                    </button>
-                  ))}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1.5">
-                  {CREDENTIAL_HINT[editCredential]}
-                </p>
-                {editing.has_custom_password && (
-                  <p className="text-xs text-amber-600 mt-1.5">
-                    This member has already set their own password, so the credential above will not change how they sign in.
+                    Inactive members cannot sign in.
                   </p>
                 )}
               </div>
@@ -869,7 +535,7 @@ export function UsersClient({ initialUsers, sectors, subsectors, categories, mod
                     Reset to default credential
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Their custom password stops working immediately. They can log back in with their {CREDENTIAL_LABEL[toCredential(editing.login_credential)]} — the default credential shown above.
+                    Their custom password stops working immediately. They can log back in with their Sabeel number — the default credential.
                   </p>
 
                   {resetError && (

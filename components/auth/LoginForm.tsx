@@ -176,7 +176,7 @@ export function LoginForm() {
           />
         </div>
 
-        {/* Password (default credential is the account's Sabeel or PACI number, per auth_accounts.login_credential) */}
+        {/* Password (default credential is the account's Sabeel number) */}
         <div>
           <label
             htmlFor="paci_no"

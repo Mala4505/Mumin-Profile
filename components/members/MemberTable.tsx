@@ -1,20 +1,31 @@
 'use client'
 
-import { useState, useMemo, Fragment } from 'react'
+import { useState, useMemo, useEffect, Fragment } from 'react'
 import Link from 'next/link'
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import {
-  Users, ChevronUp, ChevronDown, ChevronRight, FilePlus,
+  Users, ChevronUp, ChevronDown, ChevronRight, FilePlus, MoveRight,
   ChevronsUpDown, LayoutList, Hash, Search,
 } from 'lucide-react'
 import type { MemberListItem, Role } from '@/lib/types/app'
 import { EditMemberModal } from './EditMemberModal'
+import { MoveHouseholdPanel, type MoveSource } from './MoveHouseholdPanel'
 import {
   BaligPill,
+  Chip,
   GenderPill,
   HeadBadge,
   MemberIdentity,
   MemberStatusBadge,
 } from './MemberPrimitives'
+
+/**
+ * "Move pending" tone — distinct from every status/gender/balig chip already
+ * rendered in this table (green/gray/blue/red/yellow for status, blue/pink for
+ * gender, orange for balig/HoF), so it never gets mistaken for one of those.
+ */
+const MOVE_PENDING_TONE = 'bg-violet-100 text-violet-700 border-violet-200'
+const MOVE_PENDING_TITLE = 'An address change request is open for this family.'
 
 
 interface MemberTableProps {
@@ -167,12 +178,41 @@ function sortPaciGroups(groups: PaciGroup[], col: string, dir: SortDir): PaciGro
 // ─── Main component ────────────────────────────────────────────────────────
 
 export function MemberTable({ members, role, mode }: MemberTableProps) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
   const [viewMode, setViewMode] = useState<'paci' | 'member'>('paci')
   const [sortCol, setSortCol] = useState('name')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const [page, setPage] = useState(1)
   const [expandedPaci, setExpandedPaci] = useState<Set<string>>(new Set())
   const [editMember, setEditMember] = useState<MemberListItem | null>(null)
+  // Moves are SuperAdmin-only for now — the write path 403s for anyone else,
+  // Masool/Musaid get a request-based flow in a later phase not yet built.
+  const canMove = role === 'SuperAdmin'
+  // Deep-link: `?move=<sabeel_no>` opens the move panel for that household on
+  // mount (e.g. a link from elsewhere in the app), same as the row action.
+  // Gated on `canMove` so a non-SuperAdmin hitting this URL directly doesn't
+  // get the panel populated (its GETs are staff-accessible) only to 403 on submit.
+  const [moveSource, setMoveSource] = useState<MoveSource | null>(() => {
+    if (!canMove) return null
+    const deepLink = searchParams.get('move')
+    return deepLink ? { type: 'sabeel', sabeelNo: deepLink } : null
+  })
+  // Part A — "Move pending" badge: fetched once client-side, same fetch-on-mount
+  // + swallow-errors pattern MemberFiltersBar already uses for /api/members/filters.
+  const [movePendingSet, setMovePendingSet] = useState<Set<string>>(new Set())
+  useEffect(() => {
+    fetch('/api/requests/open-address-sabeels')
+      .then((r) => r.json())
+      .then((d) => setMovePendingSet(new Set(d.sabeel_nos ?? [])))
+      .catch(() => {})
+  }, [])
+  // Part C — bulk selection, flat/paci view only, SuperAdmin-gated below.
+  // Keyed by the same `rowKey` each paci row already uses (paci_no, or
+  // `sabeel_no` for the null-paci fallback case).
+  const [selectedPaci, setSelectedPaci] = useState<Set<string>>(new Set())
 
   const isMumin = role === 'Mumin'
   const isStaff = role !== 'Mumin'
@@ -180,6 +220,20 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
   const showMasool = isStaff
   const showMusaid = isStaff
   const canEdit = role === 'SuperAdmin' || role === 'Admin'
+
+  // Mirror the panel's open/closed state into the URL so it's linkable and
+  // survives a refresh. Only the sabeel-sourced case has a URL representation
+  // (`?move=<sabeel_no>`); a whole-flat PACI move just clears the param on close.
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (moveSource?.type === 'sabeel') params.set('move', moveSource.sabeelNo)
+    else params.delete('move')
+    const next = params.toString()
+    if (next !== searchParams.toString()) {
+      router.replace(`${pathname}${next ? `?${next}` : ''}`, { scroll: false })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [moveSource])
 
   function handleSort(col: string) {
     if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
@@ -201,6 +255,23 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
   const paciGroups = useMemo(() => groupByPaci(members), [members])
   const sortedPaci = useMemo(() => sortPaciGroups(paciGroups, sortCol, sortDir), [paciGroups, sortCol, sortDir])
   const paciPage = useMemo(() => sortedPaci.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [sortedPaci, page])
+
+  // Every sabeel_no behind the selected paci rows. A paci group's own
+  // `sabeel_no` field only reflects the first member folded into it — a flat
+  // shared by multiple families needs every member's sabeel_no, deduped.
+  const bulkSabeelNos = useMemo(() => {
+    const set = new Set<string>()
+    for (const g of paciGroups) {
+      if (selectedPaci.has(g.paci_no ?? g.sabeel_no)) {
+        for (const m of g.members) set.add(m.sabeel_no)
+      }
+    }
+    return [...set]
+  }, [paciGroups, selectedPaci])
+
+  function clearSelection() {
+    setSelectedPaci(new Set())
+  }
 
   if (mode === 'idle') {
     return (
@@ -238,9 +309,12 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
   }
 
   const totalItems = viewMode === 'paci' ? paciGroups.length : members.length
-  // PACI header columns: paci_no, sabeel_no, floor, flat, building, Head of
-  // Family, Count, [Sector], Subsector, Request, chevron → 11 with sector, 10 without.
-  const paciColSpan = showSector ? 11 : 10
+  // PACI header columns: [checkbox], paci_no, sabeel_no, floor, flat, building,
+  // Head of Family, Count, [Sector], Subsector, Request, [Move], chevron → 10
+  // base, +1 for Sector (SuperAdmin/Admin), +2 for Move + checkbox (SuperAdmin only).
+  const paciColSpan = 10 + (showSector ? 1 : 0) + (canMove ? 2 : 0)
+  const allPaciOnPageSelected =
+    paciPage.length > 0 && paciPage.every((g) => selectedPaci.has(g.paci_no ?? g.sabeel_no))
 
   return (
     <div className="bg-card rounded-xl border border-border overflow-hidden shadow-sm">
@@ -278,6 +352,27 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-muted/40 border-b border-border">
+                  {canMove && (
+                    <th className="px-4 py-3 w-10">
+                      <input
+                        type="checkbox"
+                        checked={allPaciOnPageSelected}
+                        onChange={(e) => {
+                          setSelectedPaci((prev) => {
+                            const next = new Set(prev)
+                            for (const g of paciPage) {
+                              const key = g.paci_no ?? g.sabeel_no
+                              if (e.target.checked) next.add(key)
+                              else next.delete(key)
+                            }
+                            return next
+                          })
+                        }}
+                        aria-label="Select all flats on this page"
+                        className="h-4 w-4 rounded border-border text-primary focus:ring-2 focus:ring-primary/40"
+                      />
+                    </th>
+                  )}
                   <SortTh col="paci_no" label="PACI No" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
                   <SortTh col="sabeel_no" label="Sabeel No" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
                   <SortTh col="floor_no" label="Floor" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
@@ -292,6 +387,11 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
                   <th className="px-4 py-3 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                     Request
                   </th>
+                  {canMove && (
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      Move
+                    </th>
+                  )}
 
                   <th className="px-4 py-3" />
                 </tr>
@@ -309,8 +409,33 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
                         className="hover:bg-muted/30 transition-colors border-b border-border last:border-0 cursor-pointer"
                         onClick={() => togglePaci(rowKey)}
                       >
+                        {canMove && (
+                          <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              checked={selectedPaci.has(rowKey)}
+                              onChange={(e) => {
+                                setSelectedPaci((prev) => {
+                                  const next = new Set(prev)
+                                  if (e.target.checked) next.add(rowKey)
+                                  else next.delete(rowKey)
+                                  return next
+                                })
+                              }}
+                              aria-label={`Select flat ${rowKey}`}
+                              className="h-4 w-4 rounded border-border text-primary focus:ring-2 focus:ring-primary/40"
+                            />
+                          </td>
+                        )}
                         <td className="px-4 py-3"><span className="font-mono text-xs text-muted-foreground">{group.paci_no ?? '—'}</span></td>
-                        <td className="px-4 py-3"><span className="font-mono text-xs text-muted-foreground">{group.sabeel_no}</span></td>
+                        <td className="px-4 py-3">
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className="font-mono text-xs text-muted-foreground">{group.sabeel_no}</span>
+                            {group.members.some((m) => movePendingSet.has(m.sabeel_no)) && (
+                              <Chip tone={MOVE_PENDING_TONE} title={MOVE_PENDING_TITLE}>Move pending</Chip>
+                            )}
+                          </span>
+                        </td>
                         <td className="px-4 py-3"><span className="text-sm">{group.floor_no ?? '—'}</span></td>
                         <td className="px-4 py-3"><span className="text-sm">{group.flat_no ?? '—'}</span></td>
                         <td className="px-4 py-3"><span className="text-sm">{group.building_name ?? '—'}</span></td>
@@ -336,6 +461,31 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
                             <FilePlus className="w-4 h-4 text-primary" />
                           </Link>
                         </td>
+
+                        {/* Move button column — the flat is the movable unit, so a
+                            PACI-grouped row moves the whole flat (every family on
+                            it) at once; a flat with no PACI on file yet (not
+                            really "a flat" so much as one unplaced family) falls
+                            back to moving just that household by sabeel_no. */}
+                        {canMove && (
+                          <td className="px-4 py-3 text-center" onClick={e => e.stopPropagation()}>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setMoveSource(
+                                  group.paci_no
+                                    ? { type: 'paci', paciNo: group.paci_no }
+                                    : { type: 'sabeel', sabeelNo: group.sabeel_no },
+                                )
+                              }
+                              className="inline-flex items-center justify-center p-1 rounded hover:bg-muted/50 transition-colors"
+                              title={group.paci_no ? 'Move this flat' : 'Move this household'}
+                              aria-label={group.paci_no ? 'Move this flat' : 'Move this household'}
+                            >
+                              <MoveRight className="w-4 h-4 text-primary" />
+                            </button>
+                          </td>
+                        )}
 
                         <td className="px-4 py-3 text-right" onClick={e => { e.stopPropagation(); togglePaci(rowKey) }}>
                           <button className="p-1 rounded hover:bg-muted/50 transition-colors">
@@ -436,28 +586,49 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
               )
               return (
                 <div key={rowKey + idx} className="hover:bg-muted/30 transition-colors">
-                  <button className="w-full text-left p-4" onClick={() => togglePaci(rowKey)}>
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-sm truncate">{group.hof_name ?? '—'}</span>
-                          <span className="shrink-0 inline-flex items-center justify-center min-w-[1.25rem] px-1.5 py-0.5 rounded-full text-xs font-semibold bg-muted text-foreground border border-border">
-                            {group.members.length}
-                          </span>
+                  <div className="flex items-start gap-2 p-4">
+                    {canMove && (
+                      <input
+                        type="checkbox"
+                        checked={selectedPaci.has(rowKey)}
+                        onChange={(e) => {
+                          setSelectedPaci((prev) => {
+                            const next = new Set(prev)
+                            if (e.target.checked) next.add(rowKey)
+                            else next.delete(rowKey)
+                            return next
+                          })
+                        }}
+                        aria-label={`Select flat ${rowKey}`}
+                        className="mt-1 h-4 w-4 shrink-0 rounded border-border text-primary focus:ring-2 focus:ring-primary/40"
+                      />
+                    )}
+                    <button className="flex-1 min-w-0 text-left" onClick={() => togglePaci(rowKey)}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-medium text-sm truncate">{group.hof_name ?? '—'}</span>
+                            <span className="shrink-0 inline-flex items-center justify-center min-w-[1.25rem] px-1.5 py-0.5 rounded-full text-xs font-semibold bg-muted text-foreground border border-border">
+                              {group.members.length}
+                            </span>
+                            {group.members.some((m) => movePendingSet.has(m.sabeel_no)) && (
+                              <Chip tone={MOVE_PENDING_TONE} title={MOVE_PENDING_TITLE}>Move pending</Chip>
+                            )}
+                          </div>
+                          <p className="font-mono text-xs text-muted-foreground mt-0.5">
+                            PACI: {group.paci_no ?? '—'} · Sabeel: {group.sabeel_no}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Floor {group.floor_no ?? '—'} · Flat {group.flat_no ?? '—'}
+                            {group.building_name ? ` · ${group.building_name}` : ''}
+                          </p>
                         </div>
-                        <p className="font-mono text-xs text-muted-foreground mt-0.5">
-                          PACI: {group.paci_no ?? '—'} · Sabeel: {group.sabeel_no}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Floor {group.floor_no ?? '—'} · Flat {group.flat_no ?? '—'}
-                          {group.building_name ? ` · ${group.building_name}` : ''}
-                        </p>
+                        {isExpanded
+                          ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
+                          : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />}
                       </div>
-                      {isExpanded
-                        ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
-                        : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />}
-                    </div>
-                  </button>
+                    </button>
+                  </div>
                   {isExpanded && (
                     <div className="px-4 pb-4 space-y-1.5">
                       {sortedGroupMembers.map(m => (
@@ -546,6 +717,9 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
                           <div className="flex items-center gap-1.5">
                             <MemberIdentity name={member.name} itsNo={member.its_no} size="sm" />
                             {isHead && <HeadBadge />}
+                            {movePendingSet.has(member.sabeel_no) && (
+                              <Chip tone={MOVE_PENDING_TONE} title={MOVE_PENDING_TITLE}>Move pending</Chip>
+                            )}
                           </div>
                         </td>
                         {isStaff && (
@@ -586,6 +760,14 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
                                 Edit
                               </button>
                             )}
+                            {canMove && (
+                              <button
+                                onClick={() => setMoveSource({ type: 'sabeel', sabeelNo: member.sabeel_no })}
+                                className={ROW_ACTION}
+                              >
+                                Move
+                              </button>
+                            )}
                             {isStaff && (
                               <Link href={`/requests?search=${member.sabeel_no}`} className={ROW_ACTION}>
                                 Request
@@ -614,9 +796,12 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
                   <div key={member.its_no} className="p-4 hover:bg-muted/30 transition-colors">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-start gap-1.5">
+                        <div className="flex flex-wrap items-start gap-1.5">
                           <MemberIdentity name={member.name} itsNo={member.its_no} size="sm" />
                           {isHead && <HeadBadge />}
+                          {movePendingSet.has(member.sabeel_no) && (
+                            <Chip tone={MOVE_PENDING_TONE} title={MOVE_PENDING_TITLE}>Move pending</Chip>
+                          )}
                         </div>
                         {isStaff && !isHead && member.hof_name && (
                           <p className="text-xs text-muted-foreground mt-0.5">HoF: {member.hof_name}</p>
@@ -643,11 +828,19 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
                       </Link>
                     </div>
 
-                    {(canEdit || isStaff) && (
+                    {(canEdit || canMove || isStaff) && (
                       <div className="flex flex-wrap items-center gap-2 mt-3">
                         {canEdit && (
                           <button onClick={() => setEditMember(member)} className={CARD_ACTION}>
                             Edit
+                          </button>
+                        )}
+                        {canMove && (
+                          <button
+                            onClick={() => setMoveSource({ type: 'sabeel', sabeelNo: member.sabeel_no })}
+                            className={CARD_ACTION}
+                          >
+                            Move
                           </button>
                         )}
                         {isStaff && (
@@ -667,6 +860,31 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
 
       <Pagination page={page} total={totalItems} pageSize={PAGE_SIZE} onPage={setPage} />
 
+      {/* Part C — sticky bulk-selection action bar. Same border/shadow weight
+          as MoveHouseholdPanel's own container chrome (border-t + shadow-2xl). */}
+      {canMove && viewMode === 'paci' && selectedPaci.size > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 z-30 flex flex-wrap items-center justify-between gap-3 border-t border-border bg-card px-4 py-3 shadow-2xl sm:px-6">
+          <span className="text-sm font-medium text-foreground">
+            {selectedPaci.size} selected
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={clearSelection}
+              className="px-3 py-1.5 rounded-md border border-border text-xs font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors"
+            >
+              Clear
+            </button>
+            <button
+              onClick={() => setMoveSource({ type: 'bulk', sabeelNos: bulkSabeelNos })}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors"
+            >
+              <MoveRight className="w-3.5 h-3.5" />
+              Move to…
+            </button>
+          </div>
+        </div>
+      )}
+
       {editMember && (
         <EditMemberModal
           open={!!editMember}
@@ -679,14 +897,16 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
             phone: editMember.phone ?? '',
             status: editMember.status,
           }}
-          initialAddress={role === 'SuperAdmin' ? {
-            subsector_id: String(editMember.subsector_id),
-            building_name: editMember.building_name ?? '',
-            floor_no: editMember.floor_no ?? '',
-            flat_no: editMember.flat_no ?? '',
-            paci_no: editMember.paci_no ?? '',
-          } : undefined}
           onSaved={() => { setEditMember(null); window.location.reload() }}
+        />
+      )}
+
+      {canMove && moveSource && (
+        <MoveHouseholdPanel
+          open={!!moveSource}
+          onOpenChange={(open) => { if (!open) { setMoveSource(null); clearSelection() } }}
+          source={moveSource}
+          onMoved={() => { setMoveSource(null); clearSelection(); window.location.reload() }}
         />
       )}
     </div>

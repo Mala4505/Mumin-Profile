@@ -448,6 +448,10 @@ export async function importCoreMembers(
     // (PostgREST requires uniform columns per batch for correct ON CONFLICT behaviour)
     // Profile key: `${isNew}_${hasPhone}_${hasFamilyType}`
     const muminGroups = new Map<string, Record<string, unknown>[]>();
+    // CSV role for brand-new members, grouped by role — applied to
+    // auth_accounts after the mumin insert below (mumin has no role column;
+    // auth_accounts is the single master for it since migration 018).
+    const newMemberRolesByRole = new Map<string, number[]>();
     let insertedRows = 0;
     let updatedRows = 0;
 
@@ -468,11 +472,20 @@ export async function importCoreMembers(
       if (hasPhone) base.phone = p.phone;
       if (hasFamilyType) base.family_type = p.family_type;
 
-      // status and role: only set for new inserts — never overwrite on re-import
+      // status: only set for new inserts — never overwrite on re-import
       if (isNew) {
         base.status = "active";
-        base.role = p._csvRole;
         insertedRows++;
+        // auth_accounts rows are auto-created (defaulting to role 'Mumin')
+        // by trg_sync_auth_account_on_mumin_change during the mumin insert
+        // below. A non-default CSV role is applied as a follow-up update
+        // in Phase 7.5, once those rows are guaranteed to exist.
+        if (p._csvRole !== "Mumin") {
+          if (!newMemberRolesByRole.has(p._csvRole)) {
+            newMemberRolesByRole.set(p._csvRole, []);
+          }
+          newMemberRolesByRole.get(p._csvRole)!.push(p.its_no);
+        }
       } else {
         updatedRows++;
       }
@@ -482,6 +495,7 @@ export async function importCoreMembers(
       muminGroups.get(groupKey)!.push(base);
     }
 
+    const failedItsNos = new Set<number>();
     for (const group of muminGroups.values()) {
       for (const chunk of chunkArray(group, 500)) {
         const { error: upsertErr } = await admin
@@ -492,6 +506,30 @@ export async function importCoreMembers(
             rowNumber: 0,
             rawData: {},
             message: `Batch mumin upsert failed: ${upsertErr.message}`,
+          });
+          for (const row of chunk as { its_no: number }[]) failedItsNos.add(row.its_no);
+        }
+      }
+    }
+
+    // ── Phase 7.5: Apply CSV roles for brand-new members ────
+    // Must run after the mumin upsert above so trg_sync_auth_account_on_mumin_change
+    // has already created the corresponding auth_accounts rows. Skip its_nos whose
+    // mumin upsert failed above — their auth_accounts row was never created, so the
+    // update below would silently match zero rows.
+    for (const [role, allItsNos] of newMemberRolesByRole) {
+      const itsNos = allItsNos.filter((n) => !failedItsNos.has(n));
+      if (itsNos.length === 0) continue;
+      for (const chunk of chunkArray(itsNos, 500)) {
+        const { error: roleErr } = await admin
+          .from("auth_accounts")
+          .update({ role })
+          .in("its_no", chunk);
+        if (roleErr) {
+          errors.push({
+            rowNumber: 0,
+            rawData: {},
+            message: `Batch auth_accounts role update failed for role "${role}": ${roleErr.message}`,
           });
         }
       }

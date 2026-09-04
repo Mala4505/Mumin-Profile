@@ -46,10 +46,10 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
 
   if (hasFilter) {
     // Auth fields (role, is_active, last_login_at, supabase_auth_id,
-    // login_credential, has_custom_password) moved off `mumin` onto
-    // `auth_accounts` in migration 018. There's no direct FK path that makes a
-    // single embedded PostgREST join clean here, so query both and merge by
-    // its_no in JS — same map-building pattern as sectorMap/subsectorMap/umoorMap.
+    // has_custom_password) moved off `mumin` onto `auth_accounts` in
+    // migration 018. There's no direct FK path that makes a single embedded
+    // PostgREST join clean here, so query both and merge by its_no in JS —
+    // same map-building pattern as sectorMap/subsectorMap/umoorMap.
     //
     // roleFilter now targets auth_accounts.role, so resolve it against
     // auth_accounts first and constrain the mumin query by its_no — otherwise
@@ -57,7 +57,7 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
     // ever gets applied.
     let authQuery = admin
       .from('auth_accounts')
-      .select('its_no, role, is_active, last_login_at, supabase_auth_id, login_credential, has_custom_password')
+      .select('its_no, role, is_active, last_login_at, supabase_auth_id, has_custom_password')
 
     if (roleFilter) {
       authQuery = authQuery.eq('role', roleFilter as 'SuperAdmin' | 'Admin' | 'Masool' | 'Musaid' | 'Mumin' | 'UmoorCoordinator')
@@ -124,7 +124,6 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
         is_active: auth?.is_active ?? true,
         last_login_at: auth?.last_login_at ?? null,
         supabase_auth_id: auth?.supabase_auth_id ?? null,
-        login_credential: auth?.login_credential ?? 'sabeel',
         has_custom_password: auth?.has_custom_password ?? false,
         sector: (sectorMap.get(m.its_no) ?? []).map((id: number) => ({ sector_id: id })),
         subsector: (subsectorMap.get(m.its_no) ?? []).map((id: number) => ({ subsector_id: id })),

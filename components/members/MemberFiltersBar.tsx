@@ -144,6 +144,12 @@ export function MemberFiltersBar({
     updateFilter(key, current === value ? '' : value)
   }
 
+  /** Boolean-valued pill (as opposed to `togglePill`'s enum-valued groups) — presence of `'1'` is the only state. */
+  function toggleBoolFilter(key: string) {
+    const current = searchParams.get(key)
+    updateFilter(key, current === '1' ? '' : '1')
+  }
+
   // Debounced search
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
@@ -383,6 +389,18 @@ export function MemberFiltersBar({
             </div>
           )
         })}
+
+        {/* Standalone boolean pill — not part of PILL_GROUPS since those are enum-valued. */}
+        <button
+          onClick={() => toggleBoolFilter('move_pending')}
+          className={`inline-flex items-center justify-center min-h-9 sm:min-h-8 px-3 rounded-full text-xs font-medium border transition-colors ${
+            currentFilters.move_pending
+              ? 'bg-primary text-primary-foreground border-primary'
+              : 'bg-background text-muted-foreground border-border hover:border-primary/50 hover:text-foreground'
+          }`}
+        >
+          Move pending
+        </button>
       </div>
     </div>
   )

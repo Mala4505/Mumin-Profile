@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/getSession'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { materializeAudience } from '@/lib/forms/materializeAudience'
 import { isAuthorizedFiller } from '@/lib/forms/checkFillerAccess'
 import { Database } from '@/lib/types/database'
@@ -108,10 +109,12 @@ export async function PUT(
 
   // Handle submit-for-approval by Masool/Musaid/UmoorCoordinator
   if (body.status === 'pending_approval' && ['Masool', 'Musaid', 'UmoorCoordinator'].includes(session.role)) {
-    const { data: admins } = await supabase
-      .from('mumin')
+    const admin = createAdminClient()
+    const { data: admins } = await admin
+      .from('auth_accounts')
       .select('its_no')
       .in('role', ['SuperAdmin', 'Admin'])
+      .eq('is_active', true)
     if (admins?.length) {
       await supabase.from('notifications').insert(
         admins.map((a) => ({

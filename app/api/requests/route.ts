@@ -98,9 +98,45 @@ export async function POST(request: NextRequest) {
     new_value: string
   }
 
-  const body = await request.json() as { sabeel_no: string; remark: string; requested_changes?: RequestedChange[] }
+  interface AddressChangeRequest {
+    type: 'address_change'
+    known: 'flag' | 'area' | 'building' | 'full'
+    note?: string
+    reported_sector_id?: number
+    reported_subsector_id?: number
+    reported_building_id?: number
+    reported_building_name?: string
+    paci_no?: string
+    floor_no?: string
+    flat_no?: string
+  }
+
+  const body = await request.json() as {
+    sabeel_no: string
+    remark: string
+    requested_changes?: RequestedChange[] | AddressChangeRequest
+  }
   if (!body.sabeel_no || !body.remark?.trim()) {
     return NextResponse.json({ error: 'sabeel_no and remark are required' }, { status: 400 })
+  }
+
+  const isAddressChange =
+    !!body.requested_changes &&
+    !Array.isArray(body.requested_changes) &&
+    (body.requested_changes as AddressChangeRequest).type === 'address_change'
+
+  let addressStatus: 'pending' | 'awaiting_address' | undefined
+
+  if (isAddressChange) {
+    const addressChange = body.requested_changes as AddressChangeRequest
+    const validKnownValues = ['flag', 'area', 'building', 'full']
+    if (!validKnownValues.includes(addressChange.known)) {
+      return NextResponse.json({ error: 'known must be one of: flag, area, building, full' }, { status: 422 })
+    }
+    if (addressChange.known === 'full' && !addressChange.paci_no?.trim()) {
+      return NextResponse.json({ error: 'paci_no is required when known is "full"' }, { status: 422 })
+    }
+    addressStatus = addressChange.known === 'full' ? 'pending' : 'awaiting_address'
   }
 
   const admin = createAdminClient()
@@ -137,8 +173,9 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  if (body.requested_changes && body.requested_changes.length > 0) {
-    const submittedItsNos = [...new Set(body.requested_changes.map((c: any) => c.its_no as number))]
+  if (!isAddressChange && body.requested_changes && (body.requested_changes as RequestedChange[]).length > 0) {
+    const fieldChanges = body.requested_changes as RequestedChange[]
+    const submittedItsNos = [...new Set(fieldChanges.map((c: any) => c.its_no as number))]
     const { data: memberCheck } = await admin
       .from('mumin')
       .select('its_no')
@@ -158,6 +195,7 @@ export async function POST(request: NextRequest) {
       sabeel_no: body.sabeel_no,
       remark: body.remark.trim(),
       requested_changes: body.requested_changes ? JSON.parse(JSON.stringify(body.requested_changes)) : null,
+      ...(addressStatus ? { status: addressStatus } : {}),
     })
     .select('id, sabeel_no, remark, status, requested_changes, created_at')
     .single()

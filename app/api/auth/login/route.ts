@@ -66,9 +66,6 @@ async function provisionAuthUser(
 }
 
 // Generic credential failure message — same for all 401 cases to prevent user enumeration.
-// Deliberately doesn't name a specific credential (PACI/Sabeel): which one an account
-// uses is per-account (auth_accounts.login_credential) and naming the wrong one here
-// would also leak which credential type an unknown/nonexistent ITS number would use.
 const INVALID_CREDENTIALS_RESPONSE = { error: "Invalid ITS number or password" } as const;
 
 export async function POST(request: Request) {
@@ -124,10 +121,12 @@ export async function POST(request: Request) {
     }
 
     // Single query straight against auth_accounts — no join, no view.
+    // paci_no/login_credential were retired in migration 021 (fixes S1):
+    // default_credential now mirrors sabeel_no unconditionally.
     const { data: row, error: rowError } = await admin
       .from("auth_accounts")
       .select(
-        "its_no, sabeel_no, paci_no, default_credential, login_credential, has_custom_password, supabase_auth_id, role, is_active",
+        "its_no, sabeel_no, default_credential, has_custom_password, supabase_auth_id, role, is_active",
       )
       .eq("its_no", its_no_num)
       .maybeSingle();

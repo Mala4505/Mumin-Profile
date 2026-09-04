@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { ChevronDown, User, KeyRound, LogOut } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Role } from '@/lib/types/app'
-import { MemberAvatar, MemberIdentity } from '@/components/members/MemberPrimitives'
+import { MemberAvatar } from '@/components/members/MemberPrimitives'
 
 interface UserMenuProps {
   name: string
@@ -42,12 +42,9 @@ export function UserMenu({ name, role, its_no }: UserMenuProps) {
         className="flex min-h-11 items-center gap-2 rounded-lg px-2.5 py-1.5 transition-colors hover:bg-muted"
       >
         <MemberAvatar name={name} size="xs" />
-        <MemberIdentity
-          name={name}
-          itsNo={its_no}
-          size="sm"
-          className="max-w-[12rem] text-left"
-        />
+        <span className="whitespace-nowrap font-mono text-sm font-medium text-foreground">
+          ITS {its_no}
+        </span>
         <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
       </button>
 
@@ -56,7 +53,12 @@ export function UserMenu({ name, role, its_no }: UserMenuProps) {
           role="menu"
           className="absolute right-0 top-full z-50 mt-1 w-56 rounded-lg border border-border bg-background py-1 shadow-lg"
         >
-          <p className="px-3 py-1.5 text-xs text-muted-foreground">{role}</p>
+          <div className="px-3 py-2">
+            <p className="truncate text-sm font-semibold text-foreground">{name}</p>
+            <p className="mt-0.5 font-mono text-xs text-muted-foreground">
+              ITS {its_no} <span className="mx-1">·</span> {role}
+            </p>
+          </div>
           <div className="my-1 border-t border-border" />
           <button
             role="menuitem"

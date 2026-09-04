@@ -44,9 +44,24 @@ export async function PATCH(
     'phone', 'alternate_phone', 'email', 'status', 'notes',
   ])
 
+  interface AddressChangeRequest {
+    type: 'address_change'
+    known: 'flag' | 'area' | 'building' | 'full'
+    note?: string
+    reported_sector_id?: number
+    reported_subsector_id?: number
+    reported_building_id?: number
+    reported_building_name?: string
+    paci_no?: string
+    floor_no?: string
+    flat_no?: string
+  }
+
   const body = await request.json() as
     | { action: 'approve' }
     | { action: 'reject'; reviewer_note?: string }
+    | { action: 'complete' }
+    | { action: 'ask'; note: string }
     | { status: 'pending' | 'done' }
 
   const admin = createAdminClient()
@@ -56,7 +71,7 @@ export async function PATCH(
     // 1. Fetch the change request with requested_changes
     const { data: cr, error: fetchErr } = await admin
       .from('change_request')
-      .select('id, status, requested_changes')
+      .select('id, status, requested_changes, sabeel_no, remark')
       .eq('id', requestId)
       .single()
 
@@ -66,6 +81,65 @@ export async function PATCH(
 
     if (cr.status !== 'pending') {
       return NextResponse.json({ error: 'Request is not pending' }, { status: 409 })
+    }
+
+    const isAddressChange = !Array.isArray(cr.requested_changes) &&
+      cr.requested_changes !== null &&
+      (cr.requested_changes as any).type === 'address_change'
+
+    if (isAddressChange) {
+      const ac = cr.requested_changes as unknown as AddressChangeRequest
+      const destination: Record<string, unknown> = { paci_no: ac.paci_no }
+      if (ac.reported_building_id) {
+        destination.building_id = ac.reported_building_id
+      } else if (ac.reported_building_name && ac.reported_subsector_id) {
+        destination.new_building = {
+          building_name: ac.reported_building_name,
+          subsector_id: ac.reported_subsector_id,
+        }
+      }
+      if (ac.floor_no) destination.floor_no = ac.floor_no
+      if (ac.flat_no) destination.flat_no = ac.flat_no
+
+      const payload = {
+        sources: [{ sabeel_no: cr.sabeel_no }],
+        destination,
+        effective_date: new Date().toISOString().slice(0, 10),
+        reason: cr.remark ?? 'Approved address change request',
+      }
+
+      const { data: rpcData, error: rpcErr } = await admin.rpc('rpc_move_household', {
+        p_payload: JSON.parse(JSON.stringify(payload)),
+        p_moved_by: meta.its_no!,
+      })
+
+      if (rpcErr) {
+        if (rpcErr.message.startsWith('CONFLICT:')) {
+          return NextResponse.json({ error: rpcErr.message }, { status: 409 })
+        }
+        return NextResponse.json({ error: rpcErr.message }, { status: 400 })
+      }
+
+      const now = new Date().toISOString()
+      const { data: doneData, error: doneErr } = await admin
+        .from('change_request')
+        .update({ status: 'done', reviewed_by: meta.its_no!, reviewed_at: now })
+        .eq('id', requestId)
+        .select('id, status, reviewed_by, reviewed_at, requested_changes')
+        .single()
+
+      if (doneErr) return NextResponse.json({ error: doneErr.message }, { status: 500 })
+
+      const { error: logErr } = await admin.from('activity_log').insert({
+        performed_by_its: meta.its_no!,
+        action: 'approve_address_change_request',
+        entity_type: 'family',
+        entity_id: cr.sabeel_no,
+        metadata: JSON.parse(JSON.stringify({ change_request_id: requestId, rpc_result: rpcData })),
+      })
+      if (logErr) console.error(`activity_log insert failed for change_request=${requestId}:`, logErr.message)
+
+      return NextResponse.json(doneData)
     }
 
     const changes: RequestedChange[] = Array.isArray(cr.requested_changes)
@@ -141,6 +215,76 @@ export async function PATCH(
       })
       .eq('id', requestId)
       .select('id, status, reviewer_note, reviewed_by, reviewed_at')
+      .single()
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json(data)
+  }
+
+  // --- complete: close out an awaiting_address request after an out-of-band move ---
+  if ('action' in body && body.action === 'complete') {
+    const { data: crComplete, error: fetchCompleteErr } = await admin
+      .from('change_request')
+      .select('id, status')
+      .eq('id', requestId)
+      .single()
+
+    if (fetchCompleteErr || !crComplete) {
+      return NextResponse.json({ error: fetchCompleteErr?.message ?? 'Not found' }, { status: 404 })
+    }
+
+    if (crComplete.status !== 'awaiting_address') {
+      return NextResponse.json({ error: 'Request is not awaiting_address' }, { status: 409 })
+    }
+
+    const now = new Date().toISOString()
+    const { data, error } = await admin
+      .from('change_request')
+      .update({ status: 'done', reviewed_by: meta.its_no!, reviewed_at: now })
+      .eq('id', requestId)
+      .select('id, status, reviewed_by, reviewed_at')
+      .single()
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+    const { error: logErr } = await admin.from('activity_log').insert({
+      performed_by_its: meta.its_no!,
+      action: 'complete_change_request',
+      entity_type: 'change_request',
+      entity_id: String(requestId),
+      metadata: {},
+    })
+    if (logErr) console.error(`activity_log insert failed for change_request=${requestId}:`, logErr.message)
+
+    return NextResponse.json(data)
+  }
+
+  // --- ask: request more detail from the reporter without changing status ---
+  if ('action' in body && body.action === 'ask') {
+    const { note } = body as { action: 'ask'; note: string }
+    if (!note?.trim()) {
+      return NextResponse.json({ error: 'note is required' }, { status: 400 })
+    }
+
+    const { data: crAsk, error: fetchAskErr } = await admin
+      .from('change_request')
+      .select('id, status')
+      .eq('id', requestId)
+      .single()
+
+    if (fetchAskErr || !crAsk) {
+      return NextResponse.json({ error: fetchAskErr?.message ?? 'Not found' }, { status: 404 })
+    }
+
+    if (!['pending', 'awaiting_address'].includes(crAsk.status)) {
+      return NextResponse.json({ error: 'Request is not pending or awaiting_address' }, { status: 409 })
+    }
+
+    const { data, error } = await admin
+      .from('change_request')
+      .update({ reviewer_note: note.trim() })
+      .eq('id', requestId)
+      .select('id, status, reviewer_note')
       .single()
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })

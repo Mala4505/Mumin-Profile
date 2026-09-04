@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   MapPin,
@@ -16,11 +16,13 @@ import {
   User,
   CalendarRange,
   Filter,
+  MoveRight,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { MemberProfile } from '@/lib/members/getMemberProfile'
 import type { SessionUser, LoginMode } from '@/lib/types/app'
 import { EditMemberModal } from '@/components/members/EditMemberModal'
+import { MoveHouseholdPanel } from '@/components/members/MoveHouseholdPanel'
 import {
   Dialog,
   DialogContent,
@@ -40,6 +42,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
   BaligPill,
+  Chip,
   GenderPill,
   InfoField,
   INFO_GRID,
@@ -50,6 +53,11 @@ import {
   SectionHeader,
 } from '@/components/members/MemberPrimitives'
 import { TOUCH_TARGET } from '@/lib/members/display'
+
+// Distinct from every status/gender/balig chip tone used on this page — see
+// the matching constant + comment in MemberTable.tsx.
+const MOVE_PENDING_TONE = 'bg-violet-100 text-violet-700 border-violet-200'
+const MOVE_PENDING_TITLE = 'An address change request is open for this family.'
 
 interface Props {
   profile: MemberProfile
@@ -312,8 +320,12 @@ export function MemberProfileView({ profile, session, initialResponses = [], log
   const isOwnProfile = session.its_no === profile.its_no
 
   const canDirectEdit = effectiveRole === 'SuperAdmin' || effectiveRole === 'Admin'
+  // Address moves are SuperAdmin-only for now — the write path 403s for
+  // everyone else. Masool/Musaid get a request-based flow in a later phase.
+  const canMoveHousehold = effectiveRole === 'SuperAdmin'
   const [coreEditOpen, setCoreEditOpen] = useState(false)
   const [contactEditOpen, setContactEditOpen] = useState(false)
+  const [moveOpen, setMoveOpen] = useState(false)
   const [contactForm, setContactForm] = useState({
     phone: profile.phone ?? '',
     alternate_phone: profile.alternate_phone ?? '',
@@ -323,6 +335,12 @@ export function MemberProfileView({ profile, session, initialResponses = [], log
   const [contactSaving, setContactSaving] = useState(false)
   const [contactError, setContactError] = useState('')
   const [displayProfile, setDisplayProfile] = useState(profile)
+  // Latest address move, for the "Moved <date> from <building>" caption on
+  // the Location Card — just the newest entry, not the full history.
+  const [latestMove, setLatestMove] = useState<{
+    effective_date: string
+    from_building_name: string | null
+  } | null>(null)
   const [activeTab, setActiveTab] = useState<string>(allCategories[0] ?? '')
   const [openAccordion, setOpenAccordion] = useState<string | null>(null)
 
@@ -346,6 +364,36 @@ export function MemberProfileView({ profile, session, initialResponses = [], log
   const [historyTo, setHistoryTo] = useState('')
 
   const canEditContact = isStaff || isOwnProfile
+
+  // "Move pending" badge — same fetch-on-mount + swallow-errors pattern as
+  // MemberTable.tsx and MemberFiltersBar.tsx's own filter-options fetch.
+  const [movePending, setMovePending] = useState(false)
+  useEffect(() => {
+    fetch('/api/requests/open-address-sabeels')
+      .then((r) => r.json())
+      .then((d) => setMovePending(new Set(d.sabeel_nos ?? []).has(displayProfile.sabeel_no)))
+      .catch(() => {})
+  }, [displayProfile.sabeel_no])
+
+  // One-line summary for the Location Card — no need for a fancy data layer,
+  // just the most recent entry from the same endpoint the full history uses.
+  const fetchLatestMove = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/families/${encodeURIComponent(displayProfile.sabeel_no)}/address-history`)
+      if (!res.ok) return
+      const data = await res.json()
+      const first = data.history?.[0]
+      setLatestMove(
+        first ? { effective_date: first.effective_date, from_building_name: first.from_building_name } : null,
+      )
+    } catch {
+      // Non-fatal — this only feeds a small caption line.
+    }
+  }, [displayProfile.sabeel_no])
+
+  useEffect(() => {
+    if (isStaff || isOwnProfile) fetchLatestMove()
+  }, [fetchLatestMove, isStaff, isOwnProfile])
 
   // Process initial responses from server
   useEffect(() => {
@@ -569,6 +617,11 @@ export function MemberProfileView({ profile, session, initialResponses = [], log
               <MemberStatusBadge status={displayProfile.status} size="md" />
               <GenderPill gender={displayProfile.gender} size="md" />
               <BaligPill status={displayProfile.balig_status} size="md" />
+              {movePending && (
+                <Chip size="md" tone={MOVE_PENDING_TONE} title={MOVE_PENDING_TITLE}>
+                  Move pending
+                </Chip>
+              )}
             </div>
           </div>
         </div>
@@ -602,13 +655,6 @@ export function MemberProfileView({ profile, session, initialResponses = [], log
             status: displayProfile.status,
             notes: (displayProfile as any).notes ?? '',
           }}
-          initialAddress={effectiveRole === 'SuperAdmin' ? {
-            subsector_id: String(displayProfile.subsector_id),
-            building_name: displayProfile.building_name ?? '',
-            floor_no: displayProfile.floor_no ?? '',
-            flat_no: displayProfile.flat_no ?? '',
-            paci_no: displayProfile.paci_no ?? '',
-          } : undefined}
           onSaved={() => router.refresh()}
         />
       )}
@@ -874,6 +920,25 @@ export function MemberProfileView({ profile, session, initialResponses = [], log
           <SectionHeader
             icon={<MapPin className="w-4 h-4 shrink-0 text-primary" />}
             title="Location"
+            action={
+              <div className="flex shrink-0 items-center gap-2">
+                {movePending && (
+                  <Chip tone={MOVE_PENDING_TONE} title={MOVE_PENDING_TITLE}>
+                    Move pending
+                  </Chip>
+                )}
+                {canMoveHousehold && (
+                  <button
+                    onClick={() => setMoveOpen(true)}
+                    className="flex shrink-0 items-center gap-1 min-h-11 sm:min-h-8 px-3 sm:px-2 rounded-lg text-xs font-medium text-muted-foreground border border-border hover:text-foreground hover:bg-muted/40 transition-colors"
+                    title="Move this household to a new address"
+                  >
+                    <MoveRight className="w-3 h-3" />
+                    Change address
+                  </button>
+                )}
+              </div>
+            }
             className="mb-4"
           />
           <div className={INFO_GRID}>
@@ -891,7 +956,31 @@ export function MemberProfileView({ profile, session, initialResponses = [], log
               <InfoField label="Flat" value={displayProfile.flat_no} />
             )}
           </div>
+          {latestMove?.from_building_name && (
+            <p className="mt-3 text-xs text-muted-foreground">
+              Moved{' '}
+              {new Date(latestMove.effective_date).toLocaleDateString('en-GB', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
+              })}{' '}
+              from {latestMove.from_building_name}
+            </p>
+          )}
         </SectionCard>
+      )}
+
+      {/* Move Household Panel (SuperAdmin) */}
+      {canMoveHousehold && (
+        <MoveHouseholdPanel
+          open={moveOpen}
+          onOpenChange={setMoveOpen}
+          source={{ type: 'sabeel', sabeelNo: displayProfile.sabeel_no }}
+          onMoved={() => {
+            router.refresh()
+            fetchLatestMove()
+          }}
+        />
       )}
 
       {/* 12 Umoor Section */}

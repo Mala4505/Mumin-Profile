@@ -90,4 +90,6 @@ export interface MemberFilters {
   age_to?: number
   /** null = unrestricted, number[] = restrict to these subsector_ids (role-based scope gate) */
   scopedSubsectorIds?: number[] | null
+  /** true = only members whose family has an open (pending/awaiting_address) address-change report. Derived from `change_request`, not a DB column — see app/(dashboard)/members/page.tsx. */
+  move_pending?: boolean
 }
