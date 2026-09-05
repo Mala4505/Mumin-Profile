@@ -232,15 +232,24 @@ function DestinationResolver({ subsectorHint, initialBuilding, onResolved, disab
   const [manualFlat, setManualFlat] = useState('')
   const [manualPaci, setManualPaci] = useState('')
   /**
-   * Manual entry (new building/new PACI) needs an explicit confirm before
-   * the inputs are replaced by the summary card — unlike the 'existing'
-   * paths (PACI lookup, FlatPicker), which are already a single deliberate
-   * action. Without this, `resolved` below flips truthy the instant all
-   * three fields hold *any* character, so whichever field is filled last
-   * (often floor or flat) visibly only ever accepts one digit before the
-   * form vanishes out from under the user's cursor.
+   * Two cases need an explicit confirm click before `resolved` collapses the
+   * search UI into the summary card, instead of resolving the instant the
+   * data allows it:
+   *   - Manual entry (new building/new PACI): `resolved` flips truthy the
+   *     moment all three fields hold *any* character, so without a gate
+   *     whichever field is filled last visibly only accepts one digit
+   *     before the form vanishes out from under the user's cursor.
+   *   - Typing a PACI that's already on file *and already has families
+   *     living there*: the debounced lookup resolves this the instant it
+   *     returns, with only a small WarningBox easy to miss. Since this is
+   *     the one path where a plain string typo (or muscle-memory reuse of
+   *     an earlier test PACI) silently attaches the current family to
+   *     someone else's flat instead of a distinct new one, it gets the same
+   *     explicit-confirm treatment as the brand-new-address case.
+   * (FlatPicker's own occupied/vacant chips already make this visible
+   * *before* the click that selects a flat, so that path doesn't need it.)
    */
-  const [manualConfirmed, setManualConfirmed] = useState(false)
+  const [destinationConfirmed, setDestinationConfirmed] = useState(false)
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const requestIdRef = useRef(0)
@@ -373,10 +382,14 @@ function DestinationResolver({ subsectorHint, initialBuilding, onResolved, disab
     setManualFloor('')
     setManualFlat('')
     setManualPaci('')
-    setManualConfirmed(false)
+    setDestinationConfirmed(false)
   }
 
-  if (resolved && (resolved.kind !== 'new' || manualConfirmed)) {
+  const needsConfirm =
+    resolved?.kind === 'new' ||
+    (resolved?.kind === 'existing' && shape === 'paci' && resolved.occupant_family_count > 0)
+
+  if (resolved && (!needsConfirm || destinationConfirmed)) {
     return <ResolvedDestinationSummary resolved={resolved} onChange={resetAll} disabled={disabled} />
   }
 
@@ -430,6 +443,20 @@ function DestinationResolver({ subsectorHint, initialBuilding, onResolved, disab
               )}
               {paciLookup.status === 'forbidden' && <InlineError>{paciLookup.message}</InlineError>}
               {paciLookup.status === 'error' && <InlineError>{paciLookup.message}</InlineError>}
+              {paciLookup.status === 'found' && paciLookup.house.occupant_family_count > 0 && !destinationConfirmed && (
+                <div className="space-y-2">
+                  <WarningBox>
+                    PACI <span className="font-mono text-foreground">{paciLookup.house.paci_no}</span> (
+                    {paciLookup.house.building_name}, floor {paciLookup.house.floor_no ?? '—'}, flat{' '}
+                    {paciLookup.house.flat_no ?? '—'}) already has {paciLookup.house.occupant_family_count} other
+                    famil{paciLookup.house.occupant_family_count === 1 ? 'y' : 'ies'} living there. Confirm you mean
+                    to add this family to that same flat, not a different one.
+                  </WarningBox>
+                  <Button type="button" size="sm" onClick={() => setDestinationConfirmed(true)} disabled={disabled}>
+                    Yes, use this address
+                  </Button>
+                </div>
+              )}
             </>
           )}
 
@@ -507,7 +534,7 @@ function DestinationResolver({ subsectorHint, initialBuilding, onResolved, disab
                       type="button"
                       size="sm"
                       className="col-span-2"
-                      onClick={() => setManualConfirmed(true)}
+                      onClick={() => setDestinationConfirmed(true)}
                       disabled={disabled}
                     >
                       Use this address

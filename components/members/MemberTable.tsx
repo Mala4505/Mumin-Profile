@@ -142,10 +142,23 @@ interface PaciGroup {
   members: MemberListItem[]
 }
 
+/**
+ * `'0'` shows up in the data as a placeholder for "no address assigned yet"
+ * — but it's a non-empty string, so a plain truthy/`??` check treats it as a
+ * real, shared PACI. That silently grouped every family still sitting on
+ * that placeholder into one "flat," and moving any one of them (via the
+ * PACI-grouped row's "move this flat" action) swept all the others along
+ * too. Treat it, and blank strings, the same as null everywhere a paci_no
+ * decides grouping or move-type.
+ */
+function hasRealPaci(paciNo: string | null): paciNo is string {
+  return paciNo !== null && paciNo.trim() !== '' && paciNo.trim() !== '0'
+}
+
 function groupByPaci(members: MemberListItem[]): PaciGroup[] {
   const map = new Map<string, PaciGroup>()
   for (const m of members) {
-    const key = m.paci_no ?? `no-paci-${m.sabeel_no}`
+    const key = hasRealPaci(m.paci_no) ? m.paci_no : `no-paci-${m.sabeel_no}`
     if (!map.has(key)) {
       map.set(key, {
         paci_no: m.paci_no,
@@ -182,7 +195,7 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
 
-  const [viewMode, setViewMode] = useState<'paci' | 'member'>('paci')
+  const [viewMode, setViewMode] = useState<'paci' | 'member'>('member')
   const [sortCol, setSortCol] = useState('name')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const [page, setPage] = useState(1)
@@ -262,7 +275,7 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
   const bulkSabeelNos = useMemo(() => {
     const set = new Set<string>()
     for (const g of paciGroups) {
-      if (selectedPaci.has(g.paci_no ?? g.sabeel_no)) {
+      if (selectedPaci.has(hasRealPaci(g.paci_no) ? g.paci_no : g.sabeel_no)) {
         for (const m of g.members) set.add(m.sabeel_no)
       }
     }
@@ -314,7 +327,7 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
   // base, +1 for Sector (SuperAdmin/Admin), +2 for Move + checkbox (SuperAdmin only).
   const paciColSpan = 10 + (showSector ? 1 : 0) + (canMove ? 2 : 0)
   const allPaciOnPageSelected =
-    paciPage.length > 0 && paciPage.every((g) => selectedPaci.has(g.paci_no ?? g.sabeel_no))
+    paciPage.length > 0 && paciPage.every((g) => selectedPaci.has(hasRealPaci(g.paci_no) ? g.paci_no : g.sabeel_no))
 
   return (
     <div className="bg-card rounded-xl border border-border overflow-hidden shadow-sm">
@@ -328,18 +341,18 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
         {isStaff && (
           <div className="flex items-center gap-1 bg-muted/40 rounded-lg p-0.5 border border-border">
             <button
-              onClick={() => { setViewMode('paci'); setPage(1) }}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${viewMode === 'paci' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
-            >
-              <Hash className="w-3.5 h-3.5" />
-              By PACI
-            </button>
-            <button
               onClick={() => { setViewMode('member'); setPage(1) }}
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${viewMode === 'member' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
             >
               <LayoutList className="w-3.5 h-3.5" />
               By Member
+            </button>
+            <button
+              onClick={() => { setViewMode('paci'); setPage(1) }}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${viewMode === 'paci' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              <Hash className="w-3.5 h-3.5" />
+              By PACI
             </button>
           </div>
         )}
@@ -361,7 +374,7 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
                           setSelectedPaci((prev) => {
                             const next = new Set(prev)
                             for (const g of paciPage) {
-                              const key = g.paci_no ?? g.sabeel_no
+                              const key = hasRealPaci(g.paci_no) ? g.paci_no : g.sabeel_no
                               if (e.target.checked) next.add(key)
                               else next.delete(key)
                             }
@@ -398,7 +411,7 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
               </thead>
               <tbody>
                 {paciPage.map((group, idx) => {
-                  const rowKey = group.paci_no ?? group.sabeel_no
+                  const rowKey = hasRealPaci(group.paci_no) ? group.paci_no : group.sabeel_no
                   const isExpanded = expandedPaci.has(rowKey)
                   const sortedGroupMembers = [...group.members].sort(
                     (a, b) => (b.its_no === group.head_its_no ? 1 : 0) - (a.its_no === group.head_its_no ? 1 : 0)
@@ -473,14 +486,14 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
                               type="button"
                               onClick={() =>
                                 setMoveSource(
-                                  group.paci_no
+                                  hasRealPaci(group.paci_no)
                                     ? { type: 'paci', paciNo: group.paci_no }
                                     : { type: 'sabeel', sabeelNo: group.sabeel_no },
                                 )
                               }
                               className="inline-flex items-center justify-center p-1 rounded hover:bg-muted/50 transition-colors"
-                              title={group.paci_no ? 'Move this flat' : 'Move this household'}
-                              aria-label={group.paci_no ? 'Move this flat' : 'Move this household'}
+                              title={hasRealPaci(group.paci_no) ? 'Move this flat' : 'Move this household'}
+                              aria-label={hasRealPaci(group.paci_no) ? 'Move this flat' : 'Move this household'}
                             >
                               <MoveRight className="w-4 h-4 text-primary" />
                             </button>
@@ -579,7 +592,7 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
           {/* Mobile / tablet PACI cards */}
           <div className="lg:hidden divide-y divide-border">
             {paciPage.map((group, idx) => {
-              const rowKey = group.paci_no ?? group.sabeel_no
+              const rowKey = hasRealPaci(group.paci_no) ? group.paci_no : group.sabeel_no
               const isExpanded = expandedPaci.has(rowKey)
               const sortedGroupMembers = [...group.members].sort(
                 (a, b) => (b.its_no === group.head_its_no ? 1 : 0) - (a.its_no === group.head_its_no ? 1 : 0)
