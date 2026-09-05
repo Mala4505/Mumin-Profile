@@ -48,8 +48,8 @@ export function Step2Audience({ draft, update, onNext, onBack }: Props) {
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.from('sector').select('sector_id, sector_name').then(({ data }) => setSectors(data ?? []))
-    supabase.from('subsector').select('subsector_id, subsector_name, sector_id').then(({ data }) => setSubsectors(data ?? []))
+    supabase.from('sector').select('sector_id, sector_name').order('sector_id').then(({ data }) => setSectors(data ?? []))
+    supabase.from('subsector').select('subsector_id, subsector_name, sector_id').order('subsector_id').then(({ data }) => setSubsectors(data ?? []))
   }, [])
 
   function setAll(v: boolean) {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withAuth } from '@/lib/auth/withAuth'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { naturalCompare } from '@/lib/utils'
 
 export const GET = withAuth(
   ['SuperAdmin', 'Admin', 'Masool', 'Musaid'],
@@ -54,18 +55,20 @@ export const GET = withAuth(
       normalizedGroups.set(key, group)
     }
 
-    const buildings = (data ?? []).map((b: any) => {
-      const group = normalizedGroups.get(dupKey(b)) ?? []
-      return {
-        building_id: b.building_id,
-        building_name: b.building_name,
-        subsector_id: b.subsector_id,
-        subsector_name: b.subsector?.subsector_name ?? '',
-        street: b.street,
-        landmark: b.landmark,
-        duplicate_building_ids: group.filter((id) => id !== b.building_id),
-      }
-    })
+    const buildings = (data ?? [])
+      .map((b: any) => {
+        const group = normalizedGroups.get(dupKey(b)) ?? []
+        return {
+          building_id: b.building_id,
+          building_name: b.building_name,
+          subsector_id: b.subsector_id,
+          subsector_name: b.subsector?.subsector_name ?? '',
+          street: b.street,
+          landmark: b.landmark,
+          duplicate_building_ids: group.filter((id) => id !== b.building_id),
+        }
+      })
+      .sort((a, b) => naturalCompare(a.building_name, b.building_name))
 
     return NextResponse.json({ buildings })
   },

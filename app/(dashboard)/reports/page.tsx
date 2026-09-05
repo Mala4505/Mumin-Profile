@@ -21,7 +21,7 @@ export default async function ReportsPage() {
   if (umoorScope) categoriesQuery = categoriesQuery.in('id', umoorScope)
 
   const [sectorsResult, categoriesResult] = await Promise.all([
-    admin.from('sector').select('sector_id, sector_name').order('sector_name', { ascending: true }),
+    admin.from('sector').select('sector_id, sector_name').order('sector_id', { ascending: true }),
     categoriesQuery,
   ])
 

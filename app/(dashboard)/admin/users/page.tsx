@@ -34,8 +34,8 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
     categoriesResult,
     umoorAssignResult,
   ] = await Promise.all([
-    admin.from('sector').select('sector_id, sector_name').order('sector_name'),
-    admin.from('subsector').select('subsector_id, sector_id, subsector_name').order('subsector_name'),
+    admin.from('sector').select('sector_id, sector_name').order('sector_id'),
+    admin.from('subsector').select('subsector_id, sector_id, subsector_name').order('subsector_id'),
     admin.from('user_sector').select('its_no, sector_id'),
     admin.from('user_subsector').select('its_no, subsector_id'),
     admin.from('profile_category').select('id, name').order('sort_order'),

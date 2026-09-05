@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withAuth } from '@/lib/auth/withAuth'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { naturalCompare } from '@/lib/utils'
 
 export const GET = withAuth(
   ['SuperAdmin', 'Admin', 'Masool', 'Musaid'],
@@ -54,12 +55,16 @@ export const GET = withAuth(
       }
     }
 
-    const flats = (houses ?? []).map((h) => ({
-      paci_no: h.paci_no,
-      floor_no: h.floor_no,
-      flat_no: h.flat_no,
-      occupancy: occupancyByPaci.get(h.paci_no) ?? 0,
-    }))
+    const flats = (houses ?? [])
+      .map((h) => ({
+        paci_no: h.paci_no,
+        floor_no: h.floor_no,
+        flat_no: h.flat_no,
+        occupancy: occupancyByPaci.get(h.paci_no) ?? 0,
+      }))
+      .sort(
+        (a, b) => naturalCompare(a.floor_no, b.floor_no) || naturalCompare(a.flat_no, b.flat_no),
+      )
 
     return NextResponse.json({
       building: {
