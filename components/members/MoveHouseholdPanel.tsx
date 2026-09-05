@@ -231,6 +231,16 @@ function DestinationResolver({ subsectorHint, initialBuilding, onResolved, disab
   const [manualFloor, setManualFloor] = useState('')
   const [manualFlat, setManualFlat] = useState('')
   const [manualPaci, setManualPaci] = useState('')
+  /**
+   * Manual entry (new building/new PACI) needs an explicit confirm before
+   * the inputs are replaced by the summary card — unlike the 'existing'
+   * paths (PACI lookup, FlatPicker), which are already a single deliberate
+   * action. Without this, `resolved` below flips truthy the instant all
+   * three fields hold *any* character, so whichever field is filled last
+   * (often floor or flat) visibly only ever accepts one digit before the
+   * form vanishes out from under the user's cursor.
+   */
+  const [manualConfirmed, setManualConfirmed] = useState(false)
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const requestIdRef = useRef(0)
@@ -363,9 +373,10 @@ function DestinationResolver({ subsectorHint, initialBuilding, onResolved, disab
     setManualFloor('')
     setManualFlat('')
     setManualPaci('')
+    setManualConfirmed(false)
   }
 
-  if (resolved) {
+  if (resolved && (resolved.kind !== 'new' || manualConfirmed)) {
     return <ResolvedDestinationSummary resolved={resolved} onChange={resetAll} disabled={disabled} />
   }
 
@@ -490,6 +501,17 @@ function DestinationResolver({ subsectorHint, initialBuilding, onResolved, disab
                     <p className="col-span-2 text-xs text-muted-foreground">
                       Registering PACI <span className="font-mono text-foreground">{paciAlreadyFixed}</span>
                     </p>
+                  )}
+                  {resolved?.kind === 'new' && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="col-span-2"
+                      onClick={() => setManualConfirmed(true)}
+                      disabled={disabled}
+                    >
+                      Use this address
+                    </Button>
                   )}
                 </div>
               )}

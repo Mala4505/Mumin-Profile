@@ -8,8 +8,8 @@ import {
   Users,
   Upload,
   Settings,
-  ChevronLeft,
-  ChevronRight,
+  Pin,
+  PinOff,
   ClipboardList,
   ClipboardCheck,
   FileText,
@@ -83,29 +83,69 @@ interface AppSidebarProps {
   loginMode: LoginMode
 }
 
+const SIDEBAR_LOCK_KEY = 'sidebar-locked'
+
 export function AppSidebar({ role, loginMode }: AppSidebarProps) {
   const pathname = usePathname()
-  const [collapsed, setCollapsed] = React.useState(false)
+  // Locked = pinned open and part of the layout flow (pushes content).
+  // Unlocked (default) = a collapsed icon rail that flies out over the
+  // content on hover, so hovering never reflows the page.
+  const [locked, setLocked] = React.useState(false)
+  const [hovering, setHovering] = React.useState(false)
+  const leaveTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  React.useEffect(() => {
+    setLocked(localStorage.getItem(SIDEBAR_LOCK_KEY) === 'true')
+    return () => {
+      if (leaveTimer.current) clearTimeout(leaveTimer.current)
+    }
+  }, [])
+
+  const toggleLock = () => {
+    setLocked((prev) => {
+      const next = !prev
+      localStorage.setItem(SIDEBAR_LOCK_KEY, String(next))
+      return next
+    })
+  }
+
+  const handleMouseEnter = () => {
+    if (leaveTimer.current) clearTimeout(leaveTimer.current)
+    setHovering(true)
+  }
+
+  const handleMouseLeave = () => {
+    leaveTimer.current = setTimeout(() => setHovering(false), 200)
+  }
+
+  const expanded = locked || hovering
+  const collapsed = !expanded
 
   return (
-    <aside
-      className={cn(
-        'relative flex h-screen flex-col bg-sidebar-bg border-r border-sidebar-border transition-all duration-300',
-        collapsed ? 'w-16' : 'w-64'
-      )}
-    >
-      {/* Collapse toggle */}
-      <button
-        onClick={() => setCollapsed((prev) => !prev)}
-        className="absolute -right-3 top-6 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-sidebar-border bg-sidebar-bg text-sidebar-fg hover:bg-sidebar-accent transition-colors"
-        title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-      >
-        {collapsed ? (
-          <ChevronRight className="h-3 w-3" />
-        ) : (
-          <ChevronLeft className="h-3 w-3" />
+    <>
+      {/* Spacer: reserves layout space equal to the rail width, or the full
+          width once locked. Hover never touches this, so content never
+          shifts when the flyout opens. */}
+      <div
+        className={cn('h-screen shrink-0 transition-all duration-300', locked ? 'w-64' : 'w-16')}
+      />
+      <aside
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        className={cn(
+          'fixed inset-y-0 left-0 z-30 flex h-screen flex-col bg-sidebar-bg border-r border-sidebar-border transition-all duration-200',
+          expanded ? 'w-64' : 'w-16',
+          !locked && hovering && 'shadow-2xl'
         )}
-      </button>
+      >
+        {/* Lock toggle */}
+        <button
+          onClick={toggleLock}
+          className="absolute -right-3 top-6 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-sidebar-border bg-sidebar-bg text-sidebar-fg hover:bg-sidebar-accent transition-colors"
+          title={locked ? 'Unlock sidebar' : 'Lock sidebar open'}
+        >
+          {locked ? <PinOff className="h-3 w-3" /> : <Pin className="h-3 w-3" />}
+        </button>
 
       {/* Header / Logo */}
       <div
@@ -241,7 +281,7 @@ export function AppSidebar({ role, loginMode }: AppSidebarProps) {
           )
         )}
       </div>
-
-    </aside>
+      </aside>
+    </>
   )
 }
