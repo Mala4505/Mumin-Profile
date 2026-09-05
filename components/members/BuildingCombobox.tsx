@@ -34,8 +34,9 @@ export type SelectedBuilding = ExistingBuilding | NewBuildingSelection
 
 export interface BuildingComboboxProps {
   /**
-   * Subsector to scope the search to (sent as `?subsector_id=`), and — this is
-   * the load-bearing use — the subsector a new building gets created under.
+   * The subsector a new building gets created under, and (only when
+   * `scopeSearchToSubsector` is also true) the subsector the *search* is
+   * restricted to.
    *
    * Decision: rather than embedding a nested subsector picker in this
    * component, the "Create new building" option only appears once the caller
@@ -45,6 +46,18 @@ export interface BuildingComboboxProps {
    * still searches city-wide and simply omits the create option with a hint.
    */
   subsectorId?: number
+  /**
+   * Whether `subsectorId` also restricts the *search* to that one subsector
+   * (sent as `?subsector_id=`), on top of gating "create new". Default true.
+   *
+   * Set false when `subsectorId` is only a default/hint for creating a new
+   * building — e.g. the move panel seeds it from the household's *current*
+   * subsector, but the whole point of a move is often landing somewhere
+   * else, so search must stay city-wide (still bounded by the caller's own
+   * role scope server-side) or an existing destination building outside
+   * that one subsector is simply never found.
+   */
+  scopeSearchToSubsector?: boolean
   value: SelectedBuilding | null
   onChange: (building: SelectedBuilding) => void
   placeholder?: string
@@ -71,6 +84,7 @@ function buildingSubtitle(b: ExistingBuilding): string {
 
 export function BuildingCombobox({
   subsectorId,
+  scopeSearchToSubsector = true,
   value,
   onChange,
   placeholder = 'Search buildings…',
@@ -117,7 +131,7 @@ export function BuildingCombobox({
       setError('')
       try {
         const params = new URLSearchParams({ q })
-        if (subsectorId !== undefined) params.set('subsector_id', String(subsectorId))
+        if (subsectorId !== undefined && scopeSearchToSubsector) params.set('subsector_id', String(subsectorId))
         const res = await fetch(`/api/buildings?${params.toString()}`)
         if (!res.ok) {
           const d = await res.json().catch(() => ({}))
@@ -135,7 +149,7 @@ export function BuildingCombobox({
         if (requestId === requestIdRef.current) setLoading(false)
       }
     },
-    [subsectorId],
+    [subsectorId, scopeSearchToSubsector],
   )
 
   // Debounced search — same shape as MemberFiltersBar's search debounce.
@@ -156,7 +170,7 @@ export function BuildingCombobox({
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, subsectorId])
+  }, [query, subsectorId, scopeSearchToSubsector])
 
   // Close on outside click.
   useEffect(() => {

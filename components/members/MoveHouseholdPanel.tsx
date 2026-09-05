@@ -426,6 +426,7 @@ function DestinationResolver({ subsectorHint, initialBuilding, onResolved, disab
             <div className="space-y-2">
               <BuildingCombobox
                 subsectorId={subsectorHint}
+                scopeSearchToSubsector={false}
                 value={chosenBuilding}
                 initialQuery={shape === 'building' ? query : undefined}
                 onChange={(b) => {
