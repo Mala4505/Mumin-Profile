@@ -124,6 +124,23 @@ export function BuildingCombobox({
     setQuery(value?.building_name ?? '')
   }, [value?.building_id, value?.building_name])
 
+  // When seeded via `initialQuery`, this mount is a hand-off from a caller's
+  // own text input (e.g. DestinationResolver's front-door field, which
+  // unmounts itself the instant it hands off) — that input had focus, and
+  // React doesn't carry DOM focus across an unmount/mount of two different
+  // elements. Without this, the cursor just drops out and the user has to
+  // click back in to keep typing. Run once, on mount, matching the
+  // read-once-on-mount semantics of `initialQuery` itself.
+  useEffect(() => {
+    if (!initialQuery?.trim()) return
+    const el = inputRef.current
+    if (!el) return
+    el.focus()
+    const len = el.value.length
+    el.setSelectionRange(len, len)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const runSearch = useCallback(
     async (q: string) => {
       const requestId = ++requestIdRef.current
