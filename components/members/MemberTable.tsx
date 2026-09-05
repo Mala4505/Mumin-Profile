@@ -155,6 +155,19 @@ function hasRealPaci(paciNo: string | null): paciNo is string {
   return paciNo !== null && paciNo.trim() !== '' && paciNo.trim() !== '0'
 }
 
+/**
+ * The row identity used for expand/collapse and bulk-select state. In
+ * 'sabeel' mode this is always the sabeel_no — never the paci_no — because
+ * two different sabeel groups can legitimately share one real PACI (genuine
+ * flatmates), and keying by that shared value would collide their
+ * checked/expanded state together. 'paci' mode keeps the existing fallback
+ * (a group with no real PACI on file falls back to its sabeel_no).
+ */
+function rowKeyFor(g: PaciGroup, mode: 'sabeel' | 'paci' | 'member'): string {
+  if (mode === 'sabeel') return g.sabeel_no
+  return hasRealPaci(g.paci_no) ? g.paci_no : g.sabeel_no
+}
+
 function groupByPaci(members: MemberListItem[]): PaciGroup[] {
   const map = new Map<string, PaciGroup>()
   for (const m of members) {
@@ -179,6 +192,36 @@ function groupByPaci(members: MemberListItem[]): PaciGroup[] {
   return [...map.values()]
 }
 
+/**
+ * Same row shape as `groupByPaci`, grouped by `sabeel_no` instead — one row
+ * per household, always, regardless of whether it shares a PACI with anyone
+ * else. Unlike the PACI grouping, this key is never ambiguous (no placeholder
+ * value to fall back from), so every row here maps to exactly one family and
+ * its Move action never needs — or offers — a "move this flat" branch.
+ */
+function groupBySabeel(members: MemberListItem[]): PaciGroup[] {
+  const map = new Map<string, PaciGroup>()
+  for (const m of members) {
+    if (!map.has(m.sabeel_no)) {
+      map.set(m.sabeel_no, {
+        paci_no: m.paci_no,
+        sabeel_no: m.sabeel_no,
+        floor_no: m.floor_no,
+        flat_no: m.flat_no,
+        building_name: m.building_name,
+        landmark: m.landmark,
+        subsector_name: m.subsector_name,
+        sector_name: m.sector_name,
+        head_its_no: m.head_its_no,
+        hof_name: m.hof_name,
+        members: [],
+      })
+    }
+    map.get(m.sabeel_no)!.members.push(m)
+  }
+  return [...map.values()]
+}
+
 function sortPaciGroups(groups: PaciGroup[], col: string, dir: SortDir): PaciGroup[] {
   return [...groups].sort((a, b) => {
     const av = col === 'member_count' ? String(a.members.length) : String((a as any)[col] ?? '')
@@ -195,7 +238,7 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
 
-  const [viewMode, setViewMode] = useState<'paci' | 'member'>('member')
+  const [viewMode, setViewMode] = useState<'sabeel' | 'paci' | 'member'>('sabeel')
   const [sortCol, setSortCol] = useState('name')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const [page, setPage] = useState(1)
@@ -266,21 +309,27 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
   const memberPage = useMemo(() => sortedMembers.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [sortedMembers, page])
 
   const paciGroups = useMemo(() => groupByPaci(members), [members])
-  const sortedPaci = useMemo(() => sortPaciGroups(paciGroups, sortCol, sortDir), [paciGroups, sortCol, sortDir])
+  const sabeelGroups = useMemo(() => groupBySabeel(members), [members])
+  // The grouped-table UI (desktop table + mobile cards, sorting, expand,
+  // bulk-select, Move) is shared by both grouping modes — only the grouping
+  // key and the Move button's flat-vs-household branch differ between them.
+  const activeGroups = viewMode === 'sabeel' ? sabeelGroups : paciGroups
+  const sortedPaci = useMemo(() => sortPaciGroups(activeGroups, sortCol, sortDir), [activeGroups, sortCol, sortDir])
   const paciPage = useMemo(() => sortedPaci.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [sortedPaci, page])
 
-  // Every sabeel_no behind the selected paci rows. A paci group's own
-  // `sabeel_no` field only reflects the first member folded into it — a flat
-  // shared by multiple families needs every member's sabeel_no, deduped.
+  // Every sabeel_no behind the selected rows. A group's own `sabeel_no` field
+  // only reflects the first member folded into it — a flat shared by multiple
+  // families (paci mode) needs every member's sabeel_no, deduped. (In sabeel
+  // mode every group is already exactly one family, so this is a no-op there.)
   const bulkSabeelNos = useMemo(() => {
     const set = new Set<string>()
-    for (const g of paciGroups) {
-      if (selectedPaci.has(hasRealPaci(g.paci_no) ? g.paci_no : g.sabeel_no)) {
+    for (const g of activeGroups) {
+      if (selectedPaci.has(rowKeyFor(g, viewMode))) {
         for (const m of g.members) set.add(m.sabeel_no)
       }
     }
     return [...set]
-  }, [paciGroups, selectedPaci])
+  }, [activeGroups, selectedPaci, viewMode])
 
   function clearSelection() {
     setSelectedPaci(new Set())
@@ -321,31 +370,33 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
     )
   }
 
-  const totalItems = viewMode === 'paci' ? paciGroups.length : members.length
+  const totalItems = viewMode === 'sabeel' || viewMode === 'paci' ? activeGroups.length : members.length
   // PACI header columns: [checkbox], paci_no, sabeel_no, floor, flat, building,
   // Head of Family, Count, [Sector], Subsector, Request, [Move], chevron → 10
   // base, +1 for Sector (SuperAdmin/Admin), +2 for Move + checkbox (SuperAdmin only).
   const paciColSpan = 10 + (showSector ? 1 : 0) + (canMove ? 2 : 0)
   const allPaciOnPageSelected =
-    paciPage.length > 0 && paciPage.every((g) => selectedPaci.has(hasRealPaci(g.paci_no) ? g.paci_no : g.sabeel_no))
+    paciPage.length > 0 && paciPage.every((g) => selectedPaci.has(rowKeyFor(g, viewMode)))
 
   return (
     <div className="bg-card rounded-xl border border-border overflow-hidden shadow-sm">
       {/* Toolbar */}
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-muted/20">
         <span className="text-xs text-muted-foreground font-medium">
-          {viewMode === 'paci'
-            ? `${paciGroups.length} flat${paciGroups.length !== 1 ? 's' : ''} (${members.length} member${members.length !== 1 ? 's' : ''})`
-            : `${members.length} member${members.length !== 1 ? 's' : ''}`}
+          {viewMode === 'sabeel'
+            ? `${sabeelGroups.length} household${sabeelGroups.length !== 1 ? 's' : ''} (${members.length} member${members.length !== 1 ? 's' : ''})`
+            : viewMode === 'paci'
+              ? `${paciGroups.length} flat${paciGroups.length !== 1 ? 's' : ''} (${members.length} member${members.length !== 1 ? 's' : ''})`
+              : `${members.length} member${members.length !== 1 ? 's' : ''}`}
         </span>
         {isStaff && (
           <div className="flex items-center gap-1 bg-muted/40 rounded-lg p-0.5 border border-border">
             <button
-              onClick={() => { setViewMode('member'); setPage(1) }}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${viewMode === 'member' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+              onClick={() => { setViewMode('sabeel'); setPage(1) }}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${viewMode === 'sabeel' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
             >
               <LayoutList className="w-3.5 h-3.5" />
-              By Member
+              By Sabeel
             </button>
             <button
               onClick={() => { setViewMode('paci'); setPage(1) }}
@@ -358,8 +409,8 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
         )}
       </div>
 
-      {/* ── PACI View ────────────────────────────────────────────────────── */}
-      {viewMode === 'paci' && isStaff && (
+      {/* ── Grouped view (By Sabeel / By PACI) ──────────────────────────────── */}
+      {(viewMode === 'sabeel' || viewMode === 'paci') && isStaff && (
         <>
           <div className="hidden lg:block overflow-x-auto">
             <table className="w-full text-sm">
@@ -374,7 +425,7 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
                           setSelectedPaci((prev) => {
                             const next = new Set(prev)
                             for (const g of paciPage) {
-                              const key = hasRealPaci(g.paci_no) ? g.paci_no : g.sabeel_no
+                              const key = rowKeyFor(g, viewMode)
                               if (e.target.checked) next.add(key)
                               else next.delete(key)
                             }
@@ -411,7 +462,7 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
               </thead>
               <tbody>
                 {paciPage.map((group, idx) => {
-                  const rowKey = hasRealPaci(group.paci_no) ? group.paci_no : group.sabeel_no
+                  const rowKey = rowKeyFor(group, viewMode)
                   const isExpanded = expandedPaci.has(rowKey)
                   const sortedGroupMembers = [...group.members].sort(
                     (a, b) => (b.its_no === group.head_its_no ? 1 : 0) - (a.its_no === group.head_its_no ? 1 : 0)
@@ -486,14 +537,19 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
                               type="button"
                               onClick={() =>
                                 setMoveSource(
-                                  hasRealPaci(group.paci_no)
+                                  // 'sabeel' mode groups by household, never by
+                                  // address, so every row here is exactly one
+                                  // family regardless of what its paci_no is —
+                                  // the whole-flat branch only applies in 'paci'
+                                  // mode, where a row can genuinely be shared.
+                                  viewMode === 'paci' && hasRealPaci(group.paci_no)
                                     ? { type: 'paci', paciNo: group.paci_no }
                                     : { type: 'sabeel', sabeelNo: group.sabeel_no },
                                 )
                               }
                               className="inline-flex items-center justify-center p-1 rounded hover:bg-muted/50 transition-colors"
-                              title={hasRealPaci(group.paci_no) ? 'Move this flat' : 'Move this household'}
-                              aria-label={hasRealPaci(group.paci_no) ? 'Move this flat' : 'Move this household'}
+                              title={viewMode === 'paci' && hasRealPaci(group.paci_no) ? 'Move this flat' : 'Move this household'}
+                              aria-label={viewMode === 'paci' && hasRealPaci(group.paci_no) ? 'Move this flat' : 'Move this household'}
                             >
                               <MoveRight className="w-4 h-4 text-primary" />
                             </button>
@@ -592,7 +648,7 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
           {/* Mobile / tablet PACI cards */}
           <div className="lg:hidden divide-y divide-border">
             {paciPage.map((group, idx) => {
-              const rowKey = hasRealPaci(group.paci_no) ? group.paci_no : group.sabeel_no
+              const rowKey = rowKeyFor(group, viewMode)
               const isExpanded = expandedPaci.has(rowKey)
               const sortedGroupMembers = [...group.members].sort(
                 (a, b) => (b.its_no === group.head_its_no ? 1 : 0) - (a.its_no === group.head_its_no ? 1 : 0)
@@ -875,7 +931,7 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
 
       {/* Part C — sticky bulk-selection action bar. Same border/shadow weight
           as MoveHouseholdPanel's own container chrome (border-t + shadow-2xl). */}
-      {canMove && viewMode === 'paci' && selectedPaci.size > 0 && (
+      {canMove && (viewMode === 'sabeel' || viewMode === 'paci') && selectedPaci.size > 0 && (
         <div className="fixed bottom-0 left-0 right-0 z-30 flex flex-wrap items-center justify-between gap-3 border-t border-border bg-card px-4 py-3 shadow-2xl sm:px-6">
           <span className="text-sm font-medium text-foreground">
             {selectedPaci.size} selected
