@@ -14,6 +14,9 @@ import {
   MoreVertical,
   Eye,
   EyeOff,
+  Loader2,
+  PlusCircle,
+  XCircle,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { FormQuestion } from '@/lib/types/forms'
@@ -25,6 +28,7 @@ interface ProfileField {
   caption: string
   field_type: string
   behavior: 'static' | 'historical'
+  options?: string[] | null
 }
 
 interface Props {
@@ -32,6 +36,8 @@ interface Props {
   update: (patch: Partial<FormDraft>) => void
   onNext: () => void
   onBack: () => void
+  role: Role
+  umoorIds?: number[]
 }
 
 const selectClass =
@@ -44,6 +50,14 @@ const QUESTION_TYPES = [
   { value: 'date',        label: 'Date'            },
   { value: 'select',      label: 'Single Choice'   },
   { value: 'multiselect', label: 'Multiple Choice' },
+] as const
+
+const CREATE_FIELD_TYPES = [
+  { value: 'text',        label: 'Text' },
+  { value: 'number',      label: 'Number' },
+  { value: 'date',        label: 'Date' },
+  { value: 'select',      label: 'Select (single choice)' },
+  { value: 'multiselect', label: 'Multiselect (multiple choice)' },
 ] as const
 
 const VISIBILITY_ROLES: { role: Role; label: string; desc: string }[] = [
@@ -121,21 +135,60 @@ function VisibilityDropdown({
   )
 }
 
-export function Step3Questions({ draft, update, onNext, onBack }: Props) {
+export function Step3Questions({ draft, update, onNext, onBack, role, umoorIds }: Props) {
+  const isCoordinator = role === 'UmoorCoordinator'
+  const canCreateField =
+    role === 'SuperAdmin' || role === 'Admin' || role === 'UmoorCoordinator'
+
   const [fields, setFields] = useState<ProfileField[]>([])
   const [questions, setQuestions] = useState<FormQuestion[]>(draft.questions ?? [])
   const [attempted, setAttempted] = useState(false)
   const [openDropdown, setOpenDropdown] = useState<number | null>(null)
+  const [scopedEmpty, setScopedEmpty] = useState(false)
+
+  // Create-new-field modal state (mirrors FormEditClient)
+  const [showCreate, setShowCreate] = useState(false)
+  const [createCaption, setCreateCaption] = useState('')
+  const [createType, setCreateType] = useState('text')
+  const [createOptions, setCreateOptions] = useState<string[]>([''])
+  const [createBehavior, setCreateBehavior] = useState<'static' | 'historical'>('static')
+  const [createCategoryId, setCreateCategoryId] = useState<number | ''>('')
+  const [createSaving, setCreateSaving] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
+  const [categories, setCategories] = useState<{ id: number; name: string }[]>([])
+  const [categoriesLoading, setCategoriesLoading] = useState(false)
 
   useEffect(() => {
     const supabase = createClient()
-    supabase
+    let query = supabase
       .from('profile_field')
-      .select('id, caption, field_type, behavior')
+      .select('id, caption, field_type, behavior, options')
       .eq('is_active', true)
       .order('caption')
-      .then(({ data }) => setFields((data ?? []) as ProfileField[]))
-  }, [])
+    // Scope the picker to the selected Umoor when one is set (it's optional).
+    if (draft.umoor_category_id) {
+      query = query.eq('category_id', draft.umoor_category_id)
+    }
+    query.then(async ({ data }) => {
+      const scoped = (data ?? []) as ProfileField[]
+      setScopedEmpty(Boolean(draft.umoor_category_id) && scoped.length === 0)
+      // Keep any already-selected fields available even if they now fall outside
+      // the Umoor scope (e.g. user picked an Umoor after adding a question).
+      const missingIds = (draft.questions ?? [])
+        .map((q) => q.profile_field_id)
+        .filter((id) => id > 0 && !scoped.some((f) => f.id === id))
+      if (missingIds.length === 0) {
+        setFields(scoped)
+        return
+      }
+      const { data: extra } = await supabase
+        .from('profile_field')
+        .select('id, caption, field_type, behavior, options')
+        .in('id', missingIds)
+      setFields([...scoped, ...((extra ?? []) as ProfileField[])])
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft.umoor_category_id])
 
   function sync(updated: FormQuestion[]) {
     setQuestions(updated)
@@ -213,6 +266,86 @@ export function Step3Questions({ draft, update, onNext, onBack }: Props) {
 
   function updateHiddenRoles(index: number, roles: Role[]) {
     sync(questions.map((q, i) => i === index ? { ...q, hidden_from_roles: roles } : q))
+  }
+
+  function openCreate() {
+    setCreateCaption('')
+    setCreateType('text')
+    setCreateOptions([''])
+    setCreateBehavior('static')
+    setCreateCategoryId(draft.umoor_category_id ?? '')
+    setCreateError(null)
+    setShowCreate(true)
+    setCategoriesLoading(true)
+    const supabase = createClient()
+    supabase
+      .from('profile_category')
+      .select('id, name')
+      .order('name')
+      .then(({ data, error: catErr }) => {
+        setCategoriesLoading(false)
+        if (catErr) { setCreateError('Failed to load categories.'); return }
+        // Coordinators may only create fields inside their own umoors.
+        const cats = (data ?? []) as { id: number; name: string }[]
+        setCategories(isCoordinator ? cats.filter((c) => (umoorIds ?? []).includes(c.id)) : cats)
+      })
+  }
+
+  function closeCreate() {
+    setShowCreate(false)
+    setCreateCaption('')
+    setCreateType('text')
+    setCreateOptions([''])
+    setCreateBehavior('static')
+    setCreateCategoryId('')
+    setCreateError(null)
+  }
+
+  async function handleCreateSave() {
+    setCreateError(null)
+    if (!createCaption.trim()) { setCreateError('Caption is required.'); return }
+    if (createCategoryId === '') { setCreateError('Please select a category.'); return }
+    const nonEmpty = createOptions.map((o) => o.trim()).filter(Boolean)
+    if (createType === 'select' || createType === 'multiselect') {
+      if (nonEmpty.length === 0) { setCreateError('At least one option is required.'); return }
+      if (new Set(nonEmpty).size !== nonEmpty.length) { setCreateError('Options must be unique.'); return }
+    }
+    setCreateSaving(true)
+    try {
+      const body: Record<string, unknown> = {
+        caption: createCaption.trim(),
+        field_type: createType,
+        behavior: createBehavior,
+        category_id: createCategoryId,
+      }
+      if (createType === 'select' || createType === 'multiselect') body.options = nonEmpty
+      const res = await fetch('/api/admin/profile-fields', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error ?? 'Failed to create field')
+      const field = json.field as ProfileField
+      setFields((prev) => (prev.some((f) => f.id === field.id) ? prev : [...prev, field]))
+      if (draft.umoor_category_id && Number(createCategoryId) === draft.umoor_category_id) {
+        setScopedEmpty(false)
+      }
+      const isChoice = field.field_type === 'select' || field.field_type === 'multiselect'
+      sync([...questions, {
+        profile_field_id: field.id,
+        question_text: field.caption,
+        sort_order: questions.length,
+        field_type_override: field.field_type,
+        options_override: isChoice ? (field.options?.length ? field.options : ['']) : null,
+        hidden_from_roles: [],
+      }])
+      closeCreate()
+    } catch (e) {
+      setCreateError(e instanceof Error ? e.message : 'Failed to create field')
+    } finally {
+      setCreateSaving(false)
+    }
   }
 
   function handleNext() {
@@ -420,14 +553,34 @@ export function Step3Questions({ draft, update, onNext, onBack }: Props) {
           })}
         </div>
 
-        <button
-          type="button"
-          onClick={addQuestion}
-          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-dashed border-border text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Add Question
-        </button>
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={addQuestion}
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-dashed border-border text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Add Question
+          </button>
+
+          {canCreateField && (
+            <button
+              type="button"
+              onClick={openCreate}
+              className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-primary/40 text-sm text-primary hover:bg-primary/5 transition-colors"
+            >
+              <PlusCircle className="w-4 h-4" />
+              Create new field
+            </button>
+          )}
+
+          {scopedEmpty && (
+            <p className="text-xs text-muted-foreground">
+              No profile fields exist for this Umoor yet.
+              {canCreateField ? ' Create one to get started.' : ''}
+            </p>
+          )}
+        </div>
 
         {hasError && (
           <p className="text-sm text-destructive">Add at least one question to continue.</p>
@@ -440,6 +593,169 @@ export function Step3Questions({ draft, update, onNext, onBack }: Props) {
           </Button>
         </div>
       </div>
+
+      {/* Create New Field Modal */}
+      {showCreate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-card border border-border rounded-xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-4 border-b border-border flex items-center justify-between shrink-0">
+              <h3 className="text-sm font-semibold text-foreground">Create New Field</h3>
+              <button
+                onClick={closeCreate}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <XCircle className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-4 overflow-y-auto flex-1">
+              {/* Caption */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Caption <span className="text-destructive">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={createCaption}
+                  onChange={e => setCreateCaption(e.target.value)}
+                  placeholder="e.g. Date of Birth"
+                  autoFocus
+                  className="w-full h-9 px-3 text-sm bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+                />
+              </div>
+
+              {/* Type */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Type</label>
+                <select
+                  value={createType}
+                  onChange={e => {
+                    setCreateType(e.target.value)
+                    if (e.target.value !== 'select' && e.target.value !== 'multiselect') {
+                      setCreateOptions([''])
+                    }
+                  }}
+                  className="w-full h-9 px-3 text-sm bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+                >
+                  {CREATE_FIELD_TYPES.map(t => (
+                    <option key={t.value} value={t.value}>{t.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Options builder — only for select / multiselect */}
+              {(createType === 'select' || createType === 'multiselect') && (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    Options <span className="text-destructive">*</span>
+                  </label>
+                  <div className="space-y-2">
+                    {createOptions.map((opt, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={opt}
+                          onChange={e => {
+                            const next = [...createOptions]
+                            next[idx] = e.target.value
+                            setCreateOptions(next)
+                          }}
+                          placeholder={`Option ${idx + 1}`}
+                          className="flex-1 h-9 px-3 text-sm bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setCreateOptions(prev => prev.filter((_, i) => i !== idx))}
+                          disabled={createOptions.length === 1}
+                          className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-30"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setCreateOptions(prev => [...prev, ''])}
+                      className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Add option
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Category */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Category <span className="text-destructive">*</span>
+                </label>
+                <select
+                  value={createCategoryId}
+                  onChange={e => setCreateCategoryId(e.target.value === '' ? '' : Number(e.target.value))}
+                  disabled={categoriesLoading}
+                  className="w-full h-9 px-3 text-sm bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors disabled:opacity-60"
+                >
+                  {categoriesLoading ? (
+                    <option value="" disabled>Loading categories…</option>
+                  ) : (
+                    <option value="" disabled>Select a category…</option>
+                  )}
+                  {categories.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Behavior */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Behavior</label>
+                <div className="flex items-center gap-4">
+                  {(['static', 'historical'] as const).map(b => (
+                    <label key={b} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="createFieldBehavior"
+                        value={b}
+                        checked={createBehavior === b}
+                        onChange={() => setCreateBehavior(b)}
+                        className="accent-primary"
+                      />
+                      <span className="text-sm text-foreground capitalize flex items-center gap-1">
+                        {b === 'static' ? <UserCircle className="w-3.5 h-3.5 text-blue-500" /> : <History className="w-3.5 h-3.5 text-amber-500" />}
+                        {b === 'static' ? 'Profile (static)' : 'Event (historical)'}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Error */}
+              {createError && (
+                <p className="text-xs text-destructive bg-destructive/10 px-3 py-2 rounded-lg">{createError}</p>
+              )}
+            </div>
+
+            <div className="p-4 border-t border-border flex items-center justify-end gap-2 shrink-0">
+              <button
+                onClick={closeCreate}
+                disabled={createSaving}
+                className="px-3 py-1.5 rounded-lg border border-border text-sm text-foreground hover:bg-muted/40 transition-colors disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateSave}
+                disabled={createSaving}
+                className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-60"
+              >
+                {createSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlusCircle className="w-4 h-4" />}
+                Create &amp; Add
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

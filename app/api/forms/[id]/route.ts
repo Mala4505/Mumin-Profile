@@ -90,19 +90,28 @@ export async function PUT(
     if (!['draft', 'pending_approval'].includes(existing.status ?? '')) {
       return NextResponse.json({ error: 'Cannot publish from current status' }, { status: 400 })
     }
-    await materializeAudience(id, body.audience_filters ?? existing.audience_filters)
-    body.published_at = new Date().toISOString()
+    try {
+      await materializeAudience(id, body.audience_filters ?? existing.audience_filters)
+      body.published_at = new Date().toISOString()
 
-    const { data: audience } = await supabase.from('form_audience').select('its_no').eq('form_id', id)
-    if (audience?.length) {
-      await supabase.from('notifications').insert(
-        audience.map((a) => ({
-          its_no: a.its_no,
-          type: 'form_assigned',
-          title: `New form: ${body.title ?? existing.title}`,
-          body: 'A form has been assigned to you.',
-          related_form_id: id,
-        }))
+      const admin = createAdminClient()
+      const { data: audience } = await admin.from('form_audience').select('its_no').eq('form_id', id)
+      if (audience?.length) {
+        await admin.from('notifications').insert(
+          audience.map((a) => ({
+            its_no: a.its_no,
+            type: 'form_assigned',
+            title: `New form: ${body.title ?? existing.title}`,
+            body: 'A form has been assigned to you.',
+            related_form_id: id,
+          }))
+        )
+      }
+    } catch (err) {
+      console.error('[forms:publish] failed to materialize audience / notify:', err)
+      return NextResponse.json(
+        { error: err instanceof Error ? err.message : 'Failed to publish form' },
+        { status: 500 },
       )
     }
   }

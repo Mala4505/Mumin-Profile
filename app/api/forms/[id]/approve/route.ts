@@ -37,10 +37,18 @@ export async function POST(
 
   // Materialize audience (cast Json -> AudienceFilters safely)
   if (form.audience_filters) {
-    await materializeAudience(
-      id,
-      form.audience_filters as unknown as AudienceFilters,
-    );
+    try {
+      await materializeAudience(
+        id,
+        form.audience_filters as unknown as AudienceFilters,
+      );
+    } catch (err) {
+      console.error("[forms:approve] failed to materialize audience:", err);
+      return NextResponse.json(
+        { error: err instanceof Error ? err.message : "Failed to materialize audience" },
+        { status: 500 },
+      );
+    }
   }
 
   // Update form status and record approval

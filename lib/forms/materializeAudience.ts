@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { AudienceFilters } from "@/lib/types/forms";
 import { ageToDobRange } from "@/lib/members/ageToDobRange";
 
@@ -54,7 +55,12 @@ export async function materializeAudience(
 
   if (!rows.length) return;
 
-  const { error: insertErr } = await supabase
+  // The member list above is resolved under the caller's RLS scope (intentional —
+  // a Masool publishing "all members" gets their sector). The write itself is a
+  // privileged server operation: form_audience has no INSERT policy for end users,
+  // so use the service-role client to persist the resolved rows.
+  const admin = createAdminClient();
+  const { error: insertErr } = await admin
     .from("form_audience")
     .upsert(rows, { onConflict: "form_id,its_no", ignoreDuplicates: true });
 

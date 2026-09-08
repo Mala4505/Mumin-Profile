@@ -347,53 +347,6 @@ export function Step1BasicInfo({ draft, update, onNext, userRole, umoorIds }: Pr
         />
       </div>
 
-      {/* Response Visibility */}
-      {userRole && ['Masool', 'Musaid', 'Admin', 'SuperAdmin', 'UmoorCoordinator'].includes(userRole) && (
-        <div className="space-y-2">
-          <Label>Who can view responses for this form?</Label>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {[
-              {
-                value: 'all',
-                label: 'Everyone',
-                desc: 'Members + Masool, Musaid, Admin, SuperAdmin',
-              },
-              {
-                value: 'staff_only',
-                label: 'Staff Only',
-                desc: 'Only Masool, Musaid, Admin, SuperAdmin',
-              },
-            ].map((opt) => {
-              const active = (draft.viewable_by_roles ?? 'all') === opt.value
-              return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => update({ viewable_by_roles: opt.value })}
-                  className={`text-left p-3.5 rounded-lg border transition-colors ${
-                    active
-                      ? 'border-primary bg-primary/5 ring-1 ring-primary'
-                      : 'border-border hover:border-primary/40 hover:bg-muted/40'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <div
-                      className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center ${
-                        active ? 'border-primary' : 'border-muted-foreground'
-                      }`}
-                    >
-                      {active && <div className="w-1.5 h-1.5 rounded-full bg-primary" />}
-                    </div>
-                    <span className="text-sm font-medium text-foreground">{opt.label}</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground pl-5">{opt.desc}</p>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
       {/* Footer */}
       <div className="flex justify-end pt-2 border-t border-border">
         <Button onClick={handleNext} disabled={!draft.title?.trim()}>
