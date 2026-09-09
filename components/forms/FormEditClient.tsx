@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ChevronLeft, ChevronUp, ChevronDown, Trash2, Plus,
@@ -9,6 +9,10 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Role } from '@/lib/types/app'
+import type { AudienceFilters, FillerAccess } from '@/lib/types/forms'
+import type { FormDraft } from './FormBuilder'
+import { Step2Audience } from './steps/Step2Audience'
+import { Step4Access } from './steps/Step4Access'
 
 const QUESTION_TYPES = [
   { value: 'text',         label: 'Short Text'     },
@@ -55,6 +59,10 @@ interface Props {
     form_type: string
     created_by: number
     created_at: string
+    expires_at?: string | null
+    audience_filters?: AudienceFilters | null
+    filler_access?: FillerAccess | null
+    response_viewer_roles?: Role[] | null
   }
   fields: FormField[]
   role: Role
@@ -80,6 +88,24 @@ export function FormEditClient({ form, fields: initialFields, role, itsNo, umoor
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
   const [editingTypeIdx, setEditingTypeIdx] = useState<number | null>(null)
+
+  // Full-form settings (audience / access / visibility / expiry) — same controls
+  // as the create wizard, reusing Step2Audience / Step4Access.
+  const [expiresAt, setExpiresAt] = useState(form.expires_at ? form.expires_at.slice(0, 10) : '')
+  const [settingsDraft, setSettingsDraft] = useState<Partial<FormDraft>>({
+    audience_filters: form.audience_filters ?? { all: true },
+    filler_access: form.filler_access ?? { fillers: [] },
+    response_viewer_roles: form.response_viewer_roles ?? null,
+  })
+  const patchSettings = (patch: Partial<FormDraft>) => setSettingsDraft((d) => ({ ...d, ...patch }))
+  const [showAudience, setShowAudience] = useState(false)
+  const [showAccess, setShowAccess] = useState(false)
+
+  const initialAudienceJSON = useMemo(
+    () => JSON.stringify(form.audience_filters ?? { all: true }),
+    [form.audience_filters],
+  )
+  const audienceDirty = JSON.stringify(settingsDraft.audience_filters ?? {}) !== initialAudienceJSON
 
   const [profileFields, setProfileFields] = useState<ProfileField[]>([])
   const [showAdd, setShowAdd] = useState(false)
@@ -268,6 +294,10 @@ export function FormEditClient({ form, fields: initialFields, role, itsNo, umoor
           body: JSON.stringify({
             title,
             description,
+            expires_at: expiresAt || null,
+            audience_filters: settingsDraft.audience_filters ?? { all: true },
+            filler_access: settingsDraft.filler_access ?? { fillers: [] },
+            response_viewer_roles: settingsDraft.response_viewer_roles ?? null,
             ...(overrideStatus ? { status: overrideStatus } : {}),
           }),
         }),
@@ -299,7 +329,15 @@ export function FormEditClient({ form, fields: initialFields, role, itsNo, umoor
       }
 
       if (overrideStatus) setStatus(overrideStatus)
-      showToast('success', overrideStatus === 'pending_approval' ? 'Submitted for approval.' : 'Form saved.')
+      showToast(
+        'success',
+        overrideStatus === 'pending_approval'
+          ? 'Submitted for approval.'
+          : status === 'published' && audienceDirty
+            ? 'Form saved — audience re-assigned to match the new targeting.'
+            : 'Form saved.',
+      )
+      router.refresh()
     } catch (e) {
       showToast('error', e instanceof Error ? e.message : 'Save failed')
     } finally {
@@ -389,7 +427,55 @@ export function FormEditClient({ form, fields: initialFields, role, itsNo, umoor
               </span>
             </span>
           </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">
+              Expiry Date <span className="font-normal">(optional)</span>
+            </label>
+            <input
+              type="date"
+              value={expiresAt}
+              onChange={e => setExpiresAt(e.target.value)}
+              className="h-9 px-3 text-sm bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors w-48"
+            />
+            {expiresAt && (
+              <button
+                type="button"
+                onClick={() => setExpiresAt('')}
+                className="ml-2 text-xs text-muted-foreground hover:text-destructive transition-colors"
+              >
+                Clear
+              </button>
+            )}
+          </div>
         </div>
+      </div>
+
+      {/* Audience */}
+      <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setShowAudience(v => !v)}
+          className="w-full flex items-center justify-between gap-3 p-5 text-left hover:bg-muted/30 transition-colors"
+        >
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">Audience</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Who this form is assigned to{audienceDirty ? ' · unsaved changes' : ''}
+            </p>
+          </div>
+          {showAudience ? <ChevronUp className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />}
+        </button>
+        {showAudience && (
+          <div className="px-5 pb-5 space-y-3">
+            {status === 'published' && (
+              <div className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
+                This form is published. Saving a changed audience re-assigns it immediately —
+                newly matched Mumineen receive it, and Mumineen who no longer match lose access.
+              </div>
+            )}
+            <Step2Audience draft={settingsDraft} update={patchSettings} />
+          </div>
+        )}
       </div>
 
       {/* Fields */}
@@ -537,6 +623,26 @@ export function FormEditClient({ form, fields: initialFields, role, itsNo, umoor
                 </button>
               </div>
             ))}
+          </div>
+        )}
+      </div>
+
+      {/* Access & response visibility */}
+      <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setShowAccess(v => !v)}
+          className="w-full flex items-center justify-between gap-3 p-5 text-left hover:bg-muted/30 transition-colors"
+        >
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">Access &amp; Visibility</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">Who can fill this form and who can view responses</p>
+          </div>
+          {showAccess ? <ChevronUp className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />}
+        </button>
+        {showAccess && (
+          <div className="px-5 pb-5">
+            <Step4Access draft={settingsDraft} update={patchSettings} />
           </div>
         )}
       </div>

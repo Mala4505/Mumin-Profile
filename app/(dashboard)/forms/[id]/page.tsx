@@ -3,6 +3,7 @@ import { getSession } from '@/lib/auth/getSession'
 import { createClient } from '@/lib/supabase/server'
 import { FormEditClient } from '@/components/forms/FormEditClient'
 import type { Role } from '@/lib/types/app'
+import type { AudienceFilters, FillerAccess } from '@/lib/types/forms'
 
 export default async function FormEditPage({
   params,
@@ -65,6 +66,10 @@ export default async function FormEditPage({
           form_type: form.form_type ?? 'simple',
           created_by: form.created_by ?? 0,
           created_at: form.created_at ?? '',
+          expires_at: form.expires_at ?? null,
+          audience_filters: (form.audience_filters as unknown as AudienceFilters | null) ?? { all: true },
+          filler_access: (form.filler_access as unknown as FillerAccess | null) ?? { fillers: [] },
+          response_viewer_roles: (form.response_viewer_roles as unknown as Role[] | null) ?? null,
         }}
         fields={(fieldRows ?? []) as any}
         role={session.role as Role}

@@ -12,8 +12,9 @@ interface MuminOption { its_no: number; name: string }
 interface Props {
   draft: Partial<FormDraft>
   update: (patch: Partial<FormDraft>) => void
-  onNext: () => void
-  onBack: () => void
+  /** Wizard navigation — omit both to render the step without its footer (edit mode). */
+  onNext?: () => void
+  onBack?: () => void
 }
 
 function CheckItem({ id, label, checked, onChange, sublabel }: {
@@ -127,6 +128,15 @@ export function Step4Access({ draft, update, onNext, onBack }: Props) {
       ? [...ALL_VIEWER_ROLES]
       : (draft.response_viewer_roles as Role[])
   )
+
+  // Commit viewer-role changes to the draft immediately (null = "all roles", the
+  // open default). The wizard's Next button also does this; edit mode has no Next.
+  function commitViewerRoles(next: Role[]) {
+    setResponseViewerRoles(next)
+    update({
+      response_viewer_roles: next.length === ALL_VIEWER_ROLES.length ? null : next,
+    })
+  }
 
   const access = draft.filler_access ?? { fillers: [] }
   const fillers = access.fillers
@@ -298,7 +308,7 @@ export function Step4Access({ draft, update, onNext, onBack }: Props) {
                     const next = isOn
                       ? responseViewerRoles.filter(r => r !== role)
                       : [...responseViewerRoles, role]
-                    setResponseViewerRoles(next)
+                    commitViewerRoles(next)
                   }}
                   className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary shrink-0 ${
                     isOn ? 'bg-primary' : 'bg-muted'
@@ -328,17 +338,19 @@ export function Step4Access({ draft, update, onNext, onBack }: Props) {
         </p>
       </div>
 
-      {/* Footer */}
-      <div className="flex justify-between pt-2 border-t border-border">
-        <Button variant="outline" onClick={onBack}>Back</Button>
-        <Button onClick={() => {
-          // Save null if all roles selected (open/default), else save explicit array
-          const toSave: Role[] | null =
-            responseViewerRoles.length === ALL_VIEWER_ROLES.length ? null : responseViewerRoles
-          update({ response_viewer_roles: toSave })
-          onNext()
-        }}>Next: Review</Button>
-      </div>
+      {/* Footer — wizard only */}
+      {(onNext || onBack) && (
+        <div className="flex justify-between pt-2 border-t border-border">
+          <Button variant="outline" onClick={onBack}>Back</Button>
+          <Button onClick={() => {
+            // Save null if all roles selected (open/default), else save explicit array
+            const toSave: Role[] | null =
+              responseViewerRoles.length === ALL_VIEWER_ROLES.length ? null : responseViewerRoles
+            update({ response_viewer_roles: toSave })
+            onNext?.()
+          }}>Next: Review</Button>
+        </div>
+      )}
     </div>
   )
 }

@@ -12,8 +12,9 @@ interface SubsectorRow { subsector_id: number; subsector_name: string; sector_id
 interface Props {
   draft: Partial<FormDraft>
   update: (patch: Partial<FormDraft>) => void
-  onNext: () => void
-  onBack: () => void
+  /** Wizard navigation — omit both to render the step without its footer (edit mode). */
+  onNext?: () => void
+  onBack?: () => void
 }
 
 const inputClass =
@@ -236,11 +237,13 @@ export function Step2Audience({ draft, update, onNext, onBack }: Props) {
         </div>
       )}
 
-      {/* Footer */}
-      <div className="flex justify-between pt-2 border-t border-border">
-        <Button variant="outline" onClick={onBack}>Back</Button>
-        <Button onClick={onNext}>Next: Questions</Button>
-      </div>
+      {/* Footer — wizard only */}
+      {(onNext || onBack) && (
+        <div className="flex justify-between pt-2 border-t border-border">
+          <Button variant="outline" onClick={onBack}>Back</Button>
+          <Button onClick={onNext}>Next: Questions</Button>
+        </div>
+      )}
     </div>
   )
 }

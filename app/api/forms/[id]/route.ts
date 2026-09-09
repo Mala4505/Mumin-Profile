@@ -118,6 +118,43 @@ export async function PUT(
     }
   }
 
+  // Re-resolve the audience when an ALREADY-published form's targeting changes.
+  // (The publish transition above covers the first materialization.) prune keeps
+  // form_audience an exact mirror of the filters; fullScope resolves against the
+  // whole membership rather than the editor's RLS slice.
+  const audienceChanged =
+    'audience_filters' in body &&
+    JSON.stringify(body.audience_filters ?? {}) !==
+      JSON.stringify(existing.audience_filters ?? {})
+
+  if (existing.status === 'published' && audienceChanged) {
+    try {
+      const admin = createAdminClient()
+      const { added } = await materializeAudience(
+        id,
+        body.audience_filters ?? { all: true },
+        { prune: true, fullScope: true },
+      )
+      if (added.length) {
+        await admin.from('notifications').insert(
+          added.map((its_no) => ({
+            its_no,
+            type: 'form_assigned',
+            title: `Form assigned: ${body.title ?? existing.title}`,
+            body: 'A form has been assigned to you.',
+            related_form_id: id,
+          })),
+        )
+      }
+    } catch (err) {
+      console.error('[forms:edit] failed to re-materialize audience:', err)
+      return NextResponse.json(
+        { error: err instanceof Error ? err.message : 'Failed to update audience' },
+        { status: 500 },
+      )
+    }
+  }
+
   // Handle submit-for-approval by Masool/Musaid/UmoorCoordinator
   if (body.status === 'pending_approval' && ['Masool', 'Musaid', 'UmoorCoordinator'].includes(session.role)) {
     const admin = createAdminClient()
