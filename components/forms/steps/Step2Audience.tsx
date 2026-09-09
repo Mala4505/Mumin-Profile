@@ -105,7 +105,7 @@ export function Step2Audience({ draft, update, onNext, onBack }: Props) {
       {/* All vs By criteria toggle */}
       <div className="flex gap-3">
         {[
-          { label: 'All members', value: true },
+          { label: 'All Mumineen', value: true },
           { label: 'By criteria', value: false },
         ].map((opt) => {
           const active = isAll === opt.value
@@ -158,7 +158,7 @@ export function Step2Audience({ draft, update, onNext, onBack }: Props) {
           <div>
             <CheckItem
               id="balig-only"
-              label="Balig members only"
+              label="Balig Mumineen only"
               checked={!!filters.balig_status}
               onChange={setBalig}
             />

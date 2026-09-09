@@ -202,7 +202,7 @@ export function FormImportSection() {
                     <td className="px-3 py-2">
                       <span className="text-xs bg-red-100 text-red-700 rounded px-1.5 py-0.5">Required</span>
                     </td>
-                    <td className="px-3 py-2 text-muted-foreground">Member ITS number</td>
+                    <td className="px-3 py-2 text-muted-foreground">Mumin ITS number</td>
                   </tr>
                   {formFields.map((f) => (
                     <tr key={f.caption} className="border-t">
@@ -216,7 +216,7 @@ export function FormImportSection() {
                       </td>
                       <td className="px-3 py-2 text-muted-foreground">
                         {f.behavior === 'static'
-                          ? 'Static — updates member profile permanently'
+                          ? 'Static — updates Mumin profile permanently'
                           : 'Historical — shows in profile timeline'}
                         {f.is_required && (
                           <span className="ml-1 text-xs text-red-600">(required)</span>
@@ -229,7 +229,7 @@ export function FormImportSection() {
                     <td className="px-3 py-2">
                       <span className="text-xs bg-gray-100 text-gray-600 rounded px-1.5 py-0.5">Optional</span>
                     </td>
-                    <td className="px-3 py-2 text-muted-foreground">Note applied to all answers for this member row</td>
+                    <td className="px-3 py-2 text-muted-foreground">Note applied to all answers for this Mumin row</td>
                   </tr>
                 </tbody>
               </table>

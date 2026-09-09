@@ -58,7 +58,7 @@ export default async function ImportPage() {
         <StepCard
           step={1}
           title="Core Mumin Import"
-          description="Upload the full mumin CSV to upsert members, houses, families, sectors, and subsectors in one pass. Processes 500 records per batch with live progress logs."
+          description="Upload the full mumin CSV to upsert Mumineen, houses, families, sectors, and subsectors in one pass. Processes 500 records per batch with live progress logs."
         >
           <CoreImportSection />
         </StepCard>
@@ -66,8 +66,8 @@ export default async function ImportPage() {
 
       <StepCard
         step={profileStep}
-        title="Member & Profile Data"
-        description="Import core member records and profile field values using a table-based CSV upload."
+        title="Mumin & Profile Data"
+        description="Import core Mumin records and profile field values using a table-based CSV upload."
       >
         <ImportForm />
       </StepCard>

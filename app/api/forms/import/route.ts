@@ -175,7 +175,7 @@ export async function POST(req: NextRequest) {
       continue
     }
     if (!validItsSet.has(itsNoRaw)) {
-      errors.push(`Row ${lineNum}: ITS ${itsNoRaw} not found in member records`)
+      errors.push(`Row ${lineNum}: ITS ${itsNoRaw} not found in Mumin records`)
       failedCount++
       continue
     }

@@ -53,7 +53,7 @@ export async function PATCH(
     admin.from('auth_accounts').select('supabase_auth_id, role').eq('its_no', itsNo).maybeSingle(),
   ])
 
-  if (!muminRow) return NextResponse.json({ error: 'Member not found' }, { status: 404 })
+  if (!muminRow) return NextResponse.json({ error: 'Mumin not found' }, { status: 404 })
 
   // Validate role ↔ umoor consistency: umoor assignments only make sense for UmoorCoordinator.
   // (A coordinator with 0 umoors is allowed — they simply see no profile data until assigned.)

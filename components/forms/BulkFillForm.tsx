@@ -443,7 +443,7 @@ export function BulkFillForm({ formId, role, itsNo }: BulkFillFormProps) {
           <div className="relative group flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
             <Input
-              placeholder="Filter members by name or ITS…"
+              placeholder="Filter Mumineen by name or ITS…"
               className="pl-10 h-10 bg-card"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -485,7 +485,7 @@ export function BulkFillForm({ formId, role, itsNo }: BulkFillFormProps) {
         {/* Empty state */}
         {!loadError && members.length === 0 && (
           <div className="bg-card rounded-xl border border-border shadow-sm px-5 py-16 text-center">
-            <p className="text-sm font-medium text-foreground mb-1">No audience members assigned</p>
+            <p className="text-sm font-medium text-foreground mb-1">No audience Mumineen assigned</p>
             <p className="text-xs text-muted-foreground">
               Publish this form first so the audience is materialised.
             </p>
@@ -537,7 +537,7 @@ export function BulkFillForm({ formId, role, itsNo }: BulkFillFormProps) {
                                     ? 'bg-primary/10 text-primary'
                                     : 'text-muted-foreground hover:text-primary hover:bg-primary/10'
                                 }`}
-                                title="Fill all unfilled members in this column at once"
+                                title="Fill all unfilled Mumineen in this column at once"
                               >
                                 <Zap className="w-2.5 h-2.5" />
                                 Fill all
@@ -628,8 +628,8 @@ export function BulkFillForm({ formId, role, itsNo }: BulkFillFormProps) {
                       >
                         <AlertTriangle className="w-6 h-6 mx-auto mb-2 opacity-20" />
                         {showUnfilledOnly
-                          ? 'All members on this page are filled!'
-                          : 'No members match your filter.'}
+                          ? 'All Mumineen on this page are filled!'
+                          : 'No Mumineen match your filter.'}
                       </td>
                     </tr>
                   )}

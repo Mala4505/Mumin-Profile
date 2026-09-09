@@ -108,7 +108,7 @@ export function EditMemberModal({
     <Dialog open={open} onOpenChange={(v) => { if (!saving) onOpenChange(v) }}>
       <DialogContent className="sm:max-w-xl" aria-describedby={undefined}>
         <DialogHeader>
-          <DialogTitle>Edit Member — ITS {itsNo}</DialogTitle>
+          <DialogTitle>Edit Mumin — ITS {itsNo}</DialogTitle>
         </DialogHeader>
 
         {/* No inner scroll cap — DialogContent already caps at 100dvh-2rem and scrolls. */}

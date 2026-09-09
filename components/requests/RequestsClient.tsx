@@ -78,14 +78,14 @@ const FIELD_OPTIONS = [
   { field: 'phone', label: 'Phone Number' },
   { field: 'alternate_phone', label: 'Alternate Phone' },
   { field: 'email', label: 'Email' },
-  { field: 'status', label: 'Member Status' },
+  { field: 'status', label: 'Mumin Status' },
   { field: 'notes', label: 'Notes' },
 ] as const
 
 const PRESET_REMARKS = [
   'Phone Number Changed',
-  'Member Deceased',
-  'New Member Added',
+  'Mumin Deceased',
+  'New Mumin Added',
 ]
 
 /** The 4 tiers of "how much do you know" for an address-change report. */
@@ -240,13 +240,13 @@ export function RequestsClient({ families, initialRequests, mode, currentSearch,
       .then(async res => {
         if (!res.ok) {
           const d = await res.json().catch(() => ({}))
-          setEditMembersError(d.error ?? 'Failed to load members')
+          setEditMembersError(d.error ?? 'Failed to load Mumineen')
         } else {
           const d = await res.json()
           setEditMembers(d.members ?? [])
         }
       })
-      .catch(() => setEditMembersError('Failed to load members'))
+      .catch(() => setEditMembersError('Failed to load Mumineen'))
       .finally(() => setEditMembersLoading(false))
   }, [editModalOpen]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -681,7 +681,7 @@ export function RequestsClient({ families, initialRequests, mode, currentSearch,
                   <DialogHeader>
                     <DialogTitle>Request Field Edit</DialogTitle>
                     <DialogDescription>
-                      Select a member, choose the field to change, and enter the new value.
+                      Select a Mumin, choose the field to change, and enter the new value.
                       Your request will be reviewed by an admin.
                     </DialogDescription>
                   </DialogHeader>
@@ -690,13 +690,13 @@ export function RequestsClient({ families, initialRequests, mode, currentSearch,
                     {/* Step 1 — Member picker */}
                     <div>
                       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
-                        1. Select Member
+                        1. Select Mumin
                       </p>
 
                       {editMembersLoading ? (
                         <div className="flex items-center justify-center py-6 text-muted-foreground gap-2 text-sm">
                           <Loader2 className="w-4 h-4 animate-spin" />
-                          Loading members…
+                          Loading Mumineen…
                         </div>
                       ) : editMembersError ? (
                         <p className="text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2">
@@ -713,7 +713,7 @@ export function RequestsClient({ families, initialRequests, mode, currentSearch,
                           />
                           <div className="max-h-36 overflow-y-auto rounded-lg border border-border divide-y divide-border">
                             {filteredEditMembers.length === 0 ? (
-                              <p className="px-3 py-3 text-sm text-muted-foreground text-center">No members found</p>
+                              <p className="px-3 py-3 text-sm text-muted-foreground text-center">No Mumineen found</p>
                             ) : filteredEditMembers.map(m => (
                               <button
                                 key={m.its_no}

@@ -26,11 +26,11 @@ function SectionValue({ children }: { children: React.ReactNode }) {
 }
 
 function audienceSummary(filters: FormDraft['audience_filters'] | undefined): string {
-  if (!filters || filters.all !== false) return 'All members'
+  if (!filters || filters.all !== false) return 'All Mumineen'
 
   const parts: string[] = []
   if (filters.gender) parts.push(filters.gender === 'M' ? 'Male only' : 'Female only')
-  if (filters.balig_status) parts.push('Balig members only')
+  if (filters.balig_status) parts.push('Balig Mumineen only')
   if (filters.age_from != null || filters.age_to != null) {
     const from = filters.age_from ?? 0
     const to = filters.age_to ?? '∞'
@@ -48,7 +48,7 @@ function accessSummary(filler_access: FormDraft['filler_access'] | undefined): s
     if (f.type === 'role') return `All ${f.value}s`
     if (f.type === 'specific_masool') return `${(f.value as string[]).length} specific Masool(s)`
     if (f.type === 'specific_musaid') return `${(f.value as string[]).length} specific Musaid(s)`
-    if (f.type === 'self') return 'Members (self-fill)'
+    if (f.type === 'self') return 'Mumineen (self-fill)'
     return 'Unknown'
   })
 }

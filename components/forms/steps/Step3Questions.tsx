@@ -61,7 +61,7 @@ const CREATE_FIELD_TYPES = [
 ] as const
 
 const VISIBILITY_ROLES: { role: Role; label: string; desc: string }[] = [
-  { role: 'Mumin',  label: 'Mumin',  desc: 'Members' },
+  { role: 'Mumin',  label: 'Mumin',  desc: 'Mumineen' },
   { role: 'Musaid', label: 'Musaid', desc: 'Sub-sector'  },
   { role: 'Masool', label: 'Masool', desc: 'Sector'     },
 ]

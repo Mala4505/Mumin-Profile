@@ -623,7 +623,7 @@ export function ProfileFieldsClient({ categories }: Props) {
         description={
           deleteTarget
             ? deleteTarget.value_count > 0
-              ? `“${deleteTarget.caption}” has ${deleteTarget.value_count} recorded value${deleteTarget.value_count !== 1 ? 's' : ''} across member profiles. Deleting the field permanently erases them. If you only want to hide it, deactivate it instead: that keeps all data.`
+              ? `“${deleteTarget.caption}” has ${deleteTarget.value_count} recorded value${deleteTarget.value_count !== 1 ? 's' : ''} across Mumin profiles. Deleting the field permanently erases them. If you only want to hide it, deactivate it instead: that keeps all data.`
               : `“${deleteTarget.caption}” has no recorded values. It will be permanently removed.`
             : ''
         }
@@ -787,7 +787,7 @@ export function ProfileFieldsClient({ categories }: Props) {
                   onChange={(e) => setFormVisibility(Number(e.target.value))}
                   className="w-full h-9 px-3 text-sm bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
                 >
-                  <option value={1}>Everyone (member and staff)</option>
+                  <option value={1}>Everyone (Mumin and staff)</option>
                   <option value={2}>Staff only</option>
                   <option value={3}>SuperAdmin only</option>
                 </select>
@@ -801,7 +801,7 @@ export function ProfileFieldsClient({ categories }: Props) {
                   onChange={(e) => setFormMuminEdit(e.target.checked)}
                   className="accent-primary"
                 />
-                <span className="text-sm text-foreground">Member can edit this field from their portal</span>
+                <span className="text-sm text-foreground">Mumin can edit this field from their portal</span>
               </label>
 
               {/* Error */}

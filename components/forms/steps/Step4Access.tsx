@@ -110,7 +110,7 @@ function PersonPicker({ label, people, selected, onChange }: {
 }
 
 const VIEWER_ROLES: { role: Role; label: string; desc: string; color: string }[] = [
-  { role: 'Mumin',  label: 'Mumin',  desc: 'Members',   color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
+  { role: 'Mumin',  label: 'Mumin',  desc: 'Mumineen',   color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
   { role: 'Masool', label: 'Masool', desc: 'Sector',       color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400' },
   { role: 'Musaid', label: 'Musaid', desc: 'Sub-sector',    color: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400' },
 ]
@@ -224,7 +224,7 @@ export function Step4Access({ draft, update, onNext, onBack }: Props) {
             <CheckItem
               id="hof-fill"
               label="Heads of Family (HOF)"
-              sublabel="Family heads can fill this form for their family members"
+              sublabel="Family heads can fill this form for their family Mumineen"
               checked={hasHof}
               onChange={(v) => update({ filler_access: buildFillers({ hof: v }) })}
             />
@@ -257,8 +257,8 @@ export function Step4Access({ draft, update, onNext, onBack }: Props) {
           <div className="p-3.5 border border-border rounded-lg bg-background">
             <CheckItem
               id="self-fill"
-              label="Allow members to fill their own data"
-              sublabel="Members can access and fill this form for themselves"
+              label="Allow Mumineen to fill their own data"
+              sublabel="Mumineen can access and fill this form for themselves"
               checked={hasSelf}
               onChange={(v) => update({ filler_access: buildFillers({ self: v }) })}
             />

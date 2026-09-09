@@ -865,7 +865,7 @@ export function ReportsClient({ sectors, categories, role }: ReportsClientProps)
                 <thead>
                   <tr className="border-b border-border bg-muted/30">
                     <th className={`sticky left-0 z-10 bg-muted/50 ${TH} ${STICKY_COL}`}>
-                      Member
+                      Mumin
                     </th>
                     <th className={TH}>
                       Gender

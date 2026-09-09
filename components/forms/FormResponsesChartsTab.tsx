@@ -36,7 +36,7 @@ export function FormResponsesChartsTab({
         <h3 className="text-sm font-semibold text-foreground mb-3">Overall Completion</h3>
         <Progress value={completionPct} className="h-3 mb-2" />
         <p className="text-sm text-muted-foreground">
-          {completionPct}% — {responses.length} of {audience.length} members
+          {completionPct}% — {responses.length} of {audience.length} Mumineen
         </p>
       </div>
 

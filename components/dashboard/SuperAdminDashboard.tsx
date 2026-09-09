@@ -297,7 +297,7 @@ export default function SuperAdminDashboard({ stats }: Props) {
             <div className="flex items-center gap-4 px-5 py-2">
               <span className="w-4" />
               <span className="flex-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Sector</span>
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground w-20 text-right">Members</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground w-20 text-right">Mumineen</span>
               <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground w-20 text-right hidden sm:block">Subsectors</span>
               <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground w-20 text-right hidden md:block">Buildings</span>
               <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground w-14 text-right hidden md:block">Flats</span>

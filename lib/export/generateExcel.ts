@@ -44,7 +44,7 @@ export const BASE_COLUMNS: ExportColumn[] = [
 export async function generateExcel(
   data: Record<string, unknown>[],
   columns: ExportColumn[],
-  sheetName = 'Members'
+  sheetName = 'Mumineen'
 ): Promise<Uint8Array> {
   const ExcelJS = (await import('exceljs')).default
   const workbook = new ExcelJS.Workbook()

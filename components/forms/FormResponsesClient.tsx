@@ -168,7 +168,7 @@ export function FormResponsesClient({ form, formFields, responses, audience, rol
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border bg-muted/40">
-                    <th className={TH}>Member</th>
+                    <th className={TH}>Mumin</th>
                     <th className={TH}>Answer</th>
                     <th className={TH}>Submitted</th>
                   </tr>
@@ -217,7 +217,7 @@ export function FormResponsesClient({ form, formFields, responses, audience, rol
           {pending.length === 0 ? (
             <div className="bg-card rounded-xl border border-border shadow-sm px-5 py-12 text-center">
               <CheckCircle className="w-8 h-8 text-green-500 mx-auto mb-2" />
-              <p className="text-sm font-medium text-foreground">All members have responded!</p>
+              <p className="text-sm font-medium text-foreground">All Mumineen have responded!</p>
             </div>
           ) : (
             <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
@@ -225,7 +225,7 @@ export function FormResponsesClient({ form, formFields, responses, audience, rol
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border bg-muted/40">
-                    <th className={TH}>Member</th>
+                    <th className={TH}>Mumin</th>
                     <th className={TH}>Subsector</th>
                   </tr>
                 </thead>

@@ -43,7 +43,7 @@ export function validateImportRows(
 
     // profile_value: its_no must exist in mumin
     if (existingItsNos && row['its_no'] && !existingItsNos.has(row['its_no'])) {
-      errors.push({ row: rowNum, field: 'its_no', error: `ITS ${row['its_no']} not found in members — row will be skipped` })
+      errors.push({ row: rowNum, field: 'its_no', error: `ITS ${row['its_no']} not found in Mumineen — row will be skipped` })
     }
   }
 

@@ -268,7 +268,7 @@ export function UsersClient({ initialUsers, sectors, subsectors, categories, mod
             <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
               <Users className="w-8 h-8 text-muted-foreground" />
             </div>
-            <h3 className="text-base font-semibold text-foreground mb-1">Search to find members</h3>
+            <h3 className="text-base font-semibold text-foreground mb-1">Search to find Mumineen</h3>
             <p className="text-sm text-muted-foreground mb-5">
               Type a name or ITS No, filter by role, or load the full list.
             </p>
@@ -277,7 +277,7 @@ export function UsersClient({ initialUsers, sectors, subsectors, categories, mod
               className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
             >
               <Users className="w-4 h-4" />
-              View All Members
+              View All Mumineen
             </a>
           </div>
         </div>
@@ -335,7 +335,7 @@ export function UsersClient({ initialUsers, sectors, subsectors, categories, mod
         <div className="px-4 py-3 border-b border-border flex flex-wrap items-center gap-x-3 gap-y-3">
           <Shield className="w-4 h-4 text-primary flex-shrink-0" />
           <h2 className="font-semibold text-foreground text-sm">
-            {nf.format(users.length)} member{users.length !== 1 ? 's' : ''} found
+            {nf.format(users.length)} Mumin{users.length !== 1 ? 'een' : ''} found
           </h2>
         </div>
 
@@ -343,7 +343,7 @@ export function UsersClient({ initialUsers, sectors, subsectors, categories, mod
           <table className="w-full text-sm">
             <thead className="bg-muted/40">
               <tr>
-                <th className={TH}>Member</th>
+                <th className={TH}>Mumin</th>
                 <th className={TH}>Role</th>
                 <th className={TH}>Sector / Subsector</th>
                 <th className={TH}>Password</th>
@@ -356,7 +356,7 @@ export function UsersClient({ initialUsers, sectors, subsectors, categories, mod
               {paginated.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">
-                    No members found.
+                    No Mumineen found.
                   </td>
                 </tr>
               ) : paginated.map(u => {
@@ -397,7 +397,7 @@ export function UsersClient({ initialUsers, sectors, subsectors, categories, mod
                       ) : u.has_custom_password ? (
                         <span
                           className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[11px] sm:text-[10px] font-medium text-amber-700"
-                          title="This member set their own password."
+                          title="This Mumin set their own password."
                         >
                           <KeyRound className="w-2.5 h-2.5" />
                           own password
@@ -410,7 +410,7 @@ export function UsersClient({ initialUsers, sectors, subsectors, categories, mod
                       {u.is_active ? (
                         <Chip tone="bg-green-100 text-green-700 border-green-200">Allowed</Chip>
                       ) : (
-                        <span title="Account is inactive. This member cannot sign in.">
+                        <span title="Account is inactive. This Mumin cannot sign in.">
                           <Chip tone="bg-destructive/10 text-destructive border-destructive/20">
                             <Ban className="w-3 h-3 shrink-0" />
                             Blocked
@@ -523,7 +523,7 @@ export function UsersClient({ initialUsers, sectors, subsectors, categories, mod
                 </div>
                 {!editActive && (
                   <p className="text-xs text-destructive mt-1.5">
-                    Inactive members cannot sign in.
+                    Inactive Mumineen cannot sign in.
                   </p>
                 )}
               </div>
@@ -555,7 +555,7 @@ export function UsersClient({ initialUsers, sectors, subsectors, categories, mod
                     </button>
                   ) : (
                     <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <span className="text-xs text-foreground">Reset this member&apos;s password?</span>
+                      <span className="text-xs text-foreground">Reset this Mumin&apos;s password?</span>
                       <button
                         type="button"
                         onClick={() => { setResetConfirming(false); setResetError('') }}

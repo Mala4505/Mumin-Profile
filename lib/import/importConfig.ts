@@ -20,7 +20,7 @@ export interface TableConfig {
 
 export const IMPORT_TABLES: Record<ImportTableKey, TableConfig> = {
   mumin: {
-    label: 'Members',
+    label: 'Mumineen',
     uniqueKey: 'its_no',
     requiredFields: ['its_no', 'name'],
     optionalFields: ['gender', 'date_of_birth', 'balig_status', 'phone', 'alternate_phone', 'email', 'status', 'sabeel_no', 'subsector_id'],
