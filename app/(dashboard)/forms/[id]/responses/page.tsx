@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth/getSession'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { isAuthorizedFiller } from '@/lib/forms/checkFillerAccess'
 import { FormResponsesClient } from '@/components/forms/FormResponsesClient'
 import { Database } from '@/lib/types/database'
@@ -59,8 +60,12 @@ export default async function FormResponsesPage({
     .eq('submitted', true)
     .order('submitted_at', { ascending: false })
 
-  // Fetch audience with its_no
-  const { data: audienceData } = await supabase
+  // Fetch audience with its_no. form_audience has no usable end-user SELECT
+  // policy on the live DB, so this (and the mumin/subsector lookups that hang
+  // off it) go through the service role. The page is already staff-only and
+  // authorizes the caller against this specific form above.
+  const admin = createAdminClient()
+  const { data: audienceData } = await admin
     .from('form_audience')
     .select('its_no')
     .eq('form_id', id)
@@ -69,7 +74,7 @@ export default async function FormResponsesPage({
   const audienceItsNos = audienceData?.map(a => a.its_no) ?? []
   let mumins: Array<{ its_no: number; name: string; subsector_id: number }> = []
   if (audienceItsNos.length > 0) {
-    const { data: muminData } = await supabase
+    const { data: muminData } = await admin
       .from('mumin')
       .select('its_no, name, subsector_id')
       .in('its_no', audienceItsNos)
@@ -80,7 +85,7 @@ export default async function FormResponsesPage({
   const subsectorIds = [...new Set(mumins.map(m => m.subsector_id))]
   let subsectors: Record<number, string> = {}
   if (subsectorIds.length > 0) {
-    const { data: subsectorData } = await supabase
+    const { data: subsectorData } = await admin
       .from('subsector')
       .select('subsector_id, subsector_name')
       .in('subsector_id', subsectorIds)

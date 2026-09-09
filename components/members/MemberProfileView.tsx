@@ -587,7 +587,7 @@ export function MemberProfileView({ profile, session, initialResponses = [], log
                   <button
                     onClick={() => setCoreEditOpen(true)}
                     className="flex shrink-0 items-center gap-1 min-h-11 sm:min-h-8 px-3 sm:px-2 rounded-lg text-xs font-medium text-muted-foreground border border-border hover:text-foreground hover:bg-muted/40 transition-colors"
-                    title="Edit member details"
+                    title="Edit Mumin details"
                   >
                     <Pencil className="w-3 h-3" />
                     Edit

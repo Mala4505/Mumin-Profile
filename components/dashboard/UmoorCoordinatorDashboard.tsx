@@ -113,7 +113,7 @@ export default function UmoorCoordinatorDashboard({ stats }: Props) {
           href="/members"
           className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-lg font-medium hover:bg-primary/90 transition-colors"
         >
-          View All Members
+          View All Mumineen
           <ArrowRight className="w-4 h-4" />
         </Link>
         <Link

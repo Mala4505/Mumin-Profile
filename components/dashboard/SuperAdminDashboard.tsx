@@ -174,7 +174,7 @@ export default function SuperAdminDashboard({ stats }: Props) {
         <StatCard
           title="Total Mumineen"
           value={stats.totalMumineen}
-          subtitle="Registered members"
+          subtitle="Registered Mumineen"
           icon={<UsersIcon />}
           iconBg="bg-primary/10"
           iconColor="text-primary"

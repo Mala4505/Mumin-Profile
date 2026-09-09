@@ -71,7 +71,7 @@ export default function MusaidDashboard({ stats }: Props) {
       {/* Stat Cards — row 1: members */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          title="Total Members"
+          title="Total Mumineen"
           value={stats.muminCount}
           subtitle="In this subsector"
           icon={<UsersIcon />}
@@ -95,7 +95,7 @@ export default function MusaidDashboard({ stats }: Props) {
           iconColor="text-pink-600"
         />
         <StatCard
-          title="Balig Members"
+          title="Balig Mumineen"
           value={stats.baligCount}
           subtitle={`${stats.ghairBaligCount} Ghair Balig`}
           icon={<StarIcon />}
@@ -276,7 +276,7 @@ export default function MusaidDashboard({ stats }: Props) {
           href="/members"
           className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-lg font-medium hover:bg-primary/90 transition-colors"
         >
-          View All Members
+          View All Mumineen
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M5 12h14" />
             <path d="m12 5 7 7-7 7" />

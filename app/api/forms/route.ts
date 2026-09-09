@@ -1,19 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/getSession'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function GET() {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const supabase = await createClient()
+  // form_audience has no usable end-user SELECT policy on the live DB, so
+  // membership lookups (which forms is this Mumin assigned to, audience counts)
+  // must use the service role. Every branch below still filters by the caller's
+  // own its_no / form ownership.
+  const admin = createAdminClient()
   let formData: any[] = []
 
   if (session.role === 'Mumin' && session.is_hof) {
     // HOF Mumin sees self-fill audience forms + published HOF-access forms
     const itsNo = Number(session.its_no)
 
-    const { data: audienceRows } = await supabase
+    const { data: audienceRows } = await admin
       .from('form_audience')
       .select('form_id')
       .eq('its_no', itsNo)
@@ -58,7 +64,7 @@ export async function GET() {
     formData.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
   } else if (session.role === 'Mumin') {
     // Non-HOF Mumin sees only published self-fill forms where they're in the audience
-    const { data: audienceRows } = await supabase
+    const { data: audienceRows } = await admin
       .from('form_audience')
       .select('form_id')
       .eq('its_no', Number(session.its_no))
@@ -207,7 +213,7 @@ export async function GET() {
       }
     }
 
-    const { data: aCounts } = await supabase
+    const { data: aCounts } = await admin
       .from('form_audience')
       .select('form_id')
       .in('form_id', formIds)

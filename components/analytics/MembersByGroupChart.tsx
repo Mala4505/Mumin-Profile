@@ -46,7 +46,7 @@ export default function MembersByGroupChart({ groupData, selectedGroup, onBarCli
         />
         <Bar
           dataKey="count"
-          name="Members"
+          name="Mumineen"
           radius={[4, 4, 0, 0]}
           maxBarSize={48}
         >

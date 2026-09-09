@@ -223,7 +223,7 @@ export function SectorPerformanceSection() {
         <div className="grid grid-cols-3 gap-3">
           {[
             { label: 'Total Responses', value: totalResponded.toLocaleString() },
-            { label: 'Total Members', value: totalMembers.toLocaleString() },
+            { label: 'Total Mumineen', value: totalMembers.toLocaleString() },
             {
               label: 'Overall Completion',
               value: `${overallPct}%`,

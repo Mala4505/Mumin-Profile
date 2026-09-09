@@ -114,7 +114,7 @@ function FormResponseRates({ rates }: { rates: FormRate[] }) {
                 />
               </div>
               <p className="text-[11px] sm:text-[10px] text-muted-foreground mt-0.5">
-                {form.responses} of {form.total} members responded
+                {form.responses} of {form.total} Mumineen responded
               </p>
             </div>
           )
@@ -286,7 +286,7 @@ export function AnalyticsDashboard({ role }: { role: Role }) {
               sub="Currently published"
             />
             <WidgetCard
-              title="Members w/ No Profile"
+              title="Mumineen w/ No Profile"
               value={overview?.membersWithNoProfile ?? 0}
               sub="No profile data recorded"
             />
@@ -379,11 +379,11 @@ export function AnalyticsDashboard({ role }: { role: Role }) {
       {/* ── Drill-down Table ──────────────────────────────────────────────── */}
       <div>
         <h2 className="text-base font-semibold text-foreground mb-3">
-          {selectedGroup ? `Members — ${selectedGroup}` : 'Member Detail Table'}
+          {selectedGroup ? `Mumineen — ${selectedGroup}` : 'Mumin Detail Table'}
         </h2>
         {!selectedGroup ? (
           <div className="bg-card rounded-xl border border-border shadow-sm p-8 text-center text-muted-foreground text-sm">
-            Click a chart segment to filter members by group.
+            Click a chart segment to filter Mumineen by group.
           </div>
         ) : drillLoading ? (
           <div className="bg-card rounded-xl border border-border shadow-sm p-8 text-center text-muted-foreground text-sm animate-pulse">
@@ -461,14 +461,14 @@ export function AnalyticsDashboard({ role }: { role: Role }) {
               </div>
             </div>
             {filteredDrillMembers.length === 0 ? (
-              <div className="p-8 text-center text-muted-foreground text-sm">No members match the current filters.</div>
+              <div className="p-8 text-center text-muted-foreground text-sm">No Mumineen match the current filters.</div>
             ) : (
               <>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-border bg-muted/30">
-                        <th className={TH}>Member</th>
+                        <th className={TH}>Mumin</th>
                         <th className={TH}>Age</th>
                         <th className={`${TH} hidden sm:table-cell`}>Mobile No</th>
                         <th className={`${TH} hidden sm:table-cell`}>Sector</th>

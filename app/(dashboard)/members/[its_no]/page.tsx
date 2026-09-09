@@ -48,7 +48,7 @@ export default async function MemberProfilePage({ params }: PageProps) {
           href="/members"
           className="shrink-0 hover:text-foreground transition-colors"
         >
-          Members
+          Mumineen
         </a>
         <ChevronRight className="w-4 h-4 shrink-0" />
         <span className="min-w-0 truncate text-foreground font-medium">{profile.name}</span>

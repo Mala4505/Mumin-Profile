@@ -102,6 +102,8 @@ function canUserFill(
   itsNo: number,
   isHof: boolean,
 ): boolean {
+  // SuperAdmin / Admin can always bulk-fill any form (mirrors isAuthorizedFiller on the server)
+  if (role === 'SuperAdmin' || role === 'Admin') return true
   if (!fillerAccess?.fillers) return false
   const itsStr = String(itsNo)
   for (const f of fillerAccess.fillers) {

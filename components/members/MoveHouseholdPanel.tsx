@@ -747,7 +747,7 @@ export function MoveHouseholdPanel({
           setRosterState(
             res.status === 403
               ? { status: 'forbidden', message: d.error ?? 'Forbidden' }
-              : { status: 'error', message: d.error ?? 'Failed to load members' },
+              : { status: 'error', message: d.error ?? 'Failed to load Mumineen' },
           )
           return
         }
@@ -760,7 +760,7 @@ export function MoveHouseholdPanel({
         setCheckedIts(new Set(members.map((m) => m.its_no))) // default: whole household
       })
       .catch((e) => {
-        setRosterState({ status: 'error', message: e instanceof Error ? e.message : 'Failed to load members' })
+        setRosterState({ status: 'error', message: e instanceof Error ? e.message : 'Failed to load Mumineen' })
       })
   }, [mode, source, rosterState.status])
 
@@ -816,13 +816,13 @@ export function MoveHouseholdPanel({
 
   let buttonLabel: string
   if (mode === 'household') {
-    buttonLabel = `Move ${checkedIts.size} member${checkedIts.size === 1 ? '' : 's'}`
+    buttonLabel = `Move ${checkedIts.size} Mumin${checkedIts.size === 1 ? '' : 'een'}`
   } else if (source.type === 'sabeel' && header.status === 'ready-sabeel') {
     const n = header.family.member_count
-    buttonLabel = `Move ${n} member${n === 1 ? '' : 's'}`
+    buttonLabel = `Move ${n} Mumin${n === 1 ? '' : 'een'}`
   } else if (source.type === 'bulk' && header.status === 'ready-bulk') {
     const n = header.families.reduce((sum, f) => sum + f.member_count, 0)
-    buttonLabel = `Move ${n} member${n === 1 ? '' : 's'}`
+    buttonLabel = `Move ${n} Mumin${n === 1 ? '' : 'een'}`
   } else {
     buttonLabel = 'Move this household'
   }
@@ -994,7 +994,7 @@ export function MoveHouseholdPanel({
   function renderRosterChecklist() {
     if (rosterState.status === 'loading') {
       return (
-        <div className="space-y-1.5" aria-busy="true" aria-label="Loading members">
+        <div className="space-y-1.5" aria-busy="true" aria-label="Loading Mumineen">
           {[0, 1, 2].map((i) => (
             <Skeleton key={i} className="h-9 w-full rounded-lg" />
           ))}
@@ -1156,7 +1156,7 @@ export function MoveHouseholdPanel({
         {mode === 'household' && source.type === 'sabeel' && (
           <div className="space-y-4">
             <div className="space-y-2">
-              <p className="text-sm font-medium text-foreground">Members moving</p>
+              <p className="text-sm font-medium text-foreground">Mumineen moving</p>
               {renderRosterChecklist()}
             </div>
 

@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/getSession";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { isAuthorizedFiller } from "@/lib/forms/checkFillerAccess";
 import type { FillerAccess } from "@/lib/types/forms";
 
@@ -43,7 +44,9 @@ export async function POST(
   }
 
   if (session.role === "Mumin") {
-    const { data: inAudience } = await supabase
+    // form_audience has no usable end-user SELECT policy on the live DB — read
+    // the caller's own membership row with the service role.
+    const { data: inAudience } = await createAdminClient()
       .from("form_audience")
       .select("its_no")
       .eq("form_id", id)
@@ -61,41 +64,37 @@ export async function POST(
 
   // Normalize payload: SelfFillForm sends { profile_field_id, its_no, answer, remarks }
   // but process_form_submission RPC expects { field_id, its_no, answer, remarks }
+  const isSelfFiller = session.role === 'Mumin'
   const normalized = (responses as Array<{
     profile_field_id?: number
     field_id?: number
     its_no: number
     answer: string
     remarks?: string
-  }>).map((r) => ({
-    field_id: r.field_id ?? r.profile_field_id,
-    its_no: r.its_no,
-    answer: r.answer,
-    remarks: r.remarks ?? '',
-  }));
+  }>)
+    .map((r) => ({
+      field_id: r.field_id ?? r.profile_field_id,
+      // A self-filler can only ever write their own record — never trust the
+      // its_no in the payload for them (the RPC below runs as SECURITY DEFINER
+      // and would otherwise bypass row-level checks).
+      its_no: isSelfFiller ? Number(session.its_no) : r.its_no,
+      answer: r.answer,
+      remarks: r.remarks ?? '',
+    }))
+    .filter((r): r is typeof r & { field_id: number } => r.field_id != null)
 
-  if (form.form_type === 'simple') {
-    const upserts = normalized
-      .filter((r): r is typeof r & { field_id: number } => r.field_id != null)
-      .map((r) => ({
-        its_no: r.its_no,
-        field_id: r.field_id,
-        value: r.answer,
-      }))
-    const { error: pvErr } = await supabase
-      .from('profile_value')
-      .upsert(upserts, { onConflict: 'its_no,field_id' })
-    if (pvErr)
-      return NextResponse.json({ error: pvErr.message }, { status: 500 })
-  } else {
-    const { error: rpcErr } = await supabase.rpc('process_form_submission', {
-      p_form_id: id,
-      p_filled_by: Number(session.its_no),
-      p_responses: normalized,
-    })
-    if (rpcErr)
-      return NextResponse.json({ error: rpcErr.message }, { status: 500 })
-  }
+  // Every submission — simple or detailed — goes through process_form_submission so
+  // that each answer produces a form_responses audit row. Response counts, the
+  // responses view and analytics all read form_responses, so a direct profile_value
+  // write (the old 'simple' path) left self-fill and bulk-fill submissions invisible.
+  // The RPC routes each answer to profile_value / form_responses by profile_field.behavior.
+  const { error: rpcErr } = await supabase.rpc('process_form_submission', {
+    p_form_id: id,
+    p_filled_by: Number(session.its_no),
+    p_responses: normalized,
+  })
+  if (rpcErr)
+    return NextResponse.json({ error: rpcErr.message }, { status: 500 })
 
   return NextResponse.json({ success: true });
 }

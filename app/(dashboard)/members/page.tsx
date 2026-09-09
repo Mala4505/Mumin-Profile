@@ -222,11 +222,11 @@ export default async function MembersPage({ searchParams }: PageProps) {
     <div className="p-4 md:p-6 lg:p-8 max-w-[1600px] mx-auto w-full">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Members</h1>
+          <h1 className="text-2xl font-bold text-foreground">Mumineen</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             {mode === 'idle'
-              ? 'Search or filter to find members'
-              : `${members.length} member${members.length !== 1 ? 's' : ''} found`}
+              ? 'Search or filter to find Mumineen'
+              : `${members.length} Mumin${members.length !== 1 ? 'een' : ''} found`}
           </p>
         </div>
         {session.role !== 'Mumin' && mode === 'loaded' && (

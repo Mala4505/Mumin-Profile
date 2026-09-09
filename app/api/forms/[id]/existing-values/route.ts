@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/getSession'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { isAuthorizedFiller } from '@/lib/forms/checkFillerAccess'
 import type { FillerAccess } from '@/lib/types/forms'
 
@@ -23,6 +24,10 @@ export async function GET(
   if (!session) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const supabase = await createClient()
+  // See audience/route.ts — form_audience has no usable end-user SELECT policy on
+  // the live DB, so scope-filtered reads must go through the service role. This
+  // route still authorizes the caller and re-applies geography scoping in code.
+  const admin = createAdminClient()
 
   // Check form exists + access
   const { data: form, error: formErr } = await supabase
@@ -73,7 +78,7 @@ export async function GET(
   }
 
   // Get role-scoped audience ITS nos (same scope logic as /audience)
-  const { data: audienceRows, error: audErr } = await supabase
+  const { data: audienceRows, error: audErr } = await admin
     .from('form_audience')
     .select('its_no, mumin!inner(sabeel_no, subsector_id)')
     .eq('form_id', id)
@@ -91,7 +96,7 @@ export async function GET(
   if (session.role === 'Masool' && !isAdmin && !isCreator) {
     const sectorIds = (session.sector_ids ?? []).map(Number)
     if (sectorIds.length > 0) {
-      const { data: subs } = await supabase
+      const { data: subs } = await admin
         .from('subsector')
         .select('subsector_id')
         .in('sector_id', sectorIds)

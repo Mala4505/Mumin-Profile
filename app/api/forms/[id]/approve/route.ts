@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/getSession";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { materializeAudience } from "@/lib/forms/materializeAudience";
 import type { AudienceFilters } from "@/lib/types/forms";
 import type { Database } from "@/lib/types/database";
@@ -68,8 +69,11 @@ export async function POST(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Send form_assigned notifications to audience
-  const { data: audience } = await supabase
+  // Send form_assigned notifications to audience. form_audience and the bulk
+  // notifications insert are privileged server operations (no end-user policy on
+  // the live DB) — use the service role, same as the PUT /api/forms/[id] publish path.
+  const admin = createAdminClient();
+  const { data: audience } = await admin
     .from("form_audience")
     .select("its_no")
     .eq("form_id", id);
@@ -84,7 +88,7 @@ export async function POST(
         related_form_id: id,
       }));
 
-    await supabase.from("notifications").insert(notifications);
+    await admin.from("notifications").insert(notifications);
   }
 
   return NextResponse.json({ form: data });

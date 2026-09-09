@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/getSession'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { isAuthorizedFiller } from '@/lib/forms/checkFillerAccess'
 import type { FillerAccess } from '@/lib/types/forms'
 
@@ -112,7 +113,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
   if (respErr) return NextResponse.json({ error: respErr.message }, { status: 500 })
 
-  const { data: audience, error: audErr } = await supabase
+  // form_audience has no usable end-user SELECT policy on the live DB; this route
+  // has already authorized the caller as staff for this form.
+  const { data: audience, error: audErr } = await createAdminClient()
     .from('form_audience')
     .select('its_no, mumin!its_no(name, subsector!subsector_id(name))')
     .eq('form_id', id)

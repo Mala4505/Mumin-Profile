@@ -342,14 +342,14 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
           <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
             <Search className="w-8 h-8 text-muted-foreground" />
           </div>
-          <h3 className="text-base font-semibold text-foreground mb-1">Search to find members</h3>
+          <h3 className="text-base font-semibold text-foreground mb-1">Search to find Mumineen</h3>
           <p className="text-sm text-muted-foreground mb-5">
-            Use the filters above, or load all members you have access to.
+            Use the filters above, or load all Mumineen you have access to.
           </p>
           <a href="/members?show_all=1"
             className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors">
             <Users className="w-4 h-4" />
-            View All Members
+            View All Mumineen
           </a>
         </div>
       </div>
@@ -363,7 +363,7 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
           <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
             <Users className="w-8 h-8 text-muted-foreground" />
           </div>
-          <h3 className="text-base font-semibold text-foreground mb-1">No members found</h3>
+          <h3 className="text-base font-semibold text-foreground mb-1">No Mumineen found</h3>
           <p className="text-sm text-muted-foreground">Try adjusting your filters</p>
         </div>
       </div>
@@ -384,10 +384,10 @@ export function MemberTable({ members, role, mode }: MemberTableProps) {
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-muted/20">
         <span className="text-xs text-muted-foreground font-medium">
           {viewMode === 'sabeel'
-            ? `${sabeelGroups.length} household${sabeelGroups.length !== 1 ? 's' : ''} (${members.length} member${members.length !== 1 ? 's' : ''})`
+            ? `${sabeelGroups.length} household${sabeelGroups.length !== 1 ? 's' : ''} (${members.length} Mumin${members.length !== 1 ? 'een' : ''})`
             : viewMode === 'paci'
-              ? `${paciGroups.length} flat${paciGroups.length !== 1 ? 's' : ''} (${members.length} member${members.length !== 1 ? 's' : ''})`
-              : `${members.length} member${members.length !== 1 ? 's' : ''}`}
+              ? `${paciGroups.length} flat${paciGroups.length !== 1 ? 's' : ''} (${members.length} Mumin${members.length !== 1 ? 'een' : ''})`
+              : `${members.length} Mumin${members.length !== 1 ? 'een' : ''}`}
         </span>
         {isStaff && (
           <div className="flex items-center gap-1 bg-muted/40 rounded-lg p-0.5 border border-border">

@@ -46,7 +46,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: 'MANAGE',
     items: [
-      { label: 'Members', href: ROUTES.MEMBERS, icon: Users, roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid', 'UmoorCoordinator'] },
+      { label: 'Mumineen', href: ROUTES.MEMBERS, icon: Users, roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid', 'UmoorCoordinator'] },
       { label: 'Import', href: ROUTES.IMPORT, icon: Upload, roles: ['SuperAdmin', 'Admin', 'Masool'] },
     ],
   },

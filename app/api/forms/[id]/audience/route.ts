@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/getSession'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { isAuthorizedFiller } from '@/lib/forms/checkFillerAccess'
 import type { FillerAccess } from '@/lib/types/forms'
 
@@ -22,6 +23,12 @@ export async function GET(
   if (!session) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const supabase = await createClient()
+  // form_audience is a privileged server-side list: the live DB has no usable
+  // SELECT policy for end users (same story as its INSERT policy — see
+  // materializeAudience), so a request-scoped read comes back empty and the
+  // filler sees "no audience". Read it with the service role; this route still
+  // authorizes the caller and applies role/geography scoping in app code below.
+  const admin = createAdminClient()
 
   // Load form to check access
   const { data: form, error: formErr } = await supabase
@@ -49,7 +56,7 @@ export async function GET(
   }
 
   // Load all audience members with mumin data
-  const { data: audienceRows, error: audErr } = await supabase
+  const { data: audienceRows, error: audErr } = await admin
     .from('form_audience')
     .select('its_no, mumin!inner(name, sabeel_no, subsector_id)')
     .eq('form_id', id)
@@ -68,7 +75,7 @@ export async function GET(
   if (session.role === 'Masool' && !isAdmin && !isCreator) {
     const sectorIds = (session.sector_ids ?? []).map(Number)
     if (sectorIds.length > 0) {
-      const { data: subs } = await supabase
+      const { data: subs } = await admin
         .from('subsector')
         .select('subsector_id')
         .in('sector_id', sectorIds)

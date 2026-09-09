@@ -7,7 +7,7 @@ export default function MemberNotFound() {
       <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
         <UserX className="w-8 h-8 text-muted-foreground" />
       </div>
-      <h1 className="text-xl font-bold text-foreground mb-1">Member not found</h1>
+      <h1 className="text-xl font-bold text-foreground mb-1">Mumin not found</h1>
       <p className="text-muted-foreground text-sm mb-6">
         This ITS number doesn't exist or you don't have access to it.
       </p>
@@ -15,7 +15,7 @@ export default function MemberNotFound() {
         href="/members"
         className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
       >
-        Back to Members
+        Back to Mumineen
       </Link>
     </div>
   )

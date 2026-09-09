@@ -184,7 +184,7 @@ export function RespondentsTable({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/30">
-                  <th className={TH}>Member</th>
+                  <th className={TH}>Mumin</th>
                   <th className={TH}>Answer</th>
                   <th className={`${TH} hidden sm:table-cell`}>Mobile</th>
                   <th className={`${TH} hidden md:table-cell`}>Sector</th>

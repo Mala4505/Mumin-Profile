@@ -33,7 +33,9 @@ export async function GET(
   if (session.role === 'Mumin') {
     const selfAllowed = fillerAccess?.fillers?.some((f) => f.type === 'self') ?? false
     if (!selfAllowed) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    const { data: inAudience } = await supabase
+    // form_audience has no usable end-user SELECT policy on the live DB — read the
+    // caller's own membership row with the service role.
+    const { data: inAudience } = await createAdminClient()
       .from('form_audience')
       .select('its_no')
       .eq('form_id', id)

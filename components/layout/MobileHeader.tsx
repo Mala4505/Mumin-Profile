@@ -56,7 +56,7 @@ const NAV_ITEMS: NavItem[] = [
     roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid', 'Mumin', 'UmoorCoordinator'],
   },
   {
-    label: 'Members',
+    label: 'Mumineen',
     href: ROUTES.MEMBERS,
     icon: Users,
     roles: ['SuperAdmin', 'Admin', 'Masool', 'Musaid', 'UmoorCoordinator'],
